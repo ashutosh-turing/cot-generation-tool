@@ -24,10 +24,11 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
 
       - name: Deploy via SSH
-        run: |
-          # Deploy using deploy.sh script in the correct project directory
-          gcloud compute ssh v2-cot-intance \
-            --zone us-central1-f \
-            --project turing-gpt \
-            --ssh-key-file ~/.ssh/id_rsa \
-            --command "cd /home/cot-generation-tool && ./deploy.sh deploy"
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.GCP_VM_IP }}
+          username: ${{ secrets.GCP_VM_USER }}
+          key: ${{ secrets.GOOGLE_SSH_MAC_PVT_KEY }}
+          script: |
+            cd /home/cot-generation-tool
+            ./deploy.sh deploy
