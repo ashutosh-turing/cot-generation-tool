@@ -147,77 +147,120 @@ def process_review_colab(data):
         def extract_implementation(content):
             import re
             
+            print(f"DEBUG: Starting code extraction from content of length {len(content)}")
+            
             # Multiple strategies to find implementation code
             implementation_code = ""
             
             # Strategy 1: Look for "Implementation" section headers
             impl_patterns = [
-                r"(#+\s*Implementation[\s\S]+?)(^#+\s|\Z)",
-                r"(#+\s*Code[\s\S]+?)(^#+\s|\Z)",
-                r"(#+\s*Solution[\s\S]+?)(^#+\s|\Z)",
-                r"(#+\s*Answer[\s\S]+?)(^#+\s|\Z)"
+                r"(#+\s*Implementation[\s\S]+?)(?=^#+\s|\Z)",
+                r"(#+\s*Code[\s\S]+?)(?=^#+\s|\Z)",
+                r"(#+\s*Solution[\s\S]+?)(?=^#+\s|\Z)",
+                r"(#+\s*Answer[\s\S]+?)(?=^#+\s|\Z)",
+                r"(#+\s*Final[\s\S]*?Code[\s\S]+?)(?=^#+\s|\Z)"
             ]
             
-            for pattern in impl_patterns:
+            for i, pattern in enumerate(impl_patterns):
                 match = re.search(pattern, content, re.MULTILINE | re.IGNORECASE)
                 if match:
+                    print(f"DEBUG: Found implementation section using pattern {i+1}")
                     section = match.group(1)
                     # Extract code blocks (```...```)
-                    code_blocks = re.findall(r"```(?:python|py|code)?\n?([\s\S]+?)```", section)
+                    code_blocks = re.findall(r"```(?:python|py|code)?\s*\n?([\s\S]+?)```", section)
                     if code_blocks:
                         implementation_code = "\n\n".join(code_blocks)
+                        print(f"DEBUG: Extracted {len(code_blocks)} code blocks from section")
                         break
             
             # Strategy 2: If no section found, extract all code blocks from the entire content
             if not implementation_code:
-                all_code_blocks = re.findall(r"```(?:python|py|code)?\n?([\s\S]+?)```", content)
+                print("DEBUG: No section-based code found, trying all code blocks")
+                all_code_blocks = re.findall(r"```(?:python|py|code)?\s*\n?([\s\S]+?)```", content)
                 if all_code_blocks:
+                    print(f"DEBUG: Found {len(all_code_blocks)} total code blocks")
                     # Filter out very short code blocks (likely examples)
-                    substantial_blocks = [block for block in all_code_blocks if len(block.strip()) > 50]
+                    substantial_blocks = [block for block in all_code_blocks if len(block.strip()) > 30]
                     if substantial_blocks:
                         implementation_code = "\n\n".join(substantial_blocks)
+                        print(f"DEBUG: Using {len(substantial_blocks)} substantial code blocks")
                     else:
                         implementation_code = "\n\n".join(all_code_blocks)
+                        print(f"DEBUG: Using all {len(all_code_blocks)} code blocks")
             
             # Strategy 3: Look for Python code patterns even without code blocks
             if not implementation_code:
-                # Look for lines that start with common Python patterns
-                python_patterns = [
-                    r"^(def\s+\w+.*?)(?=^def\s|\Z)",
-                    r"^(class\s+\w+.*?)(?=^class\s|^def\s|\Z)",
-                    r"^(import\s+.*?)(?=^$|\Z)",
-                    r"^(from\s+.*?)(?=^$|\Z)"
-                ]
-                
+                print("DEBUG: No code blocks found, trying to extract Python patterns")
                 code_lines = []
                 lines = content.split('\n')
                 in_code_block = False
+                current_block = []
                 
                 for line in lines:
-                    # Skip markdown headers and text
-                    if line.strip().startswith('#') and not line.strip().startswith('# '):
+                    # Skip markdown headers but not Python comments
+                    if line.strip().startswith('#') and not line.strip().startswith('# ') and not re.match(r'^\s*#.*', line):
+                        if current_block:
+                            code_lines.extend(current_block)
+                            current_block = []
                         continue
                     
                     # Check if line looks like Python code
-                    if (line.strip() and 
+                    is_python_line = (line.strip() and 
                         (line.startswith('    ') or  # Indented code
                          line.startswith('\t') or   # Tab indented
                          any(line.strip().startswith(keyword) for keyword in 
-                             ['def ', 'class ', 'import ', 'from ', 'if ', 'for ', 'while ', 'try:', 'except:', 'with ']) or
-                         '=' in line and not line.strip().startswith('=') or  # Assignment
+                             ['def ', 'class ', 'import ', 'from ', 'if ', 'for ', 'while ', 'try:', 'except:', 'with ', 'return ', 'print(', 'len(']) or
+                         ('=' in line and not line.strip().startswith('=') and not line.strip().startswith('==')) or  # Assignment
                          line.strip().endswith(':') or  # Control structures
-                         re.match(r'^\s*[a-zA-Z_]\w*\s*\(.*\)\s*$', line.strip()))):  # Function calls
-                        code_lines.append(line)
+                         re.match(r'^\s*[a-zA-Z_]\w*\s*\(.*\)\s*$', line.strip()) or  # Function calls
+                         re.match(r'^\s*[a-zA-Z_]\w*\s*\[.*\]\s*$', line.strip()) or  # Array access
+                         line.strip().startswith('>>> ') or  # Python REPL
+                         line.strip().startswith('... ')))   # Python REPL continuation
+                    
+                    if is_python_line:
+                        current_block.append(line)
                         in_code_block = True
                     elif in_code_block and line.strip() == '':
-                        code_lines.append(line)  # Keep empty lines in code blocks
-                    elif in_code_block and not line.strip().startswith('#'):
+                        current_block.append(line)  # Keep empty lines in code blocks
+                    elif in_code_block and line.strip():
+                        # End of code block
+                        if current_block:
+                            code_lines.extend(current_block)
+                            current_block = []
                         in_code_block = False
+                
+                # Add any remaining code block
+                if current_block:
+                    code_lines.extend(current_block)
                 
                 if code_lines:
                     implementation_code = '\n'.join(code_lines)
+                    print(f"DEBUG: Extracted {len(code_lines)} lines of Python-like code")
             
-            return implementation_code.strip()
+            # Strategy 4: If still no code, look for any substantial text that might be code
+            if not implementation_code:
+                print("DEBUG: No Python patterns found, looking for any substantial code-like content")
+                # Look for lines with common programming constructs
+                potential_code_lines = []
+                for line in content.split('\n'):
+                    if (line.strip() and 
+                        ('{' in line or '}' in line or 
+                         '(' in line and ')' in line or
+                         '[' in line and ']' in line or
+                         '=' in line or
+                         line.count(' ') > 3)):  # Indented or structured text
+                        potential_code_lines.append(line)
+                
+                if len(potential_code_lines) > 5:  # At least 5 lines that look code-like
+                    implementation_code = '\n'.join(potential_code_lines)
+                    print(f"DEBUG: Using {len(potential_code_lines)} potential code lines")
+            
+            result = implementation_code.strip()
+            print(f"DEBUG: Final extracted code length: {len(result)}")
+            if result:
+                print(f"DEBUG: First 200 chars of extracted code: {result[:200]}...")
+            
+            return result
 
         implementation_code = extract_implementation(colab_content)
         
@@ -263,41 +306,88 @@ def process_review_colab(data):
             
             # Try to extract a score from the response with improved regex
             import re
+            
+            print(f"DEBUG: Plagiarism result to parse: {plagiarism_result[:300]}...")
+            
             score_patterns = [
                 r"PLAGIARISM SCORE:\s*(\d{1,3})\s*%",
                 r"Score:\s*(\d{1,3})\s*%",
+                r"Plagiarism\s*Score:\s*(\d{1,3})\s*%",
                 r"(\d{1,3})\s*%\s*plagiarism",
                 r"plagiarism.*?(\d{1,3})\s*%",
+                r"score.*?(\d{1,3})\s*%",
+                r"(\d{1,3})\s*%\s*likelihood",
+                r"likelihood.*?(\d{1,3})\s*%",
+                r"(\d{1,3})\s*percent",
                 r"(\d{1,3})\s*%"
             ]
             
             plagiarism_score = None
-            for pattern in score_patterns:
+            for i, pattern in enumerate(score_patterns):
                 score_match = re.search(pattern, plagiarism_result, re.IGNORECASE)
                 if score_match:
                     try:
                         score = int(score_match.group(1))
                         if 0 <= score <= 100:  # Validate score range
                             plagiarism_score = score
+                            print(f"DEBUG: Found plagiarism score {score}% using pattern {i+1}")
                             break
                     except (ValueError, IndexError):
                         continue
             
             # If no score found, try to infer from text
             if plagiarism_score is None:
+                print("DEBUG: No numeric score found, trying to infer from text")
                 lower_result = plagiarism_result.lower()
-                if any(word in lower_result for word in ['no plagiarism', 'original', 'unique', 'not copied']):
-                    plagiarism_score = 15
-                elif any(word in lower_result for word in ['low', 'minimal', 'slight']):
+                
+                # More comprehensive text analysis
+                if any(phrase in lower_result for phrase in [
+                    'no plagiarism', 'not plagiarized', 'original code', 'unique implementation',
+                    'highly original', 'completely original', 'no copied', 'not copied'
+                ]):
+                    plagiarism_score = 10
+                    print("DEBUG: Inferred very low plagiarism (10%)")
+                elif any(phrase in lower_result for phrase in [
+                    'low plagiarism', 'minimal plagiarism', 'slight similarity', 'mostly original',
+                    'low likelihood', 'unlikely to be copied', 'minor similarities'
+                ]):
                     plagiarism_score = 25
-                elif any(word in lower_result for word in ['moderate', 'some', 'partial']):
+                    print("DEBUG: Inferred low plagiarism (25%)")
+                elif any(phrase in lower_result for phrase in [
+                    'moderate plagiarism', 'some similarities', 'partial copying', 'mixed originality',
+                    'moderate likelihood', 'some copied elements', 'moderate concern'
+                ]):
                     plagiarism_score = 50
-                elif any(word in lower_result for word in ['high', 'likely', 'probable']):
+                    print("DEBUG: Inferred moderate plagiarism (50%)")
+                elif any(phrase in lower_result for phrase in [
+                    'high plagiarism', 'likely copied', 'probable plagiarism', 'significant similarities',
+                    'high likelihood', 'mostly copied', 'substantial copying'
+                ]):
                     plagiarism_score = 75
-                elif any(word in lower_result for word in ['copied', 'plagiarized', 'stolen']):
+                    print("DEBUG: Inferred high plagiarism (75%)")
+                elif any(phrase in lower_result for phrase in [
+                    'definitely copied', 'clearly plagiarized', 'stolen code', 'direct copy',
+                    'very high plagiarism', 'almost certainly copied', 'obvious plagiarism'
+                ]):
                     plagiarism_score = 90
+                    print("DEBUG: Inferred very high plagiarism (90%)")
                 else:
-                    plagiarism_score = 0  # Default to 0 if cannot determine
+                    # Try to find any percentage mentioned in the text
+                    percentage_matches = re.findall(r'(\d{1,3})\s*(?:%|percent)', lower_result)
+                    if percentage_matches:
+                        try:
+                            score = int(percentage_matches[0])
+                            if 0 <= score <= 100:
+                                plagiarism_score = score
+                                print(f"DEBUG: Found percentage {score}% in text")
+                        except ValueError:
+                            pass
+                    
+                    if plagiarism_score is None:
+                        plagiarism_score = 0  # Default to 0 if cannot determine
+                        print("DEBUG: Could not determine plagiarism score, defaulting to 0%")
+            
+            print(f"DEBUG: Final plagiarism score: {plagiarism_score}%")
         else:
             plagiarism_result = "No implementation code found to analyze for plagiarism."
             plagiarism_score = 0

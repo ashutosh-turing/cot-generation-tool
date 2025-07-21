@@ -85,11 +85,7 @@
           </div>
           <div>
             <select name="system_message" id="system_message" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200">
-              {% if system_messages %}
-                {% for sm in system_messages %}
-                  <option value="{{ sm.content|escape }}">{{ sm.name }}</option>
-                {% endfor %}
-              {% endif %}
+              <option value="">None</option>
               <option value="custom">Custom</option>
             </select>
             <div id="custom-system-message-container" class="hidden mt-3">
@@ -226,7 +222,9 @@
     </div>
 
     <!-- Results Section - Full Width at Bottom -->
-    <div id="review-results-section" class="space-y-6">
+    </div>
+    
+    <div id="review-results-section" class="w-full space-y-6 px-4 sm:px-6 lg:px-8 py-8">
       <!-- Results will be dynamically inserted here -->
     </div>
   </div>

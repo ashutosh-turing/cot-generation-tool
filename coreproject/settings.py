@@ -157,9 +157,9 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
     os.path.join(BASE_DIR, 'eval', 'static'),
     os.path.join(BASE_DIR, 'processor', 'static'),
-    os.path.join(BASE_DIR, 'static'),
 ]
 # Add STATIC_ROOT for WhiteNoise
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_v2')
