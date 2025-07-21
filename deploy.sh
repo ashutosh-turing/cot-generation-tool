@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Deployment and rollback script for Django eval project V2
+# Deployment and rollback script for Django eval project V2 (LOCALIZED VERSION)
 # Usage:
 #   ./deploy.sh deploy    # Deploy latest version
 #   ./deploy.sh rollback # Rollback to previous version
@@ -8,7 +8,7 @@
 
 set -e
 
-# V2 Configuration
+# Localized V2 Configuration
 PROJECT_DIR="/var/www/cot-generation-tool"
 DB_PATH="$PROJECT_DIR/db_v2.sqlite3"
 BACKUP_DIR="$PROJECT_DIR/db_backups_v2"
@@ -93,8 +93,8 @@ deploy() {
         --timeout 300 \
         --daemon \
         --pid "$GUNICORN_PID" \
-        --access-logfile /var/log/gunicorn/v2_access.log \
-        --error-logfile /var/log/gunicorn/v2_error.log
+        --access-logfile "$PROJECT_DIR/logs/v2_access.log" \
+        --error-logfile "$PROJECT_DIR/logs/v2_error.log"
 
     sleep 2
     if [ ! -S "$GUNICORN_SOCK" ]; then
@@ -107,9 +107,9 @@ deploy() {
     nohup python3 manage.py process_llm_jobs > logs/llm_jobs_v2.log 2>&1 &
     nohup python3 run_sync_daemon.py > logs/sync_daemon_v2.log 2>&1 &
 
-    # 10. Reload nginx
-    log "Reloading nginx..."
-    sudo nginx -s reload
+    # 10. (Optional) Reload nginx if used locally
+    # log "Reloading nginx..."
+    # sudo nginx -s reload
 
     log "=== V2 deployment completed successfully ==="
 }
