@@ -143,7 +143,7 @@ def process_review_colab(data):
         model_obj = LLMModel.objects.get(id=model_id)
         user = User.objects.get(id=user_id) if user_id else None
 
-        # Extract Implementation section with improved code extraction
+        # Extract Implementation section with multi-language support
         def extract_implementation(content):
             import re
             
@@ -151,6 +151,7 @@ def process_review_colab(data):
             
             # Multiple strategies to find implementation code
             implementation_code = ""
+            detected_language = "unknown"
             
             # Strategy 1: Look for "Implementation" section headers
             impl_patterns = [
@@ -166,8 +167,8 @@ def process_review_colab(data):
                 if match:
                     print(f"DEBUG: Found implementation section using pattern {i+1}")
                     section = match.group(1)
-                    # Extract code blocks (```...```)
-                    code_blocks = re.findall(r"```(?:python|py|code)?\s*\n?([\s\S]+?)```", section)
+                    # Extract code blocks with multi-language support
+                    code_blocks = re.findall(r"```(?:python|py|cpp|c\+\+|c|java|javascript|js|code)?\s*\n?([\s\S]+?)```", section)
                     if code_blocks:
                         implementation_code = "\n\n".join(code_blocks)
                         print(f"DEBUG: Extracted {len(code_blocks)} code blocks from section")
@@ -176,7 +177,7 @@ def process_review_colab(data):
             # Strategy 2: If no section found, extract all code blocks from the entire content
             if not implementation_code:
                 print("DEBUG: No section-based code found, trying all code blocks")
-                all_code_blocks = re.findall(r"```(?:python|py|code)?\s*\n?([\s\S]+?)```", content)
+                all_code_blocks = re.findall(r"```(?:python|py|cpp|c\+\+|c|java|javascript|js|code)?\s*\n?([\s\S]+?)```", content)
                 if all_code_blocks:
                     print(f"DEBUG: Found {len(all_code_blocks)} total code blocks")
                     # Filter out very short code blocks (likely examples)
@@ -188,36 +189,80 @@ def process_review_colab(data):
                         implementation_code = "\n\n".join(all_code_blocks)
                         print(f"DEBUG: Using all {len(all_code_blocks)} code blocks")
             
-            # Strategy 3: Look for Python code patterns even without code blocks
+            # Strategy 3: Detect language and look for language-specific patterns
             if not implementation_code:
-                print("DEBUG: No code blocks found, trying to extract Python patterns")
+                print("DEBUG: No code blocks found, trying to detect language and extract patterns")
+                
+                # Detect programming language from content
+                content_lower = content.lower()
+                if any(keyword in content_lower for keyword in ['#include', 'iostream', 'std::', 'int main', 'cout', 'cin']):
+                    detected_language = "cpp"
+                elif any(keyword in content_lower for keyword in ['def ', 'import ', 'from ', 'print(', 'len(', 'range(']):
+                    detected_language = "python"
+                elif any(keyword in content_lower for keyword in ['public class', 'public static void', 'system.out', 'string[]']):
+                    detected_language = "java"
+                elif any(keyword in content_lower for keyword in ['function', 'console.log', 'var ', 'let ', 'const ']):
+                    detected_language = "javascript"
+                
+                print(f"DEBUG: Detected language: {detected_language}")
+                
                 code_lines = []
                 lines = content.split('\n')
                 in_code_block = False
                 current_block = []
                 
                 for line in lines:
-                    # Skip markdown headers but not Python comments
+                    # Skip markdown headers but preserve code comments
                     if line.strip().startswith('#') and not line.strip().startswith('# ') and not re.match(r'^\s*#.*', line):
                         if current_block:
                             code_lines.extend(current_block)
                             current_block = []
                         continue
                     
-                    # Check if line looks like Python code
-                    is_python_line = (line.strip() and 
-                        (line.startswith('    ') or  # Indented code
-                         line.startswith('\t') or   # Tab indented
-                         any(line.strip().startswith(keyword) for keyword in 
-                             ['def ', 'class ', 'import ', 'from ', 'if ', 'for ', 'while ', 'try:', 'except:', 'with ', 'return ', 'print(', 'len(']) or
-                         ('=' in line and not line.strip().startswith('=') and not line.strip().startswith('==')) or  # Assignment
-                         line.strip().endswith(':') or  # Control structures
-                         re.match(r'^\s*[a-zA-Z_]\w*\s*\(.*\)\s*$', line.strip()) or  # Function calls
-                         re.match(r'^\s*[a-zA-Z_]\w*\s*\[.*\]\s*$', line.strip()) or  # Array access
-                         line.strip().startswith('>>> ') or  # Python REPL
-                         line.strip().startswith('... ')))   # Python REPL continuation
+                    # Check if line looks like code based on detected language
+                    is_code_line = False
                     
-                    if is_python_line:
+                    if detected_language == "cpp":
+                        is_code_line = (line.strip() and 
+                            (line.startswith('    ') or line.startswith('\t') or  # Indented code
+                             any(line.strip().startswith(keyword) for keyword in 
+                                 ['#include', 'using', 'int ', 'float ', 'double ', 'char ', 'bool ', 'void ', 'string ', 'if ', 'for ', 'while ', 'do ', 'switch ', 'case ', 'return ', 'cout', 'cin', 'std::', 'class ', 'struct ', 'namespace ']) or
+                             line.strip().endswith(';') or line.strip().endswith('{') or line.strip().endswith('}') or
+                             ('=' in line and not line.strip().startswith('=')) or
+                             re.match(r'^\s*[a-zA-Z_]\w*\s*\(.*\)\s*[{;]?\s*$', line.strip()) or  # Function declarations/calls
+                             '<<' in line or '>>' in line or  # Stream operators
+                             line.strip() in ['{', '}']))  # Braces
+                    
+                    elif detected_language == "python":
+                        is_code_line = (line.strip() and 
+                            (line.startswith('    ') or line.startswith('\t') or  # Indented code
+                             any(line.strip().startswith(keyword) for keyword in 
+                                 ['def ', 'class ', 'import ', 'from ', 'if ', 'for ', 'while ', 'try:', 'except:', 'with ', 'return ', 'print(', 'len(']) or
+                             ('=' in line and not line.strip().startswith('=') and not line.strip().startswith('==')) or
+                             line.strip().endswith(':') or
+                             re.match(r'^\s*[a-zA-Z_]\w*\s*\(.*\)\s*$', line.strip()) or
+                             re.match(r'^\s*[a-zA-Z_]\w*\s*\[.*\]\s*$', line.strip()) or
+                             line.strip().startswith('>>> ') or line.strip().startswith('... ')))
+                    
+                    elif detected_language == "java":
+                        is_code_line = (line.strip() and 
+                            (line.startswith('    ') or line.startswith('\t') or
+                             any(line.strip().startswith(keyword) for keyword in 
+                                 ['public ', 'private ', 'protected ', 'static ', 'class ', 'interface ', 'if ', 'for ', 'while ', 'do ', 'switch ', 'case ', 'return ', 'System.', 'import ', 'package ']) or
+                             line.strip().endswith(';') or line.strip().endswith('{') or line.strip().endswith('}') or
+                             ('=' in line and not line.strip().startswith('=')) or
+                             line.strip() in ['{', '}']))
+                    
+                    else:  # Generic code detection
+                        is_code_line = (line.strip() and 
+                            (line.startswith('    ') or line.startswith('\t') or
+                             '{' in line or '}' in line or
+                             '(' in line and ')' in line or
+                             '[' in line and ']' in line or
+                             ('=' in line and not line.strip().startswith('=')) or
+                             line.strip().endswith(';') or line.strip().endswith('{') or line.strip().endswith('}')))
+                    
+                    if is_code_line:
                         current_block.append(line)
                         in_code_block = True
                     elif in_code_block and line.strip() == '':
@@ -235,11 +280,11 @@ def process_review_colab(data):
                 
                 if code_lines:
                     implementation_code = '\n'.join(code_lines)
-                    print(f"DEBUG: Extracted {len(code_lines)} lines of Python-like code")
+                    print(f"DEBUG: Extracted {len(code_lines)} lines of {detected_language}-like code")
             
             # Strategy 4: If still no code, look for any substantial text that might be code
             if not implementation_code:
-                print("DEBUG: No Python patterns found, looking for any substantial code-like content")
+                print("DEBUG: No language-specific patterns found, looking for any substantial code-like content")
                 # Look for lines with common programming constructs
                 potential_code_lines = []
                 for line in content.split('\n'):
@@ -247,8 +292,9 @@ def process_review_colab(data):
                         ('{' in line or '}' in line or 
                          '(' in line and ')' in line or
                          '[' in line and ']' in line or
-                         '=' in line or
-                         line.count(' ') > 3)):  # Indented or structured text
+                         '=' in line or ';' in line or
+                         line.count(' ') > 3 or  # Indented or structured text
+                         line.startswith('    ') or line.startswith('\t'))):  # Indented lines
                         potential_code_lines.append(line)
                 
                 if len(potential_code_lines) > 5:  # At least 5 lines that look code-like
@@ -257,6 +303,7 @@ def process_review_colab(data):
             
             result = implementation_code.strip()
             print(f"DEBUG: Final extracted code length: {len(result)}")
+            print(f"DEBUG: Detected language: {detected_language}")
             if result:
                 print(f"DEBUG: First 200 chars of extracted code: {result[:200]}...")
             
