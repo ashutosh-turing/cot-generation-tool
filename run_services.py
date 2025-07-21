@@ -8,19 +8,33 @@ def run_command(command, name):
     return subprocess.Popen(command, shell=True, stdout=sys.stdout, stderr=sys.stderr)
 
 def main():
-    # Ensure the virtual environment is activated
-    venv_path = os.path.join(os.path.dirname(__file__), 'bin', 'activate')
+    import argparse
     
-    # Commands to run - Updated for polling-based architecture
-    commands = {
-        "gunicorn": f"source {venv_path} && gunicorn coreproject.wsgi:application --bind 127.0.0.1:8000",
-        "sync_daemon": f"source {venv_path} && python run_sync_daemon.py",
-        "llm_jobs": f"source {venv_path} && python manage.py process_llm_jobs"
-    }
+    parser = argparse.ArgumentParser(description='Run services for the evaluation system')
+    parser.add_argument('--mode', choices=['dev', 'production'], default='dev',
+                       help='Mode to run services in (dev or production)')
+    args = parser.parse_args()
+    
+    # Get the Python executable from the virtual environment
+    venv_python = os.path.join(os.path.dirname(__file__), 'bin', 'python')
+    
+    if args.mode == 'dev':
+        # Development mode - run all services including gunicorn
+        commands = {
+            "gunicorn": f"{venv_python} -m gunicorn coreproject.wsgi:application --bind 127.0.0.1:8000",
+            "sync_daemon": f"{venv_python} run_sync_daemon.py",
+            "llm_jobs": f"{venv_python} manage.py process_llm_jobs"
+        }
+    else:
+        # Production mode - only run background services (gunicorn handled by deploy.sh)
+        commands = {
+            "sync_daemon": f"{venv_python} run_sync_daemon.py",
+            "llm_jobs": f"{venv_python} manage.py process_llm_jobs"
+        }
     
     processes = {}
     try:
-        print("Starting services for polling-based architecture...")
+        print(f"Starting services for polling-based architecture in {args.mode} mode...")
         for name, cmd in commands.items():
             processes[name] = run_command(cmd, name)
         

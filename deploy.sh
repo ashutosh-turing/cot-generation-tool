@@ -106,6 +106,20 @@ deploy() {
     log "Starting background services for V2..."
     nohup python3 manage.py process_llm_jobs > logs/llm_jobs_v2.log 2>&1 &
     nohup python3 run_sync_daemon.py > logs/sync_daemon_v2.log 2>&1 &
+    
+    # Verify services are running
+    sleep 3
+    if pgrep -f "process_llm_jobs" > /dev/null; then
+        log "✓ LLM job processing service is running"
+    else
+        log "⚠ WARNING: LLM job processing service may not be running"
+    fi
+    
+    if pgrep -f "run_sync_daemon" > /dev/null; then
+        log "✓ Sync daemon service is running"
+    else
+        log "⚠ WARNING: Sync daemon service may not be running"
+    fi
 
     # 10. (Optional) Reload nginx if used locally
     # log "Reloading nginx..."
