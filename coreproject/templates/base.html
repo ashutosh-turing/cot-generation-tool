@@ -355,6 +355,15 @@
             </div>
         </div>
         
+        <!-- DEBUG: User Info -->
+        <div style="background: #ffeeba; color: #856404; padding: 8px; margin: 8px 0; border-radius: 4px;">
+            <strong>DEBUG:</strong>
+            username={{ user.username }} |
+            is_staff={{ user.is_staff }} |
+            is_superuser={{ user.is_superuser }} |
+            groups={[{% for g in user.groups.all %}{{ g.name }}{% if not forloop.last %}, {% endif %}{% endfor %}]}
+        </div>
+        
         <!-- Menu Items -->
         <div class="p-2">
             <p class="section-header menu-text">Main Menu</p>
