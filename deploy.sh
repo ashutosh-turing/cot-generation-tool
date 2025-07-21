@@ -9,7 +9,7 @@
 set -e
 
 # V2 Configuration
-PROJECT_DIR="/home/cot/v2/eval"
+PROJECT_DIR="/var/www/cot-generation-tool"
 DB_PATH="$PROJECT_DIR/db_v2.sqlite3"
 BACKUP_DIR="$PROJECT_DIR/db_backups_v2"
 COMMIT_FILE="$PROJECT_DIR/last_deploy_commit_v2.txt"
