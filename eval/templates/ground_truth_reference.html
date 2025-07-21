@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ground Truth Validation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <style>
+        /* Basic Reset */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        /* File Upload Area */
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 24px;
+            transition: background-color 0.2s;
+        }
+        
+        .upload-area:hover {
+            background-color: #f9f9f9;
+        }
+        
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            color: #888;
+            margin: 0 auto 10px;
+        }
+        
+        .upload-text {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .upload-hint {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* Error Message */
+        .error-message {
+            background-color: #fff3f3;
+            border-left: 4px solid #f56565;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .error-icon {
+            width: 20px;
+            height: 20px;
+            color: #f56565;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        
+        .error-text {
+            color: #c53030;
+            font-size: 14px;
+        }
+        
+        /* Config Form */
+        .config-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
+        @media (max-width: 768px) {
+            .config-form {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #444;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+        }
+        
+        /* Button Styles */
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            font-weight: 500;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: #3182ce;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2b6cb0;
+        }
+        
+        .btn-primary:disabled {
+            background-color: #90cdf4;
+            cursor: not-allowed;
+        }
+        
+        .btn-success {
+            background-color: #38a169;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #2f855a;
+        }
+        
+        .btn-block {
+            display: block;
+            width: 100%;
+        }
+        
+        /* Progress Bar */
+        .progress-container {
+            margin-bottom: 24px;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .progress-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #3182ce;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background-color: #cae6f6;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-value {
+            height: 100%;
+            background-color: #3182ce;
+            transition: width 0.3s ease;
+        }
+        
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 24px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background-color: #f7fafc;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: #4a5568;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+        }
+        
+        th:hover {
+            background-color: #edf2f7;
+        }
+        
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+            color: #4a5568;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        
+        .cell-content {
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+        }
+        
+        .pagination-info {
+            font-size: 14px;
+            color: #4a5568;
+        }
+        
+        .pagination-controls {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .page-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 12px;
+            border: 1px solid #e2e8f0;
+            background-color: white;
+            color: #4a5568;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .page-btn:hover {
+            background-color: #f7fafc;
+        }
+        
+        .page-btn.active {
+            background-color: #ebf5ff;
+            border-color: #3182ce;
+            color: #2b6cb0;
+            z-index: 1;
+        }
+        
+        .page-btn:disabled {
+            color: #cbd5e0;
+            cursor: not-allowed;
+        }
+        
+        .page-btn:first-child {
+            border-top-left-radius: 4px;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .page-btn:last-child {
+            border-top-right-radius: 4px;
+            border-bottom-right-radius: 4px;
+        }
+        
+        /* Results Header */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        /* Hidden Elements */
+        .hidden {
+            display: none;
+        }
+        
+        /* Sortable Headers */
+        .sort-icon {
+            margin-left: 5px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ground Truth Validation</h1>
+        
+        <!-- File Upload Section -->
+        <div id="upload-area" class="upload-area">
+            <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <input type="file" id="csv-file" accept=".csv" class="hidden">
+            <p class="upload-text" id="upload-text">Drag and drop a CSV file, or click to select</p>
+            <p class="upload-hint">CSV must include "prompt" and "ground_truth" columns</p>
+        </div>
+        
+        <!-- Error Message -->
+        <div id="error-container" class="error-message hidden">
+            <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
+            <p id="error-text" class="error-text"></p>
+        </div>
+        
+        <!-- File Preview Section -->
+        <div id="preview-section" class="hidden">
+            <h2>Preview (first 5 rows)</h2>
+            <div class="table-container">
+                <table id="preview-table">
+                    <thead id="preview-thead"></thead>
+                    <tbody id="preview-tbody"></tbody>
+                </table>
+            </div>
+            <p id="row-count" class="upload-hint"></p>
+        </div>
+        
+        <!-- Configuration Section -->
+        <div id="config-section" class="hidden">
+            <div class="config-form">
+                <div class="form-group">
+                    <label for="model-select" class="form-label">Select Model</label>
+                    <select id="model-select" class="form-control">
+                        <!-- Will be populated via JavaScript -->
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="num-replies" class="form-label">Number of Replies per Prompt (1-5)</label>
+                    <input type="number" id="num-replies" class="form-control" min="1" max="5" value="1">
+                </div>
+            </div>
+            
+            <button id="run-button" class="btn btn-primary btn-block">Run Validation</button>
+        </div>
+        
+        <!-- Progress Section -->
+        <div id="progress-section" class="progress-container hidden">
+            <div class="progress-header">
+                <span class="progress-label">Processing Prompts</span>
+                <span id="progress-percentage" class="progress-label">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div id="progress-value" class="progress-value" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <!-- Results Section -->
+        <div id="results-section" class="hidden">
+            <div class="results-header">
+                <h2>Results</h2>
+                <button id="download-button" class="btn btn-success">Download CSV</button>
+            </div>
+            
+            <div class="table-container">
+                <table id="results-table">
+                    <thead id="results-thead"></thead>
+                    <tbody id="results-tbody"></tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <div id="pagination" class="pagination hidden">
+                <div class="pagination-info">
+                    Showing page <span id="current-page-display">1</span> of <span id="total-pages-display">1</span>
+                </div>
+                <div class="pagination-controls" id="pagination-controls">
+                    <!-- Will be populated via JavaScript -->
+                </div>
+            </div>
+            
+            <div style="margin-top: 16px;">
+                <button id="run-again-button" class="btn btn-primary">Run Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let fileData = null;
+        let processedData = null;
+        let file = null;
+        let models = [];
+        let isProcessing = false;
+        let currentPage = 1;
+        let rowsPerPage = 10;
+        let sortField = null;
+        let sortDirection = 'asc';
+
+        // DOM Elements
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('csv-file');
+        const uploadText = document.getElementById('upload-text');
+        const errorContainer = document.getElementById('error-container');
+        const errorText = document.getElementById('error-text');
+        const previewSection = document.getElementById('preview-section');
+        const previewTable = document.getElementById('preview-table');
+        const previewThead = document.getElementById('preview-thead');
+        const previewTbody = document.getElementById('preview-tbody');
+        const rowCount = document.getElementById('row-count');
+        const configSection = document.getElementById('config-section');
+        const modelSelect = document.getElementById('model-select');
+        const numReplies = document.getElementById('num-replies');
+        const runButton = document.getElementById('run-button');
+        const progressSection = document.getElementById('progress-section');
+        const progressPercentage = document.getElementById('progress-percentage');
+        const progressValue = document.getElementById('progress-value');
+        const resultsSection = document.getElementById('results-section');
+        const downloadButton = document.getElementById('download-button');
+        const resultsTable = document.getElementById('results-table');
+        const resultsThead = document.getElementById('results-thead');
+        const resultsTbody = document.getElementById('results-tbody');
+        const pagination = document.getElementById('pagination');
+        const currentPageDisplay = document.getElementById('current-page-display');
+        const totalPagesDisplay = document.getElementById('total-pages-display');
+        const paginationControls = document.getElementById('pagination-controls');
+        const runAgainButton = document.getElementById('run-again-button');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            fetchModels();
+        });
+
+        function setupEventListeners() {
+            // File Upload
+            uploadArea.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', handleFileUpload);
+            
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                if (e.dataTransfer.files.length) {
+                    const droppedFile = e.dataTransfer.files[0];
+                    if (droppedFile.type === 'text/csv' || droppedFile.name.endsWith('.csv')) {
+                        fileInput.files = e.dataTransfer.files;
+                        handleFileUpload();
+                    } else {
+                        showError('Please upload a CSV file');
+                    }
+                }
+            });
+            
+            // Run Buttons
+            runButton.addEventListener('click', processData);
+            runAgainButton.addEventListener('click', processData);
+            
+            // Download Button
+            downloadButton.addEventListener('click', downloadCsv);
+        }
+
+        function fetchModels() {
+            // This would typically be an API call to your Django backend
+            // For now, we'll use mocked data
+            models = [
+                { id: 'model-1', display_name: 'GPT-4' },
+                { id: 'model-2', display_name: 'Claude 3' },
+                { id: 'model-3', display_name: 'LLaMA-3' }
+            ];
+            
+            populateModelDropdown();
+        }
+
+        function populateModelDropdown() {
+            modelSelect.innerHTML = '';
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.id;
+                option.textContent = model.display_name;
+                modelSelect.appendChild(option);
+            });
+        }
+
+        function handleFileUpload() {
+            if (!fileInput.files || !fileInput.files[0]) return;
+            
+            file = fileInput.files[0];
+            uploadText.textContent = file.name;
+            hideError();
+            resetProcessedData();
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    Papa.parse(e.target.result, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            // Validate CSV format (must have prompt and ground_truth columns)
+                            const headers = results.meta.fields.map(h => h.toLowerCase());
+                            if (!headers.includes('prompt') && !headers.includes('ground_truth')) {
+                                showError('CSV must contain "prompt" and "ground_truth" columns');
+                                fileData = null;
+                                hidePreviewSection();
+                                hideConfigSection();
+                                return;
+                            }
+                            
+                            fileData = results.data;
+                            showPreviewSection();
+                            showConfigSection();
+                        },
+                        error: function(error) {
+                            showError(`CSV parsing error: ${error.message}`);
+                            fileData = null;
+                            hidePreviewSection();
+                            hideConfigSection();
+                        }
+                    });
+                } catch (error) {
+                    showError(`File reading error: ${error.message}`);
+                    fileData = null;
+                    hidePreviewSection();
+                    hideConfigSection();
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function showPreviewSection() {
+            if (!fileData || fileData.length === 0) return;
+            
+            // Clear previous preview
+            previewThead.innerHTML = '';
+            previewTbody.innerHTML = '';
+            
+            // Create header row
+            const headerRow = document.createElement('tr');
+            Object.keys(fileData[0]).forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            previewThead.appendChild(headerRow);
+            
+            // Create data rows (up to 5)
+            const previewData = fileData.slice(0, 5);
+            previewData.forEach(row => {
+                const tr = document.createElement('tr');
+                Object.keys(fileData[0]).forEach(header => {
+                    const td = document.createElement('td');
+                    const value = row[header] || '';
+                    td.textContent = value.length > 50 ? value.substring(0, 50) + '...' : value;
+                    tr.appendChild(td);
+                });
+                previewTbody.appendChild(tr);
+            });
+            
+            rowCount.textContent = `${fileData.length} rows found in file`;
+            previewSection.classList.remove('hidden');
+        }
+
+        function showConfigSection() {
+            configSection.classList.remove('hidden');
+        }
+
+        function hidePreviewSection() {
+            previewSection.classList.add('hidden');
+        }
+
+        function hideConfigSection() {
+            configSection.classList.add('hidden');
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorContainer.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorContainer.classList.add('hidden');
+        }
+
+        function resetProcessedData() {
+            processedData = null;
+            resultsSection.classList.add('hidden');
+            pagination.classList.add('hidden');
+        }
+
+        async function processData() {
+            if (!fileData || fileData.length === 0) {
+                showError('No data to process. Please upload a valid CSV file.');
+                return;
+            }
+            
+            const selectedModel = modelSelect.value;
+            if (!selectedModel) {
+                showError('Please select a model');
+                return;
+            }
+            
+            const numRepliesValue = parseInt(numReplies.value, 10);
+            if (isNaN(numRepliesValue) || numRepliesValue < 1 || numRepliesValue > 5) {
+                showError('Number of replies must be between 1 and 5');
+                return;
+            }
+            
+            setProcessingState(true);
+            hideError();
+            resetProcessedData();
+            showProgressBar(0);
+            
+            try {
+                const totalRows = fileData.length;
+                const processedRows = [];
+                
+                for (let i = 0; i < totalRows; i++) {
+                    const row = fileData[i];
+                    const prompt = row.prompt || row.PROMPT; // Case insensitive
+                    const groundTruth = row.ground_truth || row.GROUND_TRUTH; // Case insensitive
+                    
+                    if (!prompt) {
+                        throw new Error(`Row ${i + 1} is missing a prompt`);
+                    }
+                    
+                    // Call generate endpoint (simulated)
+                    const response = await generateReplies(selectedModel, prompt, numRepliesValue);
+                    
+                    // Add replies to the row
+                    const enrichedRow = { ...row };
+                    response.replies.forEach((reply, index) => {
+                        enrichedRow[`reply_${index + 1}`] = reply;
+                    });
+                    
+                    processedRows.push(enrichedRow);
+                    updateProgress(Math.round(((i + 1) / totalRows) * 100));
+                    
+                    // Add a small delay to not freeze the UI
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                
+                processedData = processedRows;
+                showResultsSection();
+            } catch (error) {
+                showError(`Processing error: ${error.message}`);
+            } finally {
+                setProcessingState(false);
+                hideProgressBar();
+            }
+        }
+
+        async function generateReplies(modelId, prompt, numRepliesValue) {
+            // In a real implementation, this would be an API call to your Django backend
+            // For example:
+            /*
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken() // You'd need to implement this
+                },
+                body: JSON.stringify({
+                    model_id: modelId,
+                    prompt: prompt,
+                    n: numRepliesValue,
+                    cache: false
+                })
+            });
+            return await response.json();
+            */
+            
+            // For now, simulating with a delay
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            return {
+                replies: Array.from({ length: numRepliesValue }, (_, i) => 
+                    `Generated reply ${i + 1} for: ${prompt.substring(0, 20)}...`)
+            };
+        }
+
+        function setProcessingState(processing) {
+            isProcessing = processing;
+            runButton.disabled = processing;
+            runAgainButton.disabled = processing;
+            runButton.textContent = processing ? 'Processing...' : 'Run Validation';
+            modelSelect.disabled = processing;
+            numReplies.disabled = processing;
+        }
+
+        function showProgressBar(percent) {
+            progressSection.classList.remove('hidden');
+            updateProgress(percent);
+        }
+
+        function updateProgress(percent) {
+            progressPercentage.textContent = `${percent}%`;
+            progressValue.style.width = `${percent}%`;
+        }
+
+        function hideProgressBar() {
+            progressSection.classList.add('hidden');
+        }
+
+        function showResultsSection() {
+            if (!processedData || processedData.length === 0) return;
+            
+            // Reset pagination
+            currentPage = 1;
+            
+            // Populate results table
+            renderResultsTable();
+            
+            // Show results section
+            resultsSection.classList.remove('hidden');
+        }
+
+        function renderResultsTable() {
+            resultsThead.innerHTML = '';
+            resultsTbody.innerHTML = '';
+            
+            // Create header row with sorting functionality
+            const headerRow = document.createElement('tr');
+            Object.keys(processedData[0]).forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                
+                // Add sort icon if this is the current sort field
+                if (sortField === header) {
+                    const sortIcon = document.createElement('span');
+                    sortIcon.className = 'sort-icon';
+                    sortIcon.textContent = sortDirection === 'asc' ? ' ↑' : ' ↓';
+                    th.appendChild(sortIcon);
+                }
+                
+                // Add click handler for sorting
+                th.addEventListener('click', () => {
+                    if (sortField === header) {
+                        // Toggle direction if already sorting by this field
+                        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        // New sort field
+                        sortField = header;
+                        sortDirection = 'asc';
+                    }
+                    renderResultsTable();
+                });
+                
+                headerRow.appendChild(th);
+            });
+            resultsThead.appendChild(headerRow);
+            
+            // Get sorted data
+            const sortedData = getSortedData();
+            
+            // Get paginated data
+            const paginatedData = getPaginatedData(sortedData);
+            
+            // Create data rows
+            paginatedData.forEach((row, rowIndex) => {
+                const tr = document.createElement('tr');
+                tr.className = rowIndex % 2 === 0 ? '' : 'even-row';
+                
+                Object.keys(processedData[0]).forEach(header => {
+                    const td = document.createElement('td');
+                    const div = document.createElement('div');
+                    div.className = 'cell-content';
+                    
+                    const value = row[header] || '';
+                    div.textContent = value.length > 200 ? value.substring(0, 200) + '...' : value;
+                    
+                    td.appendChild(div);
+                    tr.appendChild(td);
+                });
+                
+                resultsTbody.appendChild(tr);
+            });
+            
+            // Update pagination
+            updatePagination();
+        }
+
+        function getSortedData() {
+            if (!processedData || !sortField) return processedData;
+            
+            return _.orderBy(processedData, [sortField], [sortDirection]);
+        }
+
+        function getPaginatedData(data) {
+            if (!data) return [];
+            
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            return data.slice(startIndex, startIndex + rowsPerPage);
+        }
+
+        function updatePagination() {
+            if (!processedData) return;
+            
+            const totalPages = Math.ceil(processedData.length / rowsPerPage);
+            
+            if (totalPages <= 1) {
+                pagination.classList.add('hidden');
+                return;
+            }
+            
+            // Update page info
+            currentPageDisplay.textContent = currentPage;
+            totalPagesDisplay.textContent = totalPages;
+            
+            // Generate pagination controls
+            paginationControls.innerHTML = '';
+            
+            // Previous button
+            const prevBtn = document.createElement('button');
+            prevBtn.className = 'page-btn';
+            prevBtn.textContent = '«';
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderResultsTable();
+                }
+            });
+            paginationControls.appendChild(prevBtn);
+            
+            // Page buttons
+            const pageButtons = getPaginationRange(currentPage, totalPages);
+            pageButtons.forEach(pageNum => {
+                const pageBtn = document.createElement('button');
+                pageBtn.className = 'page-btn';
+                if (pageNum === currentPage) {
+                    pageBtn.classList.add('active');
+                }
+                pageBtn.textContent = pageNum;
+                pageBtn.addEventListener('click', () => {
+                    currentPage = pageNum;
+                    renderResultsTable();
+                });
+                paginationControls.appendChild(pageBtn);
+            });
+            
+            // Next button
+            const nextBtn = document.createElement('button');
+            nextBtn.className = 'page-btn';
+            nextBtn.textContent = '»';
+            nextBtn.disabled = currentPage === totalPages;
+            nextBtn.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderResultsTable();
+                }
+            });
+            paginationControls.appendChild(nextBtn);
+            
+            // Show pagination
+            pagination.classList.remove('hidden');
+        }
+
+        function getPaginationRange(currentPage, totalPages) {
+            // Show 5 pages max
+            if (totalPages <= 5) {
+                return Array.from({ length: totalPages }, (_, i) => i + 1);
+            } else if (currentPage >= totalPages - 2) {
+                return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+            } else {
+                return [currentPage - 2, currentPage - 1, currentPage, currentPage + 1, currentPage + 2];
+            } (currentPage <= 3) {
+                return [1, 2, 3, 4, 5];
+            } else if

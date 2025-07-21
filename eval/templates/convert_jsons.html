@@ -1,0 +1,366 @@
+{% extends 'index.html' %}
+
+{% block content %}
+
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-3xl font-bold mb-4 border-b pb-2">File Upload</h2>
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded">
+            <div class="flex items-center">
+                <svg class="h-6 w-6 text-yellow-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <p class="text-sm text-yellow-700 ml-3">
+                    Please note: Maximum allowed file size is 100MB. For larger files.
+                </p>
+            </div>
+        </div>
+        <form action="{% url 'bulk_upload' %}" method="post" enctype="multipart/form-data" class="space-y-4" id="bulkUploadForm">
+            {% csrf_token %}
+            <div class="flex flex-col space-y-2">
+                <label for="files" class="text-gray-700 font-medium">Choose multiple .py or .json files (max 100MB each):</label>
+                <input type="file" 
+                       name="files" 
+                       id="files" 
+                       multiple
+                       accept=".py,.json"
+                       onchange="validateBulkFiles(this)"
+                       class="block w-full text-sm text-gray-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-md file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-blue-50 file:text-blue-700
+                              hover:file:bg-blue-100
+                              cursor-pointer">
+            </div>
+            
+            <div id="bulkProgressBar" class="hidden mt-4">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div class="bg-blue-600 h-2.5 rounded-full" style="width: 0%" id="bulkProgress"></div>
+                </div>
+                <p id="bulkProgressText" class="text-sm text-gray-600 mt-2"></p>
+            </div>
+
+            <button type="submit" 
+                    id="bulkUploadButton"
+                    disabled
+                    class="mt-4 w-full bg-blue-500 hover:bg-blue-600 
+                           text-white font-medium py-2 px-4 
+                           rounded-md transition duration-200 opacity-50">
+                Upload Files
+            </button>
+        </form>
+
+        <script>
+            function validateBulkFiles(input) {
+                const maxSize = 100 * 1024 * 1024; // 100MB
+                const allowedExtensions = ['.py', '.json'];
+                const button = document.getElementById('bulkUploadButton');
+                let valid = true;
+
+                Array.from(input.files).forEach(file => {
+                    const extension = '.' + file.name.split('.').pop().toLowerCase();
+                    if (!allowedExtensions.includes(extension)) {
+                        alert(`File ${file.name} is not a .py or .json file`);
+                        valid = false;
+                    }
+                    if (file.size > maxSize) {
+                        alert(`File ${file.name} exceeds 100MB limit`);
+                        valid = false;
+                    }
+                });
+
+                if (!valid) {
+                    input.value = '';
+                }
+                button.disabled = !valid || input.files.length === 0;
+                button.classList.toggle('opacity-50', !valid || input.files.length === 0);
+            }
+        </script>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold">Uploaded Files</h3>
+            <div class="flex items-center space-x-4">
+                <button onclick="toggleVisibility('uploadedFiles')" class="text-black hover:text-gray-800 flex items-center">
+                    <svg class="w-5 h-5 mr-1 expand-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    <span>Expand</span>
+                </button>
+                {% if files %}
+                <form action="{% url 'delete_all_files' %}" method="POST" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" 
+                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md"
+                            onclick="return confirm('Are you sure you want to delete all files?')">
+                        Delete All
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        <div id="uploadedFiles" class="hidden">
+            {% if files %}
+                <div class="grid grid-cols-1 gap-4">
+                    {% for file in files %}
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition duration-200">
+                            <span class="text-gray-700">{{ file.name }}</span>
+                            <div class="flex space-x-4">
+                                <a href="{{ file.url }}" 
+                                   class="text-blue-500 hover:text-blue-600"
+                                   download>
+                                    Download
+                                </a>
+                                <form action="{% url 'delete_file' file.name %}" method="POST" class="inline-block">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-red-500 hover:text-white hover:bg-red-500 p-1 px-2 rounded transition-colors">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-500 text-center py-4">No files uploaded yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold">Uploaded Python Files</h3>
+            <button onclick="toggleVisibility('uploadedPythonFiles')" class="expand-button">
+                <svg class="w-5 h-5 expand-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+                <span>Show Files</span>
+            </button>
+        </div>
+        <div id="uploadedPythonFiles" class="hidden">
+            <!-- Added "Select All" Option -->
+            <div class="flex items-center mb-4">
+                <input type="checkbox" id="selectAllPython" onclick="toggleSelectAll(this)" class="mr-2 text-black rounded border-gray-300 focus:ring-black">
+                <label for="selectAllPython" class="text-gray-700">Select All</label>
+            </div>
+
+            <form action="{% url 'convert_to_json' %}" method="POST" id="convertForm" onsubmit="return validateForm()">
+                {% csrf_token %}
+                {% if files %}
+                    <div class="grid grid-cols-1 gap-4 mb-4">
+                        {% for file in files %}
+                            {% if file.name|lower|slice:"-3:" == '.py' %}
+                                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" 
+                                               name="selected_files" 
+                                               value="{{ file.name }}"
+                                               class="file-checkbox mr-4 text-black rounded border-gray-300 focus:ring-black"
+                                               onclick="checkSelected()">
+                                        <span class="text-gray-700">{{ file.name }}</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div id="conversionProgress" class="hidden mb-4">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-green-600 h-2.5 rounded-full" style="width: 0%" id="progress"></div>
+                        </div>
+                        <p id="statusText" class="text-sm text-gray-600 mt-2"></p>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" 
+                                id="convertButton"
+                                disabled
+                                class="bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-md opacity-50 transition duration-200">
+                            Convert Selected to JSON
+                        </button>
+                    </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold">Available JSON Files</h3>
+            <div class="flex space-x-4">
+                {% if converted_files %}
+                <button onclick="downloadAllJsons()" 
+                        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition duration-200 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Download All JSONs
+                </button>
+                <button onclick="toggleVisibility('availableJsonFiles')" 
+                        class="bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-md transition duration-200 flex items-center">
+                    <svg class="w-5 h-5 mr-2 expand-icon transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                    Show Files
+                </button>
+                <form action="{% url 'delete_all_converted_jsons' %}" method="POST" class="inline">
+                     {% csrf_token %}
+                     <button type="submit" 
+                             class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition duration-200 flex items-center"
+                             onclick="return confirm('Are you sure you want to delete all JSON files?')">
+                         Delete All JSONs
+                     </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        <div id="availableJsonFiles" class="hidden">
+            {% if converted_files %}
+                <div class="grid grid-cols-1 gap-4">
+                    {% for file in converted_files %}
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition duration-200">
+                            <span class="text-gray-700 font-medium">{{ file.name }}</span>
+                            <div class="flex items-center space-x-4">
+                                <a href="{{ file.url }}" 
+                                   class="text-blue-500 hover:text-blue-600 flex items-center"
+                                   download>
+                                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    Download
+                                </a>
+                                <form action="{% url 'delete_file' file.name %}" method="POST" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" 
+                                            class="text-red-500 hover:text-red-600 flex items-center"
+                                            onclick="return confirm('Are you sure you want to delete this file?')">
+                                        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-500 text-center py-4">No converted JSON files available.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+const convertedFiles = [
+    {% if converted_files %}
+        {% for file in converted_files %}
+            { url: "{{ file.url }}", name: "{{ file.name }}" },
+        {% endfor %}
+    {% endif %}
+];
+
+function downloadAllJsons() {
+    convertedFiles.forEach(file => {
+        const link = document.createElement('a');
+        link.href = file.url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+}
+</script>
+
+<style>
+    .expand-icon, .collapse-icon {
+        transition: transform 0.3s ease;
+    }
+    .expand-button {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        font-weight: 500;
+        background-color: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        transition: all 0.2s ease;
+    }
+    .expand-button:hover {
+        background-color: #e5e7eb;
+    }
+    .expand-button svg {
+        margin-right: 0.5rem;
+    }
+    .rotate-180 {
+        transform: rotate(180deg);
+    }
+</style>
+
+<script>
+function validateFileSize(input) {
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (input.files[0].size > maxSize) {
+        alert('File size cannot exceed 100MB');
+        input.value = '';
+    }
+}
+
+document.getElementById('uploadForm').onsubmit = function() {
+    const fileInput = document.getElementById('file');
+    if (fileInput.files.length > 0) {
+        document.getElementById('progressBar').classList.remove('hidden');
+        document.getElementById('progressText').textContent = 'Uploading...';
+    }
+};
+
+document.getElementById('convertForm').addEventListener('submit', function(e) {
+    const selected = document.querySelectorAll('input[name="selected_files"]:checked');
+    if (selected.length === 0) {
+        e.preventDefault();
+        alert('Please select at least one file to convert');
+    }
+});
+
+function checkSelected() {
+    const selected = document.querySelectorAll('input[name="selected_files"]:checked');
+    const button = document.getElementById('convertButton');
+    button.disabled = selected.length === 0;
+    button.classList.toggle('opacity-50', selected.length === 0);
+}
+
+function validateForm() {
+    document.getElementById('conversionProgress').classList.remove('hidden');
+    document.getElementById('statusText').textContent = 'Converting files...';
+    document.getElementById('convertButton').disabled = true;
+    return true;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    checkSelected();
+});
+
+function toggleVisibility(id) {
+    const element = document.getElementById(id);
+    const button = document.querySelector(`[onclick="toggleVisibility('${id}')"]`);
+    const expandIcon = button.querySelector('.expand-icon');
+    const buttonText = button.querySelector('span');
+
+    element.classList.toggle('hidden');
+    expandIcon.classList.toggle('rotate-180');
+    buttonText.textContent = element.classList.contains('hidden') ? 'Show Files' : 'Hide Files';
+}
+
+function toggleSelectAll(source) {
+    const checkboxes = document.querySelectorAll('.file-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = source.checked;
+    });
+    checkSelected();
+}
+
+function checkSelected() {
+    const selected = document.querySelectorAll('input[name="selected_files"]:checked');
+    const button = document.getElementById('convertButton');
+    button.disabled = selected.length === 0;
+    button.classList.toggle('opacity-50', selected.length === 0);
+}
+</script>
+{% endblock %}

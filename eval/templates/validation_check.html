@@ -1,0 +1,487 @@
+{% extends 'index.html' %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-2xl font-bold mb-6">Validation Check</h2>
+    <p class="text-gray-600 mb-4">Select JSON files to check their validation.</p>
+
+    <!-- JSON Files Section -->
+    <div class="mt-8 bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Available JSON Files</h3>
+            <button onclick="toggleVisibility('jsonFiles')" class="expand-button bg-blue-50 hover:bg-blue-100 text-blue-600 p-1 px-2 rounded transition-colors">
+                <svg class="w-5 h-5 expand-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+                <span>Show Files</span>
+            </button>
+        </div>
+        <div id="jsonFiles" class="hidden">
+            {% if converted_files %}
+                <div class="grid grid-cols-1 gap-4">
+                    <!-- Select All Checkbox -->
+                    <div class="flex items-center justify-between p-4 bg-gray-100 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" 
+                                   id="selectAllJson"
+                                   onchange="toggleAllJsons(this)"
+                                   class="w-4 h-4 text-black rounded border-gray-300 focus:ring-black">
+                            <label for="selectAllJson" class="text-gray-700 font-semibold">Select All</label>
+                        </div>
+                    </div>
+                    {% for file in converted_files %}
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <input type="checkbox" 
+                                       name="json_files" 
+                                       value="{{ file.name }}"
+                                       id="json_{{ file.name }}"
+                                       class="w-4 h-4 text-black rounded border-gray-300 focus:ring-black">
+                                <label for="json_{{ file.name }}" class="text-gray-700">{{ file.name }}</label>
+                            </div>
+                            <div class="flex space-x-4">
+                                <a href="{{ file.url }}" 
+                                   class="text-blue-500 hover:text-blue-600"
+                                   download>
+                                    Download
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <script>
+                    function toggleAllJsons(checkbox) {
+                        const checkboxes = document.querySelectorAll('input[name="json_files"]');
+                        checkboxes.forEach(box => box.checked = checkbox.checked);
+                    }
+                </script>
+            {% else %}
+                <p class="text-gray-500 text-center py-4">No JSON files available.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Model Selection Section -->
+    <div class="mt-8 bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Model Selection</h3>
+            <button onclick="toggleVisibility('modelSelection')" class="expand-button bg-blue-50 hover:bg-blue-100 text-blue-600 p-1 px-2 rounded transition-colors">
+                <svg class="w-5 h-5 expand-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+                <span>Show Models</span>
+            </button>
+        </div>
+        <div id="modelSelection" class="hidden">
+            <div class="form-group mb-4">
+                <label for="model-select" class="block text-sm font-medium text-gray-700 mb-2">Select Model for Validation</label>
+                <select id="model-select" class="block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Default Model</option>
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="claude-3-opus">Claude 3 Opus</option>
+                    <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                    <option value="claude-3-haiku">Claude 3 Haiku</option>
+                    <option value="llama-3-70b">Llama 3 70B</option>
+                </select>
+                <p class="mt-1 text-sm text-gray-500">The model that will be used to generate replies for validation</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Validation Rules Section -->
+    <div class="mt-8 bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Validation Rules</h3>
+            <button onclick="toggleVisibility('validationRules')" class="expand-button bg-blue-50 hover:bg-blue-100 text-blue-600 p-1 px-2 rounded transition-colors">
+                <svg class="w-5 h-5 expand-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+                <span>Show Rules</span>
+            </button>
+        </div>
+        <div id="validationRules" class="hidden">
+            {% if validations %}
+                <div class="grid grid-cols-1 gap-4">
+                    {% for validation in validations %}
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <input type="checkbox" 
+                                       name="validation_rules" 
+                                       value="{{ validation.validation_id }}"
+                                       id="validation_{{ validation.validation_id }}"
+                                       class="w-4 h-4 text-black rounded border-gray-300 focus:ring-black">
+                                <div>
+                                    <label for="validation_{{ validation.validation_id }}" class="text-gray-700 font-medium">{{ validation.name }}</label>
+                                    {% if validation.description %}
+                                        <p class="text-sm text-gray-500">{{ validation.description }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-500 text-center py-4">No validation rules available.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Action Button -->
+    <div class="mt-6 flex justify-end">
+        <button onclick="performValidation()" 
+                class="bg-black text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition-colors duration-200">
+            Run Validation
+        </button>
+    </div>
+
+    <!-- Results Section -->
+    <div id="validationResults" class="mt-8 bg-white rounded-lg shadow p-6 hidden">
+        <h3 class="text-xl font-bold mb-4">Validation Results</h3>
+        <div id="resultsContent" class="space-y-4">
+            <!-- Results will be populated here -->
+        </div>
+    </div>
+</div>
+
+<style>
+    .expand-icon {
+        transition: transform 0.3s ease;
+    }
+    .expand-button {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        background-color: #f3f4f6;
+        border: 1px solid #e5e7eb;
+    }
+    .expand-button:hover {
+        background-color: #e5e7eb;
+    }
+    .expand-button svg {
+        margin-right: 0.5rem;
+    }
+    .rotate-180 {
+        transform: rotate(180deg);
+    }
+    .validation-success {
+        background-color: #f0fdf4;
+        border-left: 4px solid #22c55e;
+        padding: 1rem;
+    }
+    .validation-error {
+        background-color: #fef2f2;
+        border-left: 4px solid #ef4444;
+        padding: 1rem;
+    }
+    .hidden {
+        display: none !important;
+    }
+    
+    /* Model reply styling */
+    .whitespace-pre-wrap {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+</style>
+
+<script>
+function toggleVisibility(id) {
+    const element = document.getElementById(id);
+    const button = document.querySelector(`[onclick="toggleVisibility('${id}')"]`);
+    const expandIcon = button.querySelector('.expand-icon');
+    const buttonText = button.querySelector('span');
+
+    element.classList.toggle('hidden');
+    expandIcon.classList.toggle('rotate-180');
+    buttonText.textContent = element.classList.contains('hidden') ? 'Show Files' : 'Hide Files';
+}
+
+function performValidation() {
+    const selectedFiles = document.querySelectorAll('input[name="json_files"]:checked');
+    const selectedValidations = document.querySelectorAll('input[name="validation_rules"]:checked');
+    
+    if (selectedFiles.length === 0) {
+        alert('Please select at least one JSON file to validate.');
+        return;
+    }
+    
+    if (selectedValidations.length === 0) {
+        alert('Please select at least one validation rule.');
+        return;
+    }
+    
+    // Get selected model if available
+    const modelSelect = document.getElementById('model-select');
+    const selectedModel = modelSelect ? modelSelect.value : null;
+    
+    const fileNames = Array.from(selectedFiles).map(checkbox => checkbox.value);
+    const validationIds = Array.from(selectedValidations).map(checkbox => checkbox.value);
+    
+    // Show results section and loading state
+    const resultsSection = document.getElementById('validationResults');
+    const resultsContent = document.getElementById('resultsContent');
+    resultsSection.classList.remove('hidden');
+    resultsContent.innerHTML = '<div class="text-center py-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div><p class="mt-2 text-gray-600">Running validations...</p></div>';
+    
+    fetch('/perform_validation/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            files: fileNames,
+            validations: validationIds,
+            model: selectedModel
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        resultsContent.innerHTML = '';
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display summary stats if available
+        if (data.summary) {
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'mb-6 p-4 bg-gray-50 rounded-lg';
+            summaryDiv.innerHTML = `
+                <h4 class="font-bold text-lg mb-2">Validation Summary</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-green-50 p-3 rounded-lg text-center">
+                        <p class="text-sm text-gray-600">Passed</p>
+                        <p class="font-bold text-green-600 text-xl">${data.summary.passed || 0}</p>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded-lg text-center">
+                        <p class="text-sm text-gray-600">Failed</p>
+                        <p class="font-bold text-red-600 text-xl">${data.summary.failed || 0}</p>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-lg text-center">
+                        <p class="text-sm text-gray-600">Total Files</p>
+                        <p class="font-bold text-blue-600 text-xl">${data.summary.total_files || 0}</p>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded-lg text-center">
+                        <p class="text-sm text-gray-600">Total Validations</p>
+                        <p class="font-bold text-purple-600 text-xl">${data.summary.total_validations || 0}</p>
+                    </div>
+                </div>
+            `;
+            resultsContent.appendChild(summaryDiv);
+        }
+        
+        // Display detailed results for each file
+        data.results.forEach(fileResult => {
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'mb-6';
+                    
+            let validationHtml = '';
+            let passCount = 0;
+            let failCount = 0;
+                    
+            fileResult.validations.forEach(validation => {
+                const statusClass = validation.status === 'success' ? 'validation-success' : 'validation-error';
+                validation.status === 'success' ? passCount++ : failCount++;
+                        
+                // Add model reply if available
+                let modelReplyHtml = '';
+                if (validation.model_reply) {
+                    // Format the model reply to handle long text
+                    const replyText = validation.model_reply;
+                    
+                    // Check if it's a real model reply or just a placeholder
+                    if (replyText.length > 200) {
+                        // For long replies, create a collapsible section
+                        const replyId = `reply-${fileResult.file}-${validation.validation_id}`;
+                        modelReplyHtml = `
+                            <div class="mt-2 bg-gray-50 p-3 rounded text-sm">
+                                <p class="font-semibold mb-1">Model Reply:</p>
+                                <div class="relative">
+                                    <div id="${replyId}-preview" class="text-gray-700">
+                                        ${replyText.substring(0, 200)}...
+                                        <button onclick="toggleModelReply('${replyId}')" class="text-blue-600 hover:text-blue-800 text-xs font-medium ml-1">
+                                            Show more
+                                        </button>
+                                    </div>
+                                    <div id="${replyId}-full" class="hidden text-gray-700 whitespace-pre-wrap">
+                                        ${replyText}
+                                        <button onclick="toggleModelReply('${replyId}')" class="text-blue-600 hover:text-blue-800 text-xs font-medium ml-1">
+                                            Show less
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        // For normal-length replies
+                        modelReplyHtml = `
+                            <div class="mt-2 bg-gray-50 p-3 rounded text-sm">
+                                <p class="font-semibold mb-1">Model Reply:</p>
+                                <p class="text-gray-700 whitespace-pre-wrap">${replyText}</p>
+                            </div>
+                        `;
+                    }
+                }
+                        
+                // Add details section if available
+                let detailsHtml = '';
+                if (validation.details && validation.details.length > 0) {
+                    detailsHtml = `
+                        <div class="mt-2 text-sm">
+                            <button onclick="toggleDetails('details-${fileResult.file}-${validation.validation_id}')" 
+                                    class="text-blue-600 hover:text-blue-800 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                                Show Details
+                            </button>
+                            <div id="details-${fileResult.file}-${validation.validation_id}" class="hidden mt-2 pl-4 border-l-2 border-gray-200">
+                                ${validation.details.map(detail => `<p class="mb-1">${detail}</p>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                validationHtml += `
+                    <div class="${statusClass} mt-2">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <p class="font-semibold">${validation.name}</p>
+                                <p class="text-sm ${validation.status === 'success' ? 'text-green-700' : 'text-red-700'}">${validation.message}</p>
+                                ${modelReplyHtml}
+                                ${detailsHtml}
+                            </div>
+                            <div class="ml-4">
+                                <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${validation.status === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                    ${validation.status === 'success' ? 'PASS' : 'FAIL'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            
+            // Add summary for this file
+            const summaryHtml = `
+                <div class="flex items-center space-x-4 mb-2">
+                    <div class="flex-1">
+                        <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-green-500" style="width: ${fileResult.validations.length > 0 ? (passCount / fileResult.validations.length * 100) : 0}%"></div>
+                        </div>
+                    </div>
+                    <div class="text-sm">
+                        <span class="text-green-600 font-medium">${passCount}</span> / 
+                        <span class="text-red-600 font-medium">${failCount}</span>
+                    </div>
+                </div>
+            `;
+            
+            fileDiv.innerHTML = `
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <div class="font-bold text-lg mb-2 flex items-center">
+                        <svg class="w-5 h-5 mr-2 ${passCount === fileResult.validations.length ? 'text-green-500' : 'text-red-500'}" fill="currentColor" viewBox="0 0 20 20">
+                            ${passCount === fileResult.validations.length ? 
+                                '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' : 
+                                '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>'
+                            }
+                        </svg>
+                        ${fileResult.file}
+                    </div>
+                    ${summaryHtml}
+                    ${validationHtml}
+                </div>
+            `;
+            
+            resultsContent.appendChild(fileDiv);
+        });
+        
+        // Add download results button if there are results
+        if (data.results && data.results.length > 0) {
+            const downloadDiv = document.createElement('div');
+            downloadDiv.className = 'mt-4 text-right';
+            downloadDiv.innerHTML = `
+                <button onclick="downloadResults()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    Download Results
+                </button>
+            `;
+            resultsContent.appendChild(downloadDiv);
+            
+            // Store results in window object for download
+            window.validationResultsData = data;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        resultsContent.innerHTML = `
+            <div class="validation-error">
+                <p class="font-semibold">Error</p>
+                <p class="text-sm text-red-700">${error.message}</p>
+            </div>`;
+    });
+}
+
+function toggleDetails(id) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.classList.toggle('hidden');
+    }
+}
+
+function toggleModelReply(id) {
+    const previewElement = document.getElementById(`${id}-preview`);
+    const fullElement = document.getElementById(`${id}-full`);
+    
+    if (previewElement && fullElement) {
+        previewElement.classList.toggle('hidden');
+        fullElement.classList.toggle('hidden');
+    }
+}
+
+function downloadResults() {
+    if (!window.validationResultsData) return;
+    
+    const data = window.validationResultsData;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `validation-results-${timestamp}.json`;
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

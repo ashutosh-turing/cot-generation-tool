@@ -1,0 +1,756 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Question Analysis - {{ question_id }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Markdown content styling */
+    .markdown-content {
+        line-height: 1.6;
+        color: #374151;
+    }
+    .markdown-content h1,
+    .markdown-content h2,
+    .markdown-content h3,
+    .markdown-content h4,
+    .markdown-content h5,
+    .markdown-content h6 {
+        font-weight: 600;
+        margin-top: 1.5rem;
+        margin-bottom: 0.75rem;
+        color: #1f2937;
+    }
+    .markdown-content h1 { font-size: 1.875rem; }
+    .markdown-content h2 { font-size: 1.5rem; }
+    .markdown-content h3 { font-size: 1.25rem; }
+    .markdown-content h4 { font-size: 1.125rem; }
+    .markdown-content p {
+        margin-bottom: 1rem;
+    }
+    .markdown-content ul,
+    .markdown-content ol {
+        margin-bottom: 1rem;
+        padding-left: 1.5rem;
+    }
+    .markdown-content li {
+        margin-bottom: 0.25rem;
+    }
+    .markdown-content blockquote {
+        border-left: 4px solid #e5e7eb;
+        padding-left: 1rem;
+        margin: 1rem 0;
+        font-style: italic;
+        color: #6b7280;
+    }
+    .markdown-content code {
+        background-color: #f3f4f6;
+        padding: 0.125rem 0.25rem;
+        border-radius: 0.25rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+        color: #dc2626;
+    }
+    .markdown-content pre {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        overflow-x: auto;
+        margin: 1rem 0;
+    }
+    .markdown-content pre code {
+        background-color: transparent;
+        padding: 0;
+        color: #374151;
+    }
+    .markdown-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+    }
+    .markdown-content th,
+    .markdown-content td {
+        border: 1px solid #e5e7eb;
+        padding: 0.5rem;
+        text-align: left;
+    }
+    .markdown-content th {
+        background-color: #f9fafb;
+        font-weight: 600;
+    }
+    .markdown-content a {
+        color: #3b82f6;
+        text-decoration: underline;
+    }
+    .markdown-content a:hover {
+        color: #1d4ed8;
+    }
+    .markdown-content strong {
+        font-weight: 600;
+    }
+    .markdown-content em {
+        font-style: italic;
+    }
+    .prose pre {
+        background-color: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        overflow-x: auto;
+    }
+    .model-result-section {
+        @apply bg-white rounded-2xl shadow-lg overflow-hidden;
+    }
+    .model-result-header {
+        @apply p-4 border-b border-gray-200 flex justify-between items-center;
+    }
+    .model-result-title {
+        @apply text-lg font-bold text-gray-800 flex items-center;
+    }
+    .model-result-content {
+        @apply p-6 prose prose-sm max-w-none;
+        max-height: 20rem;
+        overflow-y: auto;
+    }
+    .dotted-divider {
+        border: none;
+        border-top: 2px dotted #cbd5e1;
+        margin: 1.5rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/marked.min.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Show/hide custom system message textarea
+  const systemMessageSelect = document.getElementById('system_message');
+  const customSystemMessageContainer = document.getElementById('custom-system-message-container');
+  if (systemMessageSelect && customSystemMessageContainer) {
+    systemMessageSelect.addEventListener('change', function() {
+      if (this.value === 'custom') {
+        customSystemMessageContainer.classList.remove('hidden');
+      } else {
+        customSystemMessageContainer.classList.add('hidden');
+      }
+    });
+  }
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- Header Section -->
+    <div class="mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            Question Analysis
+          </h1>
+          <p class="mt-2 text-lg text-gray-600">AI-powered question analysis and insights</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+          <div class="flex items-center space-x-2 px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200">
+            <i class="fas fa-hashtag text-blue-500"></i>
+            <span class="text-sm font-medium text-gray-700">Question ID:</span>
+            <span class="text-sm font-bold text-blue-600">{{ question_id }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if error %}
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md mb-6" role="alert">
+            <p class="font-bold">Error</p>
+            <p>{{ error }}</p>
+        </div>
+    {% endif %}
+
+    <!-- Problem Statement Section - Full Width -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
+      <div class="flex items-center mb-4">
+        <div class="p-2 bg-blue-100 rounded-lg mr-3">
+          <i class="fas fa-question-circle text-blue-600 text-lg"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-800">Problem Statement</h3>
+      </div>
+      
+      <div class="space-y-4">
+        <div>
+          <h4 class="text-md font-semibold text-gray-700 mb-2">{{ problem_title }}</h4>
+          <div class="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-700 text-sm max-h-48 overflow-y-auto">
+            {{ problem_statement }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <form id="analysis-form" method="post" class="space-y-8">
+      {% csrf_token %}
+      
+      <!-- Configuration and References Side by Side -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Left Column - Configuration & LLM Models -->
+        <div class="space-y-6">
+          <!-- Configuration Section -->
+          <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div class="flex items-center mb-4">
+              <div class="p-2 bg-indigo-100 rounded-lg mr-3">
+                <i class="fas fa-cog text-indigo-600 text-lg"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800">Configuration</h3>
+            </div>
+            
+            <div class="space-y-4">
+              <div>
+                <label for="system_message" class="block text-sm font-medium text-gray-700 mb-2">
+                  <i class="fas fa-message mr-1 text-indigo-500"></i>
+                  System Message
+                </label>
+                <div class="relative">
+                  <select name="system_message" id="system_message" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200">
+                    {% for sm in system_messages %}
+                      <option value="{{ sm.content|escape }}" {% if forloop.first %}selected{% endif %}>{{ sm.name }}</option>
+                    {% endfor %}
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <div id="custom-system-message-container" class="hidden mt-3">
+                  <label for="custom_system_message" class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-pen mr-1 text-indigo-500"></i>
+                    Custom System Message
+                  </label>
+                  <textarea name="custom_system_message" id="custom_system_message" rows="3" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 resize-none p-3" placeholder="Enter your custom system message..."></textarea>
+                </div>
+              </div>
+              <hr class="dotted-divider">
+            </div>
+          </div>
+
+          <!-- LLM Models Section -->
+          <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center">
+                <div class="p-2 bg-purple-100 rounded-lg mr-3">
+                  <i class="fas fa-robot text-purple-600 text-lg"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800">LLM Models</h3>
+              </div>
+              <button class="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200" 
+                      id="refresh-models-btn">
+                <i class="fas fa-sync-alt mr-1"></i>
+                Refresh
+              </button>
+            </div>
+            
+            <!-- Temperature Setting -->
+            <div class="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div class="flex items-center justify-between mb-2">
+                <label for="temperature-slider" class="text-sm font-medium text-gray-700">
+                  <i class="fas fa-thermometer-half mr-1 text-orange-500"></i>
+                  Temperature
+                </label>
+                <span id="temperature-value" class="text-sm font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded-full">0.7</span>
+              </div>
+              <input 
+                type="range" 
+                id="temperature-slider" 
+                min="0" 
+                max="2" 
+                step="0.1" 
+                value="0.7" 
+                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
+              <div class="flex justify-between text-xs text-gray-500 mt-1">
+                <span>0.0 (Focused)</span>
+                <span>1.0 (Balanced)</span>
+                <span>2.0 (Creative)</span>
+              </div>
+              <div class="text-xs text-gray-500 mt-2">
+                <i class="fas fa-info-circle mr-1"></i>
+                Controls randomness: lower values for more focused responses, higher for more creative ones.
+              </div>
+            </div>
+            
+            <div id="llm-models-list" class="space-y-3 h-48 overflow-y-auto">
+              {% if llm_models %}
+                {% for model in llm_models %}
+                  {% if model.is_active %}
+                  <label class="flex items-center p-3 rounded-xl hover:bg-gray-50 transition-colors duration-200 cursor-pointer border border-gray-100 hover:border-gray-200">
+                    <input type="checkbox" class="model-checkbox h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" value="{{ model.id }}" data-name="{{ model.name }}" data-temperature="{{ model.temperature }}">
+                    <div class="ml-3 flex-1">
+                      <span class="font-medium text-gray-800">{{ model.name }}</span>
+                      <div class="text-xs text-gray-500 mt-1">Temperature: {{ model.temperature }}</div>
+                    </div>
+                    <span class="text-sm text-blue-600 bg-blue-100 px-2 py-1 rounded-full font-medium">{{ model.provider|default:"AI" }}</span>
+                  </label>
+                  {% endif %}
+                {% endfor %}
+              {% else %}
+                <div class="flex items-center justify-center py-8">
+                  <div class="text-center text-gray-500">
+                    <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+                    <p class="font-medium">No LLM models available</p>
+                    <p class="text-sm">Please contact an administrator</p>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        
+        <!-- Right Column - References & Context -->
+        <div class="space-y-6">
+          <!-- References & Context Section -->
+          <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div class="flex items-center mb-4">
+              <div class="p-2 bg-teal-100 rounded-lg mr-3">
+                <i class="fas fa-link text-teal-600 text-lg"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800">References & Context</h3>
+            </div>
+            
+            <div class="space-y-4">
+              {% if reference_data %}
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  <i class="fas fa-external-link-alt mr-1 text-teal-500"></i>
+                  Reference Links
+                </label>
+                <div class="space-y-2 max-h-48 overflow-y-auto pr-2 border border-gray-200 rounded-xl p-3 bg-gray-50">
+                  {% for ref in reference_data %}
+                    {% if ref.url %}
+                      <a href="{{ ref.url }}" target="_blank" class="group flex items-center p-3 bg-gradient-to-r from-teal-50 to-blue-50 rounded-xl border border-teal-100 hover:border-teal-200 hover:shadow-md transition-all duration-200">
+                        <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center group-hover:bg-teal-200 transition-colors duration-200">
+                          <i class="fas fa-link text-teal-600 text-sm"></i>
+                        </div>
+                        <div class="ml-3 flex-1 min-w-0">
+                          <p class="text-sm font-medium text-teal-800 group-hover:text-teal-900 truncate">
+                            {{ ref.url|truncatechars:50 }}
+                          </p>
+                        </div>
+                        <div class="flex-shrink-0">
+                          <i class="fas fa-external-link-alt text-teal-400 group-hover:text-teal-600 transition-colors duration-200 text-sm"></i>
+                        </div>
+                      </a>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+
+              <div>
+                <label for="additional_context" class="block text-sm font-medium text-gray-700 mb-2">
+                  <i class="fas fa-edit mr-1 text-teal-500"></i>
+                  Additional Context
+                </label>
+                <textarea name="additional_context" id="additional_context" rows="4" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 resize-none" placeholder="Provide context for better analysis (optional)..."></textarea>
+                <div class="text-xs text-gray-500 mt-1">
+                  <i class="fas fa-info-circle mr-1"></i>
+                  This context will be included in the analysis to provide more targeted feedback.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Button -->
+          <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <button class="w-full inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 transform hover:scale-105" 
+                    id="run-analysis" type="submit">
+              <i class="fas fa-play mr-2"></i>
+              Run Analysis
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <!-- Analysis Results - Full Width Section -->
+    <div class="mt-8 space-y-6">
+      <!-- Analysis Status -->
+      <div id="analysis-result" class=""></div>
+      
+      <!-- LLM Results Container - Full Width -->
+      <div id="llm-result-container" class="space-y-6">
+        <!-- Results will be dynamically inserted here -->
+      </div>
+
+      <!-- Transfer to Colab Section -->
+      <div id="transfer-colab-section" class="hidden">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+          <button id="open-colab-modal" class="inline-flex items-center px-4 py-2 text-blue-600 hover:text-blue-800 font-semibold transition-colors duration-200">
+            <i class="fas fa-external-link-alt mr-2"></i> Transfer to Colab
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Transfer to Colab Modal -->
+<div id="colab-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg relative transform transition-all duration-300 scale-95">
+    <button id="close-colab-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+    <div class="flex items-center mb-6">
+      <div class="p-2 bg-blue-100 rounded-lg mr-3">
+        <i class="fab fa-google text-blue-600 text-lg"></i>
+      </div>
+      <h3 class="text-xl font-bold text-gray-900">Transfer to Colab</h3>
+    </div>
+    <form id="colab-transfer-form" class="space-y-5">
+      <div>
+        <label for="colab_url" class="block text-sm font-medium text-gray-700 mb-2">Colab Notebook URL</label>
+        <input type="url" id="colab_url" name="colab_url" placeholder="https://colab.research.google.com/drive/FILE_ID" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200" required>
+        <p class="text-xs text-gray-500 mt-1.5">Enter the URL of your Colab notebook.</p>
+      </div>
+      <div class="flex items-center">
+        <input type="checkbox" id="split_cells" name="split_cells" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <label for="split_cells" class="ml-2 block text-sm text-gray-900">Split into multiple cells</label>
+      </div>
+      <p class="text-xs text-gray-500 -mt-2">Separate cells using "---" (three dashes) in your content.</p>
+      <div class="flex justify-end gap-3 pt-4">
+        <button type="button" id="cancel-colab-modal" class="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition-colors duration-200">Cancel</button>
+        <button type="submit" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 font-medium transition-all duration-200">Transfer</button>
+      </div>
+    </form>
+    <div id="colab-transfer-message" class="mt-4 text-center"></div>
+  </div>
+</div>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const llmResultContainer = document.getElementById('llm-result-container');
+        let selectedModelIds = [];
+
+        // Handle model checkbox changes
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('model-checkbox')) {
+                selectedModelIds = Array.from(document.querySelectorAll('.model-checkbox:checked')).map(cb => cb.value);
+            }
+        });
+
+        // Store active polling intervals
+        let activePollingIntervals = [];
+
+        document.getElementById('analysis-form').onsubmit = async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const systemMessage = document.getElementById('system_message').value;
+            const additionalContext = document.getElementById('additional_context').value;
+
+            const resultDiv = document.getElementById('analysis-result');
+            resultDiv.innerHTML = '';
+            llmResultContainer.innerHTML = '';
+
+            if (selectedModelIds.length === 0) {
+                resultDiv.innerHTML = '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">Please select at least one LLM model.</div>';
+                return;
+            }
+
+            const runAnalysisBtn = document.getElementById('run-analysis');
+            runAnalysisBtn.disabled = true;
+
+            // Clear any existing polling intervals
+            activePollingIntervals.forEach(interval => clearInterval(interval));
+            activePollingIntervals = [];
+
+            // Prepare full input with additional context
+            let fullInput = `{{ problem_statement|escapejs }}`;
+            if (additionalContext.trim()) {
+                fullInput += '\n\nAdditional Context:\n' + additionalContext.trim();
+            }
+
+            try {
+                // Submit jobs for each selected model
+                const jobPromises = selectedModelIds.map(async (modelId) => {
+                    const modelCheckbox = document.querySelector(`.model-checkbox[value="${modelId}"]`);
+                    const modelName = modelCheckbox ? modelCheckbox.dataset.name : 'Unknown Model';
+                    
+                    // Create placeholder for this model
+                    const placeholder = document.createElement('div');
+                    placeholder.id = `llm-result-${modelId}`;
+                    placeholder.className = 'bg-white rounded-2xl shadow-lg overflow-hidden p-6';
+                    placeholder.innerHTML = `
+                        <h3 class="text-xl font-bold text-gray-800 flex items-center">
+                            <i class="fas fa-robot mr-3 text-indigo-500"></i>
+                            <span>${modelName}</span>
+                        </h3>
+                        <div class="mt-4 text-gray-500">
+                            <i class="fas fa-spinner fa-spin mr-2"></i>
+                            Submitting job...
+                        </div>
+                    `;
+                    llmResultContainer.appendChild(placeholder);
+
+                    // Submit job to new API
+                    const response = await fetch('/api/llm/trainer-analysis/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: JSON.stringify({
+                            model_id: modelId,
+                            question_id: '{{ question_id|escapejs }}',
+                            system_message: systemMessage,
+                            full_input: fullInput
+                        })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Update placeholder to show polling status
+                        placeholder.querySelector('.text-gray-500').innerHTML = `
+                            <i class="fas fa-spinner fa-spin mr-2"></i>
+                            Processing... (Job ID: ${result.job_id.substring(0, 8)}...)
+                        `;
+                        
+                        // Start polling for this job
+                        startPollingForJob(result.job_id, modelId, modelName, placeholder);
+                        
+                        return { success: true, modelId, jobId: result.job_id };
+                    } else {
+                        // Show error in placeholder
+                        placeholder.innerHTML = `
+                            <div class="p-6 bg-red-50 border-l-4 border-red-400">
+                                <h3 class="font-bold text-red-800">${modelName}</h3>
+                                <p class="text-red-700 mt-1">Error submitting job: ${result.error}</p>
+                            </div>
+                        `;
+                        return { success: false, modelId, error: result.error };
+                    }
+                });
+
+                const jobResults = await Promise.all(jobPromises);
+                const successfulJobs = jobResults.filter(r => r.success);
+                const failedJobs = jobResults.filter(r => !r.success);
+
+                if (successfulJobs.length > 0) {
+                    resultDiv.innerHTML = `
+                        <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md">
+                            Successfully submitted ${successfulJobs.length} job(s) for processing. Results will appear below as they complete.
+                            ${failedJobs.length > 0 ? `<br><strong>Note:</strong> ${failedJobs.length} job(s) failed to submit.` : ''}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">
+                            All jobs failed to submit. Please try again.
+                        </div>
+                    `;
+                    runAnalysisBtn.disabled = false;
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">Error: ${error.message}</div>`;
+                runAnalysisBtn.disabled = false;
+            }
+        };
+
+        function startPollingForJob(jobId, modelId, modelName, placeholder) {
+            const pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/llm/jobs/${jobId}/status/`);
+                    const statusData = await response.json();
+                    
+                    if (statusData.success && statusData.is_complete) {
+                        // Job is complete, clear the interval
+                        clearInterval(pollInterval);
+                        activePollingIntervals = activePollingIntervals.filter(i => i !== pollInterval);
+                        
+                        if (statusData.status === 'completed') {
+                            // Show successful result
+                            placeholder.innerHTML = `
+                                <div class="p-6 border-b border-gray-200">
+                                    <h3 class="text-xl font-bold text-gray-800 flex items-center">
+                                        <i class="fas fa-robot mr-3 text-indigo-500"></i>
+                                        <span>${modelName}</span>
+                                        <span class="ml-2 text-sm text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                                            ${statusData.processing_time ? `${statusData.processing_time.toFixed(1)}s` : 'Completed'}
+                                        </span>
+                                    </h3>
+                                </div>
+                                <div id="llm-markdown-${modelId}" class="markdown-content p-6 text-gray-700"></div>
+                                <div class="p-4 bg-gray-50 flex justify-end">
+                                    <button class="open-colab-modal-btn text-indigo-600 hover:underline font-semibold flex items-center gap-2 text-sm" data-model-id="${modelId}">
+                                        <i class="fas fa-external-link-alt"></i> Transfer to Colab
+                                    </button>
+                                </div>
+                            `;
+                            
+                            // Render the result content
+                            let content = statusData.result_data?.result || 'No result available';
+                            if (typeof content === "object" && content !== null && "result" in content) {
+                                content = content.result;
+                            }
+                            
+                            const markdownDiv = placeholder.querySelector(`#llm-markdown-${modelId}`);
+                            if (window.marked) {
+                                markdownDiv.innerHTML = window.marked.parse(content);
+                            } else {
+                                markdownDiv.textContent = content;
+                            }
+                            
+                        } else if (statusData.status === 'failed') {
+                            // Show error result
+                            placeholder.innerHTML = `
+                                <div class="p-6 bg-red-50 border-l-4 border-red-400">
+                                    <h3 class="font-bold text-red-800">${modelName}</h3>
+                                    <p class="text-red-700 mt-1">Error: ${statusData.error_message || 'Job failed'}</p>
+                                </div>
+                            `;
+                        }
+                        
+                        // Check if all jobs are complete
+                        checkAllJobsComplete();
+                        
+                    } else if (statusData.success) {
+                        // Job is still processing, update status
+                        const statusText = statusData.status === 'processing' ? 'Processing...' : 'In queue...';
+                        placeholder.querySelector('.text-gray-500').innerHTML = `
+                            <i class="fas fa-spinner fa-spin mr-2"></i>
+                            ${statusText} (${statusData.processing_time ? `${statusData.processing_time.toFixed(1)}s` : 'Job ID: ' + jobId.substring(0, 8) + '...'})
+                        `;
+                    } else {
+                        // Error getting status
+                        clearInterval(pollInterval);
+                        activePollingIntervals = activePollingIntervals.filter(i => i !== pollInterval);
+                        placeholder.innerHTML = `
+                            <div class="p-6 bg-red-50 border-l-4 border-red-400">
+                                <h3 class="font-bold text-red-800">${modelName}</h3>
+                                <p class="text-red-700 mt-1">Error checking job status: ${statusData.error || 'Unknown error'}</p>
+                            </div>
+                        `;
+                        checkAllJobsComplete();
+                    }
+                    
+                } catch (error) {
+                    console.error('Polling error:', error);
+                    clearInterval(pollInterval);
+                    activePollingIntervals = activePollingIntervals.filter(i => i !== pollInterval);
+                    placeholder.innerHTML = `
+                        <div class="p-6 bg-red-50 border-l-4 border-red-400">
+                            <h3 class="font-bold text-red-800">${modelName}</h3>
+                            <p class="text-red-700 mt-1">Error polling job status: ${error.message}</p>
+                        </div>
+                    `;
+                    checkAllJobsComplete();
+                }
+            }, 2000); // Poll every 2 seconds
+            
+            activePollingIntervals.push(pollInterval);
+        }
+
+        function checkAllJobsComplete() {
+            const allPlaceholders = llmResultContainer.querySelectorAll('[id^="llm-result-"]');
+            const stillProcessing = Array.from(allPlaceholders).some(p => p.querySelector('.fa-spinner'));
+            
+            if (!stillProcessing) {
+                document.getElementById('run-analysis').disabled = false;
+            }
+        }
+
+        // Debug info - now shows polling status instead of WebSocket
+        function updateDebugInfo(message) {
+            const dbg = document.getElementById('debug-info');
+            if (dbg) {
+                dbg.style.display = 'block';
+                dbg.innerText = `DEBUG: ${message}`;
+            }
+        }
+        
+        updateDebugInfo('Page loaded, using new polling-based API');
+        
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('open-colab-modal-btn')) {
+                const modelId = e.target.getAttribute('data-model-id');
+                document.getElementById('colab-modal').classList.remove('hidden');
+                document.getElementById('colab-modal').setAttribute('data-model-id', modelId);
+            }
+        });
+        
+        document.getElementById('colab-transfer-form').onsubmit = async function(e) {
+            e.preventDefault();
+            const url = document.getElementById('colab_url').value.trim();
+            const split = document.getElementById('split_cells').checked;
+            let file_id = "";
+            const match = url.match(/\/drive\/([a-zA-Z0-9_-]+)/);
+            if (match) {
+                file_id = match[1];
+            }
+            const modelId = document.getElementById('colab-modal').getAttribute('data-model-id');
+            const llmContent = document.getElementById(`llm-markdown-${modelId}`) ? document.getElementById(`llm-markdown-${modelId}`).innerText : "";
+            const messageDiv = document.getElementById('colab-transfer-message');
+            messageDiv.innerHTML = '<div class="text-gray-500">Transferring to Colab...</div>';
+            try {
+                const response = await fetch('/api/transfer-to-colab/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        file_id: file_id,
+                        markdown_content: llmContent,
+                        multiple_cells: split,
+                        cell_separator: "---"
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    messageDiv.innerHTML = `
+                        <div class="bg-green-100 text-green-800 p-3 rounded mt-2">
+                            <div class="mb-2">Notebook updated successfully on Colab. (Split: ${split ? "Yes" : "No"})</div>
+                            <div class="max-h-48 overflow-y-auto bg-white border border-green-200 rounded p-2 mt-2">
+                                <pre class="whitespace-pre-wrap text-xs">${result.message || ''}</pre>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    messageDiv.innerHTML = `<div class="bg-red-100 text-red-700 p-3 rounded mt-2">Error: ${result.error || 'Unknown error'}</div>`;
+                }
+            } catch (err) {
+                messageDiv.innerHTML = `<div class="bg-red-100 text-red-700 p-3 rounded mt-2">Error: ${err}</div>`;
+            }
+        };
+        
+        function resetColabModal() {
+            document.getElementById('colab_url').value = "";
+            document.getElementById('split_cells').checked = false;
+            document.getElementById('colab-transfer-message').innerHTML = "";
+            document.getElementById('colab-modal').removeAttribute('data-model-id');
+        }
+        document.getElementById('close-colab-modal').onclick = function() {
+            document.getElementById('colab-modal').classList.add('hidden');
+            resetColabModal();
+        };
+        document.getElementById('cancel-colab-modal').onclick = function() {
+            document.getElementById('colab-modal').classList.add('hidden');
+            resetColabModal();
+        };
+
+        // Temperature slider functionality
+        const temperatureSlider = document.getElementById('temperature-slider');
+        const temperatureValue = document.getElementById('temperature-value');
+        
+        if (temperatureSlider && temperatureValue) {
+            temperatureSlider.addEventListener('input', function() {
+                temperatureValue.textContent = this.value;
+            });
+        }
+
+        // Refresh models button functionality
+        const refreshModelsBtn = document.getElementById('refresh-models-btn');
+        if (refreshModelsBtn) {
+            refreshModelsBtn.addEventListener('click', function() {
+                // Add refresh functionality if needed
+                console.log('Refreshing models...');
+            });
+        }
+    });
+</script>
+{% endblock %}

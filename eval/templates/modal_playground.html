@@ -1,0 +1,469 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}LLM Modal Playground{% endblock %}
+
+{% block extra_css %}
+<style>
+  .prose pre {
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  .model-result-section {
+    @apply bg-white rounded-2xl shadow-lg overflow-hidden;
+  }
+  .model-result-header {
+    @apply p-4 border-b border-gray-200 flex justify-between items-center;
+  }
+  .model-result-title {
+    @apply text-lg font-bold text-gray-800 flex items-center;
+  }
+  .model-result-content {
+    @apply p-6 prose prose-sm max-w-none;
+    max-height: 20rem;
+    overflow-y: auto;
+  }
+  .dotted-divider {
+    border: none;
+    border-top: 2px dotted #cbd5e1;
+    margin: 1.5rem 0;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/marked.min.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            LLM Modal Playground
+          </h1>
+          <p class="mt-2 text-lg text-gray-600">Experiment with prompts, system messages, and LLM models</p>
+        </div>
+      </div>
+    </div>
+
+    <form id="modal-playground-form" method="post" class="space-y-8">
+      {% csrf_token %}
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Left Column -->
+        <div class="space-y-6">
+          <!-- Prompts Section -->
+          <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div class="flex items-center mb-4">
+              <div class="p-2 bg-blue-100 rounded-lg mr-3">
+                <i class="fas fa-keyboard text-blue-600 text-lg"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800">Prompts</h3>
+            </div>
+            <textarea name="prompts" id="prompts" rows="5" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 resize-none p-3" placeholder="Enter your prompt(s) here..."></textarea>
+          </div>
+
+          <!-- LLM Modal Section -->
+          <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div class="flex items-center mb-4">
+              <div class="p-2 bg-indigo-100 rounded-lg mr-3">
+                <i class="fas fa-robot text-indigo-600 text-lg"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800">LLM Modal</h3>
+            </div>
+            <div class="space-y-4">
+              <!-- System Message -->
+              <div>
+                <label for="system_message" class="block text-sm font-medium text-gray-700 mb-2">
+                  <i class="fas fa-message mr-1 text-indigo-500"></i>
+                  System Message
+                </label>
+                <select name="system_message" id="system_message" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200">
+                  {% for sm in system_messages %}
+                    <option value="{{ sm.content|escape }}">{{ sm.name }}</option>
+                  {% endfor %}
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <!-- Custom System Message Textarea -->
+              <div id="custom-system-message-container" class="hidden">
+                <label for="custom_system_message" class="block text-sm font-medium text-gray-700 mb-2 mt-2">
+                  <i class="fas fa-pen mr-1 text-indigo-500"></i>
+                  Custom System Message
+                </label>
+                <textarea name="custom_system_message" id="custom_system_message" rows="3" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 resize-none p-3" placeholder="Enter your custom system message..."></textarea>
+              </div>
+              <!-- Dotted Divider -->
+              <hr class="dotted-divider">
+              <!-- LLM Model Selection -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  <i class="fas fa-robot mr-1 text-purple-500"></i>
+                  Select LLM Model(s)
+                </label>
+                <div id="llm-models-list" class="space-y-3 h-32 overflow-y-auto">
+                  {% for model in llm_models %}
+                  {% if model.is_active %}
+                  <label class="flex items-center p-3 rounded-xl hover:bg-gray-50 transition-colors duration-200 cursor-pointer border border-gray-100 hover:border-gray-200">
+                    <input type="checkbox" class="model-checkbox h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" value="{{ model.id }}">
+                    <div class="ml-3 flex-1">
+                      <span class="font-medium text-gray-800">{{ model.name }}</span>
+                      <div class="text-xs text-gray-500 mt-1">Temperature: {{ model.temperature }}</div>
+                    </div>
+                    <span class="text-sm {% if model.provider == 'openai' %}text-blue-600 bg-blue-100{% elif model.provider == 'anthropic' %}text-yellow-700 bg-yellow-100{% else %}text-purple-600 bg-purple-100{% endif %} px-2 py-1 rounded-full font-medium">{{ model.get_provider_display }}</span>
+                  </label>
+                  {% endif %}
+                  {% empty %}
+                  <div class="flex items-center justify-center py-8">
+                    <div class="text-center text-gray-500">
+                      <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+                      <p class="font-medium">No LLM models available</p>
+                      <p class="text-sm">Please contact an administrator</p>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              <!-- Temperature Slider -->
+              <div class="mb-2 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                  <label for="temperature-slider" class="text-sm font-medium text-gray-700">
+                    <i class="fas fa-thermometer-half mr-1 text-orange-500"></i>
+                    Temperature
+                  </label>
+                  <span id="temperature-value" class="text-sm font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded-full">0.7</span>
+                </div>
+                <input 
+                  type="range" 
+                  id="temperature-slider" 
+                  min="0" 
+                  max="2" 
+                  step="0.1" 
+                  value="0.7" 
+                  class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>0.0 (Focused)</span>
+                  <span>1.0 (Balanced)</span>
+                  <span>2.0 (Creative)</span>
+                </div>
+                <div class="text-xs text-gray-500 mt-2">
+                  <i class="fas fa-info-circle mr-1"></i>
+                  Controls randomness: lower values for more focused responses, higher for more creative ones.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Right Column -->
+        <div class="space-y-6">
+          <!-- Additional Context Section -->
+          <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div class="flex items-center mb-4">
+              <div class="p-2 bg-teal-100 rounded-lg mr-3">
+                <i class="fas fa-edit text-teal-600 text-lg"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800">Additional Context</h3>
+            </div>
+            <textarea name="additional_context" id="additional_context" rows="8" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 resize-none p-3" placeholder="Provide any additional context for the analysis..."></textarea>
+            <div class="text-xs text-gray-500 mt-1">
+              <i class="fas fa-info-circle mr-1"></i>
+              This context will be included in the analysis to provide more targeted feedback.
+            </div>
+          </div>
+          <!-- Run Analysis Button -->
+          <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <button class="w-full inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 transform hover:scale-105" 
+                    id="run-analysis" type="submit">
+              <i class="fas fa-play mr-2"></i>
+              Run Analysis
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+    <!-- Results Section -->
+    <div class="mt-8 space-y-6">
+      <div id="analysis-result"></div>
+      <div id="llm-result-container" class="space-y-6"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Show/hide custom system message textarea
+  const systemMessageSelect = document.getElementById('system_message');
+  const customSystemMessageContainer = document.getElementById('custom-system-message-container');
+  systemMessageSelect.addEventListener('change', function() {
+    if (this.value === 'custom') {
+      customSystemMessageContainer.classList.remove('hidden');
+    } else {
+      customSystemMessageContainer.classList.add('hidden');
+    }
+  });
+
+  // Temperature slider functionality
+  const temperatureSlider = document.getElementById('temperature-slider');
+  const temperatureValue = document.getElementById('temperature-value');
+  if (temperatureSlider && temperatureValue) {
+    temperatureSlider.addEventListener('input', function() {
+      temperatureValue.textContent = this.value;
+    });
+  }
+
+  // LLM Playground Run Analysis logic
+  document.getElementById('modal-playground-form').onsubmit = async function(e) {
+    e.preventDefault();
+    const resultDiv = document.getElementById('analysis-result');
+    const llmResultContainer = document.getElementById('llm-result-container');
+    resultDiv.innerHTML = '';
+    llmResultContainer.innerHTML = '';
+
+    // Collect selected model IDs and names
+    const selectedModels = Array.from(document.querySelectorAll('.model-checkbox:checked')).map(cb => ({
+      id: cb.value,
+      name: cb.closest('label').querySelector('.font-medium.text-gray-800')?.textContent?.trim() || `Model ${cb.value}`
+    }));
+
+    // Get prompt, system message, custom message, and additional context
+    const prompt = document.getElementById('prompts').value;
+    let systemMessage = document.getElementById('system_message').value;
+    if (systemMessage === 'custom') {
+      systemMessage = document.getElementById('custom_system_message').value;
+    }
+    const additionalContext = document.getElementById('additional_context').value;
+    const temperature = document.getElementById('temperature-slider').value;
+
+    if (selectedModels.length === 0) {
+      resultDiv.innerHTML = '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">Please select at least one LLM model.</div>';
+      return;
+    }
+
+    document.getElementById('run-analysis').disabled = true;
+
+    // Prepare full input with additional context
+    let fullInput = prompt || '';
+    if (additionalContext.trim()) {
+      fullInput += '\n\nAdditional Context:\n' + additionalContext.trim();
+    }
+
+    // Store active polling intervals
+    let activePollingIntervals = [];
+
+    try {
+      // Submit jobs for each selected model
+      const jobPromises = selectedModels.map(async ({id: modelId, name: modelName}) => {
+        // Create placeholder for this model
+        const placeholder = document.createElement('div');
+        placeholder.id = `llm-result-${modelId}`;
+        placeholder.className = 'bg-white rounded-2xl shadow-lg overflow-hidden p-6';
+        placeholder.innerHTML = `
+          <h3 class="text-xl font-bold text-gray-800 flex items-center">
+            <i class="fas fa-robot mr-3 text-indigo-500"></i>
+            <span>${modelName}</span>
+          </h3>
+          <div class="mt-4 text-gray-500">
+            <i class="fas fa-spinner fa-spin mr-2"></i>
+            Submitting job...
+          </div>
+        `;
+        llmResultContainer.appendChild(placeholder);
+
+        // Submit job to LLM API
+        const response = await fetch('/api/llm/trainer-analysis/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify({
+            model_id: modelId,
+            question_id: '', // Not needed for playground
+            system_message: systemMessage,
+            full_input: fullInput,
+            temperature: parseFloat(temperature)
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // Update placeholder to show polling status
+          placeholder.querySelector('.text-gray-500').innerHTML = `
+            <i class="fas fa-spinner fa-spin mr-2"></i>
+            Processing... (Job ID: ${result.job_id.substring(0, 8)}...)
+          `;
+
+          // Start polling for this job
+          startPollingForJob(result.job_id, modelId, modelName, placeholder);
+
+          return { success: true, modelId, modelName, jobId: result.job_id };
+        } else {
+          // Show error in placeholder
+          placeholder.innerHTML = `
+            <div class="p-6 bg-red-50 border-l-4 border-red-400">
+              <h3 class="font-bold text-red-800">${modelName}</h3>
+              <p class="text-red-700 mt-1">Error submitting job: ${result.error}</p>
+            </div>
+          `;
+          return { success: false, modelId, modelName, error: result.error };
+        }
+      });
+
+      const jobResults = await Promise.all(jobPromises);
+      const successfulJobs = jobResults.filter(r => r.success);
+      const failedJobs = jobResults.filter(r => !r.success);
+
+      if (successfulJobs.length > 0) {
+        resultDiv.innerHTML = `
+          <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md">
+            Successfully submitted ${successfulJobs.length} job(s) for processing. Results will appear below as they complete.
+            ${failedJobs.length > 0 ? `<br><strong>Note:</strong> ${failedJobs.length} job(s) failed to submit.` : ''}
+          </div>
+        `;
+      } else {
+        resultDiv.innerHTML = `
+          <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">
+            All jobs failed to submit. Please try again.
+          </div>
+        `;
+        document.getElementById('run-analysis').disabled = false;
+      }
+
+    } catch (error) {
+      resultDiv.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md">Error: ${error.message}</div>`;
+      document.getElementById('run-analysis').disabled = false;
+    }
+
+    function startPollingForJob(jobId, modelId, modelName, placeholder) {
+      const pollInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/llm/jobs/${jobId}/status/`);
+          const statusData = await response.json();
+
+          if (statusData.success && statusData.is_complete) {
+            clearInterval(pollInterval);
+            activePollingIntervals = activePollingIntervals.filter(i => i !== pollInterval);
+
+            if (statusData.status === 'completed') {
+              // Show successful result
+              placeholder.innerHTML = `
+                <div class="p-6 border-b border-gray-200">
+                  <h3 class="text-xl font-bold text-gray-800 flex items-center">
+                    <i class="fas fa-robot mr-3 text-indigo-500"></i>
+                    <span>${modelName}</span>
+                    <span class="ml-2 text-sm text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                      ${statusData.processing_time ? `${statusData.processing_time.toFixed(1)}s` : 'Completed'}
+                    </span>
+                  </h3>
+                </div>
+                <div id="llm-markdown-${modelId}" class="markdown-content p-6 text-gray-700"></div>
+              `;
+
+              // Render the result content
+              let content = statusData.result_data?.result || 'No result available';
+              if (typeof content === "object" && content !== null && "result" in content) {
+                content = content.result;
+              }
+
+              const markdownDiv = placeholder.querySelector(`#llm-markdown-${modelId}`);
+              if (window.marked) {
+                markdownDiv.innerHTML = window.marked.parse(content);
+              } else {
+                markdownDiv.textContent = content;
+              }
+
+            } else if (statusData.status === 'failed') {
+              // Show error result
+              placeholder.innerHTML = `
+                <div class="p-6 bg-red-50 border-l-4 border-red-400">
+                  <h3 class="font-bold text-red-800">${modelName}</h3>
+                  <p class="text-red-700 mt-1">Error: ${statusData.error_message || 'Job failed'}</p>
+                </div>
+              `;
+            }
+
+            checkAllJobsComplete();
+
+          } else if (statusData.success) {
+            // Job is still processing, update status
+            const statusText = statusData.status === 'processing' ? 'Processing...' : 'In queue...';
+            placeholder.querySelector('.text-gray-500').innerHTML = `
+              <i class="fas fa-spinner fa-spin mr-2"></i>
+              ${modelName} ${statusText} (${statusData.processing_time ? `${statusData.processing_time.toFixed(1)}s` : 'Job ID: ' + jobId.substring(0, 8) + '...'})
+            `;
+          } else {
+            // Error getting status
+            clearInterval(pollInterval);
+            activePollingIntervals = activePollingIntervals.filter(i => i !== pollInterval);
+            placeholder.innerHTML = `
+              <div class="p-6 bg-red-50 border-l-4 border-red-400">
+                <h3 class="font-bold text-red-800">${modelName}</h3>
+                <p class="text-red-700 mt-1">Error checking job status: ${statusData.error || 'Unknown error'}</p>
+              </div>
+            `;
+            checkAllJobsComplete();
+          }
+
+        } catch (error) {
+          clearInterval(pollInterval);
+          activePollingIntervals = activePollingIntervals.filter(i => i !== pollInterval);
+          placeholder.innerHTML = `
+            <div class="p-6 bg-red-50 border-l-4 border-red-400">
+              <h3 class="font-bold text-red-800">${modelName}</h3>
+              <p class="text-red-700 mt-1">Error polling job status: ${error.message}</p>
+            </div>
+          `;
+          checkAllJobsComplete();
+        }
+      }, 2000);
+
+      activePollingIntervals.push(pollInterval);
+    }
+
+    function checkAllJobsComplete() {
+      const allPlaceholders = llmResultContainer.querySelectorAll('[id^="llm-result-"]');
+      const stillProcessing = Array.from(allPlaceholders).some(p => p.querySelector('.fa-spinner'));
+
+      if (!stillProcessing) {
+        document.getElementById('run-analysis').disabled = false;
+      }
+    }
+  };
+});
+</script>
+{% endblock %}
+
+</final_file_content>
+
+IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.
+
+<environment_details>
+# VSCode Visible Files
+eval/templates/modal_playground.html
+
+# VSCode Open Tabs
+coreproject/templates/base.html
+eval/urls.py
+eval/views.py
+eval/templates/modal_playground.html
+
+# Recently Modified Files
+These files have been modified since you last accessed them (file was just edited so you may need to re-read it before editing):
+eval/templates/modal_playground.html
+
+# Current Time
+7/21/2025, 1:15:41 PM (Asia/Calcutta, UTC+5.5:00)
+
+# Context Window Usage
+119,070 / 1,047.576K tokens used (11%)
+
+# Current Mode
+ACT MODE
+</environment_details>

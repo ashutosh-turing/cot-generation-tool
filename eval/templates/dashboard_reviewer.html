@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% block title %}Reviewer Dashboard{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Header Section -->
+        <div class="mb-8">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                        Reviewer Dashboard
+                    </h1>
+                    <p class="mt-2 text-lg text-gray-600">Manage and review training tasks efficiently</p>
+                </div>
+                <div class="mt-4 sm:mt-0">
+                    <div class="flex items-center space-x-2 text-sm text-gray-500">
+                        <i class="fas fa-clock"></i>
+                        <span>Last updated: {{ now|date:"M d, Y H:i" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-filter mr-2 text-blue-500"></i>
+                Filters
+            </h2>
+            
+            <!-- Project Filter -->
+            <form method="get" class="mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label for="project" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-project-diagram mr-1 text-blue-500"></i>
+                            Project
+                        </label>
+                        <select name="project" id="project"
+                            class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 bg-white"
+                            onchange="this.form.submit()">
+                            <option value="">All Projects</option>
+                            {% for project in projects %}
+                                <option value="{{ project.id }}" {% if project.id|stringformat:"s" == selected_project %}selected{% endif %}>
+                                    {{ project.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% if selected_project %}
+                        <div class="flex items-end">
+                            <a href="?" class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-xl transition-all duration-200">
+                                <i class="fas fa-times mr-2"></i>
+                                Clear Project
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- Trainer Filter -->
+            <form method="get" class="border-t pt-4">
+                <input type="hidden" name="project" value="{{ selected_project }}">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label for="trainer" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-user-tie mr-1 text-green-500"></i>
+                            Trainer
+                        </label>
+                        <select name="trainer" id="trainer"
+                            class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 bg-white"
+                            onchange="this.form.submit()">
+                            <option value="">All Trainers</option>
+                            {% for trainer in trainers %}
+                                <option value="{{ trainer }}" {% if trainer == selected_trainer %}selected{% endif %}>
+                                    {{ trainer }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% if selected_trainer %}
+                        <div class="flex items-end">
+                            <a href="?{% if selected_project %}project={{ selected_project }}{% endif %}" 
+                               class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-xl transition-all duration-200">
+                                <i class="fas fa-times mr-2"></i>
+                                Clear Trainer
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <!-- Active Filters Display -->
+        {% if selected_project or selected_trainer %}
+            <div class="mb-6">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-medium text-gray-600">Active filters:</span>
+                    {% if selected_project %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <i class="fas fa-project-diagram mr-1"></i>
+                            Project: 
+                            {% for project in projects %}
+                                {% if project.id|stringformat:"s" == selected_project %}
+                                    {{ project.name }}
+                                {% endif %}
+                            {% endfor %}
+                        </span>
+                    {% endif %}
+                    {% if selected_trainer %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <i class="fas fa-user-tie mr-1"></i>
+                            Trainer: {{ selected_trainer }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Statistics Section -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Tasks</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.total|default:"0" }}</p>
+                    </div>
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <i class="fas fa-tasks text-2xl text-blue-600"></i>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-blue-600 h-2 rounded-full" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">In Progress</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.in_progress|default:"0" }}</p>
+                    </div>
+                    <div class="p-3 bg-yellow-100 rounded-full">
+                        <i class="fas fa-clock text-2xl text-yellow-600"></i>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-yellow-500 h-2 rounded-full" style="width: 70%"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Completed</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.completed|default:"0" }}</p>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks Table -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-list mr-2 text-indigo-500"></i>
+                    Tasks Overview
+                </h2>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-user mr-1"></i>
+                                Trainer
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-hashtag mr-1"></i>
+                                Question ID
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-link mr-1"></i>
+                                Problem
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-tag mr-1"></i>
+                                Tool ID
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-image mr-1"></i>
+                                Screenshot
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-code mr-1"></i>
+                                Submission
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for task in tasks %}
+                        <tr class="hover:bg-blue-50 transition-all duration-200">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-8 w-8">
+                                        <div class="h-8 w-8 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-medium">
+                                            {{ task.developer.0|upper }}
+                                        </div>
+                                    </div>
+                                    <div class="ml-3">
+                                        <div class="text-sm font-medium text-gray-900">{{ task.developer }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <a href="/review/{{ task.question_id }}{% if selected_project %}?project={{ selected_project }}{% endif %}" 
+                                   class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-all duration-200">
+                                    <i class="fas fa-external-link-alt mr-1"></i>
+                                    {{ task.question_id }}
+                                </a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {% if task.problem_link %}
+                                    <a href="{{ task.problem_link }}" target="_blank" 
+                                       class="inline-flex items-center text-indigo-600 hover:text-indigo-900 transition-colors duration-200">
+                                        <i class="fas fa-external-link-alt mr-1"></i>
+                                        View Problem
+                                    </a>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        <i class="fas fa-minus mr-1"></i>
+                                        N/A
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {% if task.labelling_tool_id_link and task.labelling_tool_id_link != "-" %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        {{ task.labelling_tool_id_link }}
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        <i class="fas fa-minus mr-1"></i>
+                                        N/A
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {% if task.screenshot_drive_link %}
+                                    <a href="{{ task.screenshot_drive_link }}" target="_blank" 
+                                       class="inline-flex items-center text-green-600 hover:text-green-900 transition-colors duration-200">
+                                        <i class="fas fa-cloud mr-1"></i>
+                                        Drive Link
+                                    </a>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        <i class="fas fa-minus mr-1"></i>
+                                        N/A
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {% if task.codeforces_submission_id and task.codeforces_submission_id != "-" %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        {{ task.codeforces_submission_id }}
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        <i class="fas fa-minus mr-1"></i>
+                                        N/A
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center">
+                                    <i class="fas fa-inbox text-4xl text-gray-300 mb-4"></i>
+                                    <h3 class="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
+                                    <p class="text-gray-500">No tasks match your current filters.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if pagination.total_pages > 1 %}
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 px-6 py-4 mt-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-gray-700 mb-4 sm:mb-0">
+                    Showing page <span class="font-medium">{{ pagination.current_page }}</span> of 
+                    <span class="font-medium">{{ pagination.total_pages }}</span> 
+                    (<span class="font-medium">{{ pagination.total_records }}</span> total records)
+                </div>
+                <div class="flex items-center space-x-2">
+                    {% if pagination.has_previous %}
+                        <a href="?{% if selected_project %}project={{ selected_project }}&{% endif %}{% if selected_trainer %}trainer={{ selected_trainer }}&{% endif %}page={{ pagination.previous_page }}" 
+                           class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
+                            <i class="fas fa-chevron-left mr-1"></i>
+                            Previous
+                        </a>
+                    {% endif %}
+                    
+                    {% for p in visible_page_numbers %}
+                        {% if p == "..." %}
+                            <span class="px-3 py-2 text-gray-500">...</span>
+                        {% elif p == pagination.current_page %}
+                            <span class="inline-flex items-center px-3 py-2 border border-blue-500 rounded-lg text-sm font-medium text-white bg-blue-600">
+                                {{ p }}
+                            </span>
+                        {% else %}
+                            <a href="?{% if selected_project %}project={{ selected_project }}&{% endif %}{% if selected_trainer %}trainer={{ selected_trainer }}&{% endif %}page={{ p }}" 
+                               class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
+                                {{ p }}
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                        <a href="?{% if selected_project %}project={{ selected_project }}&{% endif %}{% if selected_trainer %}trainer={{ selected_trainer }}&{% endif %}page={{ pagination.next_page }}" 
+                           class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
+                            Next
+                            <i class="fas fa-chevron-right ml-1"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

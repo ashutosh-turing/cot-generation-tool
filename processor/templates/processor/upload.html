@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% load processor_filters %}
+
+{% block title %}CSV to LLM Evaluation{% endblock %}
+
+{% block extra_css %}
+<style>
+    .log-container {
+        background-color: var(--bg-dark);
+        color: var(--success);
+        font-family: var(--font-mono);
+        border-radius: 0.5rem;
+        height: 300px;
+        overflow-y: auto;
+        padding: 1rem;
+    }
+    
+    .collapsible {
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    
+    .step-content {
+        transition: height 0.3s ease;
+    }
+    
+    .log-entry {
+        margin-bottom: 0.25rem;
+    }
+    
+    .log-timestamp {
+        color: var(--accent-light);
+        margin-right: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container max-w-5xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Upload CSV File</h1>
+        <p class="text-gray-600">Upload your CSV file for LLM analysis and processing</p>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Upload Form</h2>
+        </div>
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            {% csrf_token %}
+            <input type="hidden" id="delete_confirmed" name="delete_confirmed" value="false">
+            {% for field in form %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}
+                        <p class="text-sm text-gray-500 mt-1">{{ field.help_text }}</p>
+                    {% endif %}
+                    {% if field.errors %}
+                        <ul class="text-sm text-red-500 mt-1">
+                            {% for error in field.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">Upload and Process</button>
+            </div>
+        </form>
+    </div>
+
+    {% if processing_steps %}
+    <div class="card mt-6">
+        <div class="card-header">
+            <h2 class="card-title">Processing Steps</h2>
+            <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">{{ processing_steps|count_completed }}/{{ processing_steps|length }}</span>
+        </div>
+        
+        <button class="collapsible w-full text-left bg-gray-100 hover:bg-gray-200 px-4 py-3 rounded my-2 flex justify-between items-center">
+            <div class="font-medium text-gray-700">
+                Processing Status <span class="text-sm text-gray-500">({{ processing_steps|length }} steps)</span>
+            </div>
+            <span class="arrow transform transition-transform duration-300">▼</span>
+        </button>
+        <div class="step-content hidden">
+            <div class="bg-gray-50 p-4 rounded mb-4">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ processing_steps|count_completed_percent }}%"></div>
+                </div>
+                <p class="text-gray-600 text-sm mt-2">Progress: {{ processing_steps|count_completed }}/{{ processing_steps|length }} completed</p>
+            </div>
+            {% for step in processing_steps %}
+                <div class="bg-white border border-gray-100 p-4 rounded shadow-sm mb-2">
+                    <div class="flex justify-between items-center">
+                        <span class="font-medium text-gray-800">
+                            {{ step.title }} - <span class="italic">{{ step.filename }}</span>
+                        </span>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded 
+                            {% if step.status == 'Completed' %}bg-green-100 text-green-800{% elif step.status == 'Failed' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ step.status }}
+                        </span>
+                    </div>
+                    {% if step.details %}
+                        <p class="text-gray-600 text-sm mt-2">{{ step.details }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if results %}
+    <div class="mt-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Analysis Results</h2>
+        <div class="space-y-4">
+            {% for result in results %}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">{{ result.file_name }}</h3>
+                    </div>
+                    <div class="text-gray-700 whitespace-pre-wrap mt-2">{{ result.analysis }}</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="mt-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Process Logs</h2>
+        <div class="log-container" id="logContainer">
+            <div id="logs"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var coll = document.getElementsByClassName("collapsible");
+        var element = coll[0]; // Single collapsible element
+        var content = element.nextElementSibling;
+        
+        // Set initial state
+        content.style.display = "none";
+        
+        element.addEventListener("click", function() {
+            this.classList.toggle("active");
+            var arrow = this.querySelector('.arrow');
+            
+            if (content.style.display === "none") {
+                content.style.display = "block";
+                arrow.style.transform = "rotate(180deg)";
+            } else {
+                content.style.display = "none";
+                arrow.style.transform = "rotate(0deg)";
+            }
+        });
+    });
+
+    function confirmDeleteFiles() {
+        if (confirm("There might be existing files in the download container. Do you want to delete them before proceeding?")) {
+            document.getElementById('delete_confirmed').value = "true";
+            return true; // Proceed with form submission
+        } else {
+            document.getElementById('delete_confirmed').value = "false";
+            return false; // Cancel form submission
+        }
+    }
+    
+    function setupEventSource() {
+        const eventSource = new EventSource('/processor/logs/');
+        const logsDiv = document.getElementById('logs');
+        
+        eventSource.onopen = function(e) {
+            console.log('Connection established');
+            addLogEntry('Connected to log stream', new Date().toLocaleTimeString());
+        };
+        
+        eventSource.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'heartbeat') return;
+                if (data.message && data.timestamp) addLogEntry(data.message, data.timestamp);
+            } catch (e) {
+                console.error('Error parsing log message:', e, event.data);
+            }
+        };
+        
+        function addLogEntry(message, timestamp) {
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span> ${message}`;
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        eventSource.onerror = function(error) {
+            console.error('EventSource failed:', error);
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry text-red-500';
+            logEntry.textContent = 'Connection lost. Attempting to reconnect...';
+            logsDiv.appendChild(logEntry);
+            eventSource.close();
+            setTimeout(setupEventSource, 5000);
+        };
+        
+        return eventSource;
+    }
+    
+    document.getElementById('uploadForm').addEventListener('submit', function(event) {
+        var hasTempFiles = {{ has_temp_files|lower }};
+        if (hasTempFiles) {
+            if (!confirmDeleteFiles()) {
+                event.preventDefault(); // Prevent form submission
+                return;
+            }
+        }
+        document.getElementById('logs').innerHTML = '';
+        setupEventSource();
+    });
+</script>
+{% endblock %}

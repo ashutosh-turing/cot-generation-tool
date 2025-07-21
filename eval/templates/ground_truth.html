@@ -1,0 +1,734 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Ground Truth Validation{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Ground Truth Validation</h1>
+    <!-- File Upload Section -->
+    <div id="upload-area" class="upload-area">
+        <i class="bi bi-cloud-arrow-up upload-icon"></i>
+        <input type="file" id="csv-file" accept=".csv" class="hidden">
+        <p class="upload-text" id="upload-text">Drag and drop a CSV file, or click to select</p>
+        <p class="upload-hint">CSV must include "prompt" and "ground_truth" columns</p>
+    </div>
+    <!-- Error Message -->
+    <div id="error-container" class="error-message hidden" style="display: none;">
+        <div class="error-content">
+            <i class="bi bi-exclamation-triangle-fill error-icon"></i>
+            <p id="error-text" class="error-text">Please check your input and try again</p>
+        </div>
+        <button class="btn-close ms-auto" aria-label="Close" onclick="document.getElementById('error-container').classList.add('hidden'); this.parentElement.style.display = 'none';"></button>
+        <div class="progress error-timer">
+            <div class="progress-bar bg-danger" role="progressbar" style="width: 100%"></div>
+        </div>
+    </div>
+    <!-- File Preview Section -->
+    <div id="preview-section" class="hidden">
+        <div class="section-header">
+            <h2>Preview</h2>
+            <span class="badge bg-primary" id="row-count"></span>
+        </div>
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table id="preview-table" class="table table-striped">
+                        <thead id="preview-thead" class="bg-light"></thead>
+                        <tbody id="preview-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-muted">Showing first 5 rows of the uploaded CSV file</small>
+            </div>
+        </div>
+    </div>
+    <!-- Configuration Section -->
+    <div id="config-section" class="hidden">
+        <div class="config-form">
+            <div class="form-group">
+                <label for="model-select" class="form-label">Select Model</label>
+                <select id="model-select" class="form-control">
+                    <option value="">Select a model</option>
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="claude-3-opus">Claude 3 Opus</option>
+                    <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                    <option value="claude-3-haiku">Claude 3 Haiku</option>
+                    <option value="llama-3-70b">Llama 3 70B</option>
+                </select>
+                <small class="text-muted">Model used to generate replies for validation</small>
+            </div>
+            <div class="form-group mt-3">
+                <label for="validation-model-select" class="form-label">Validation Model</label>
+                <select id="validation-model-select" class="form-control">
+                    <option value="">Default Validation Model</option>
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="claude-3-opus">Claude 3 Opus</option>
+                </select>
+                <small class="text-muted">Model used to evaluate how well replies match ground truth</small>
+            </div>
+            <div class="form-group mt-3">
+                <label for="num-replies" class="form-label">Number of Replies per Prompt (1-5)</label>
+                <input type="number" id="num-replies" class="form-control" min="1" max="5" value="1">
+            </div>
+            <div class="form-group mt-3">
+                <div class="d-flex align-items-center">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="enable-multithreading">
+                        <label class="form-check-label" for="enable-multithreading">Enable Multithreading</label>
+                    </div>
+                    <i class="bi bi-info-circle ms-2" data-bs-toggle="tooltip" data-bs-placement="top" 
+                       title="Process multiple prompts simultaneously to speed up validation. Recommended for large datasets like books. Note: May increase API rate limit errors with large datasets."></i>
+                </div>
+                <div class="mt-2">
+                    <label for="batch-size" class="form-label">Batch Size (1-20)</label>
+                    <input type="number" id="batch-size" class="form-control" min="1" max="20" value="5" 
+                           title="Number of prompts to process simultaneously when multithreading is enabled">
+                </div>
+            </div>
+        </div>
+        <button id="run-button" class="btn btn-primary btn-block">Run Validation</button>
+    </div>
+    <!-- Progress Section -->
+    <div id="progress-section" class="progress-container hidden">
+        <div class="progress-card">
+            <div class="progress-header">
+                <div class="progress-title">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="progress-label">Processing Prompts</span>
+                </div>
+                <div class="progress-stats">
+                    <span id="progress-counter" class="progress-stat-item">0 of 0</span>
+                    <span id="progress-percentage" class="progress-stat-item">0%</span>
+                </div>
+            </div>
+            
+            <div class="progress-details">
+                <div class="progress-detail-item">
+                    <span class="detail-label">Current prompt:</span>
+                    <span id="current-prompt" class="detail-value">Initializing...</span>
+                </div>
+                <div class="progress-detail-item">
+                    <span class="detail-label">Estimated time:</span>
+                    <span id="estimated-time" class="detail-value">Calculating...</span>
+                </div>
+            </div>
+            
+            <div class="progress-bar-container">
+                <div class="progress-bar">
+                    <div id="progress-value" class="progress-value" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="progress-actions">
+                <button id="cancel-processing" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+                <button id="minimize-progress" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrows-collapse"></i> Minimize
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- Results Section -->
+    <div id="results-section" class="hidden">
+        <div class="section-header">
+            <h2>Validation Results <span id="model-name-display" class="badge bg-success ms-2" style="font-size: 0.9rem; vertical-align: middle; padding: 0.5em 0.8em; font-weight: 600;"></span></h2>
+            <div class="btn-group">
+                <button id="download-button" class="btn btn-success">
+                    <i class="bi bi-download"></i> Download CSV
+                </button>
+                <button id="download-json-button" class="btn btn-info ms-2">
+                    <i class="bi bi-filetype-json"></i> Export JSON
+                </button>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <div class="form-inline">
+                    <label class="mr-2">Rows per page:</label>
+                    <select id="rows-per-page" class="form-control form-control-sm" style="width: 70px;">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div class="search-container">
+                    <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Search results...">
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-container">
+                    <table id="results-table" class="table table-striped">
+                        <thead id="results-thead" class="bg-light"></thead>
+                        <tbody id="results-tbody"></tbody>
+                    </table>
+                    <div id="no-results-message" class="text-center p-4 hidden">
+                        <i class="bi bi-exclamation-circle text-warning" style="font-size: 2rem;"></i>
+                        <p class="mt-2">No results to display. Please check your validation settings.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div id="pagination" class="pagination hidden">
+                    <div class="pagination-info">
+                        Showing page <span id="current-page-display">1</span> of <span id="total-pages-display">1</span>
+                    </div>
+                    <div class="pagination-controls" id="pagination-controls"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-flex justify-content-between">
+            <button id="run-again-button" class="btn btn-primary">
+                <i class="bi bi-arrow-repeat"></i> Run New Validation
+            </button>
+            <button id="export-report-button" class="btn btn-outline-primary">
+                <i class="bi bi-file-earmark-text"></i> Export Report
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+<script src="{% static 'js/ground_truth_validation.js' %}"></script>
+<script>
+// Function to properly format and display model replies
+function formatModelReply(reply) {
+    if (!reply) return '<span class="text-muted">No reply available</span>';
+    
+    // Sanitize the reply to prevent HTML injection
+    const sanitizedReply = reply
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    
+    // Check if it's a real model reply by looking at length and content patterns
+    const isRealReply = sanitizedReply.length > 200 || 
+                        sanitizedReply.includes('\n') || 
+                        sanitizedReply.includes('. ');
+    
+    // If it's not a real reply, show a message
+    if (!isRealReply && sanitizedReply.includes('simulated')) {
+        return `
+            <div class="alert alert-warning p-2 mb-0">
+                <small><i class="bi bi-exclamation-triangle-fill me-1"></i> This is a placeholder. Select a model in the configuration to get real replies.</small>
+            </div>
+        `;
+    }
+    
+    // Truncate long replies for display
+    const maxLength = 150;
+    if (sanitizedReply.length > maxLength) {
+        const truncated = sanitizedReply.substring(0, maxLength);
+        return `
+            <div class="reply-container">
+                <div class="reply-preview">${truncated}... <button class="btn btn-link btn-sm p-0 show-more-btn">Show more</button></div>
+                <div class="reply-full hidden">${sanitizedReply} <button class="btn btn-link btn-sm p-0 show-less-btn">Show less</button></div>
+            </div>
+        `;
+    }
+    
+    return sanitizedReply;
+}
+
+// Add event delegation for show more/less buttons
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('show-more-btn')) {
+        const container = e.target.closest('.reply-container');
+        container.querySelector('.reply-preview').classList.add('hidden');
+        container.querySelector('.reply-full').classList.remove('hidden');
+    }
+    
+    if (e.target.classList.contains('show-less-btn')) {
+        const container = e.target.closest('.reply-container');
+        container.querySelector('.reply-preview').classList.remove('hidden');
+        container.querySelector('.reply-full').classList.add('hidden');
+    }
+});
+
+// Initialize model selection dropdowns with default values
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default model if none selected
+    const modelSelect = document.getElementById('model-select');
+    const validationModelSelect = document.getElementById('validation-model-select');
+    
+    // Add event listener to show warning when model is changed
+    modelSelect.addEventListener('change', function() {
+        if (this.value) {
+            const infoEl = document.createElement('div');
+            infoEl.className = 'alert alert-info mt-2';
+            infoEl.innerHTML = '<i class="bi bi-info-circle-fill me-2"></i> You\'ve selected ' + 
+                               this.options[this.selectedIndex].text + 
+                               '. This model will be used to generate replies for validation.';
+            
+            // Remove any existing info alerts
+            const existingInfo = modelSelect.parentNode.querySelector('.alert-info');
+            if (existingInfo) {
+                existingInfo.remove();
+            }
+            
+            // Add the new info alert
+            modelSelect.parentNode.appendChild(infoEl);
+        }
+    });
+});
+
+// Override the display function if it exists in the main JS file
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for the main JS to load
+    setTimeout(function() {
+        if (window.displayResults) {
+            const originalDisplayResults = window.displayResults;
+            
+            window.displayResults = function(data) {
+                // Call the original function first
+                originalDisplayResults(data);
+                
+                // Then enhance the model replies
+                const rows = document.querySelectorAll('#results-tbody tr');
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 3) { // Assuming model reply is in the 3rd column
+                        const replyCell = cells[2];
+                        const originalText = replyCell.textContent || replyCell.innerText;
+                        
+                        // Skip if already formatted
+                        if (!replyCell.querySelector('.reply-container') && 
+                            !replyCell.querySelector('.text-warning') &&
+                            !replyCell.querySelector('.alert')) {
+                            replyCell.innerHTML = formatModelReply(originalText);
+                        }
+                    }
+                });
+                
+                // Check if we have any results
+                if (rows.length === 0) {
+                    document.getElementById('no-results-message').classList.remove('hidden');
+                } else {
+                    document.getElementById('no-results-message').classList.add('hidden');
+                }
+                
+                // Add a warning if we detect placeholder replies
+                const hasPlaceholders = Array.from(document.querySelectorAll('.alert-warning')).length > 0;
+                if (hasPlaceholders) {
+                    const warningEl = document.createElement('div');
+                    warningEl.className = 'alert alert-warning mt-3';
+                    warningEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i> Some replies appear to be placeholders. To get real model replies, select a model in the configuration section before running validation.';
+                    
+                    // Only add if not already present
+                    const existingWarning = document.querySelector('#results-section > .alert-warning');
+                    if (!existingWarning) {
+                        document.querySelector('#results-section .section-header').after(warningEl);
+                    }
+                }
+            };
+        }
+    }, 500);
+});
+</script>
+<style>
+    .upload-area {
+        border: 2px dashed #007bff;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        margin-bottom: 30px;
+        transition: all 0.3s ease;
+        background-color: #f8f9fa;
+    }
+    
+    .upload-area:hover {
+        background-color: #e9ecef;
+        border-color: #0056b3;
+    }
+    
+    .upload-area.drag-over {
+        background-color: #e3f2fd;
+        border-color: #0056b3;
+    }
+
+    .upload-icon {
+        font-size: 60px;
+        margin-bottom: 15px;
+        color: #007bff;
+    }
+
+    .hidden {
+        display: none !important;
+    }
+    
+    .error-message {
+        color: #dc3545;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 5px;
+        padding: 15px 15px 0 15px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        position: relative;
+    }
+    
+    .error-content {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    
+    .error-icon {
+        font-size: 24px;
+        margin-right: 10px;
+        color: #dc3545;
+    }
+    
+    .error-text {
+        margin: 0;
+    }
+    
+    .error-timer {
+        height: 4px;
+        width: 100%;
+        margin-bottom: 0;
+        background-color: transparent;
+    }
+    
+    .error-timer .progress-bar {
+        transition: width 10s linear;
+    }
+
+    .table-container {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    thead {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+    }
+    
+    th {
+        padding: 12px 15px;
+        text-align: left;
+        font-weight: bold;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    td {
+        padding: 10px 15px;
+        border-bottom: 1px solid #dee2e6;
+        vertical-align: top;
+    }
+    
+    tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+
+    /* Enhanced Progress Loader Styles */
+    .progress-container {
+        margin-bottom: 20px;
+    }
+
+    .progress-card {
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .progress-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, #007bff, #00c6ff);
+        animation: shimmer 2s infinite linear;
+        background-size: 200% 100%;
+    }
+    
+    @keyframes shimmer {
+        0% { background-position: 100% 0; }
+        100% { background-position: -100% 0; }
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    
+    .progress-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .progress-label {
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .progress-stats {
+        display: flex;
+        gap: 15px;
+    }
+    
+    .progress-stat-item {
+        background-color: #f8f9fa;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        color: #495057;
+    }
+    
+    .progress-details {
+        background-color: #f8f9fa;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 15px;
+    }
+    
+    .progress-detail-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+    
+    .progress-detail-item:last-child {
+        margin-bottom: 0;
+    }
+    
+    .detail-label {
+        font-weight: 500;
+        color: #6c757d;
+    }
+    
+    .detail-value {
+        color: #212529;
+        max-width: 70%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .progress-bar-container {
+        margin-bottom: 15px;
+    }
+    
+    .progress-bar {
+        height: 10px;
+        background-color: #e9ecef;
+        border-radius: 5px;
+        overflow: hidden;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .progress-value {
+        background: linear-gradient(90deg, #007bff, #00c6ff);
+        height: 100%;
+        transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .progress-value::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.4) 50%,
+            rgba(255, 255, 255, 0) 100%
+        );
+        animation: shimmer-progress 1.5s infinite;
+        transform: translateX(-100%);
+    }
+    
+    @keyframes shimmer-progress {
+        100% { transform: translateX(100%); }
+    }
+    
+    .progress-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+    
+    /* Minimized state */
+    .progress-container.minimized .progress-card {
+        padding: 10px;
+    }
+    
+    .progress-container.minimized .progress-details,
+    .progress-container.minimized .progress-actions {
+        display: none;
+    }
+    
+    .progress-container.minimized .progress-bar-container {
+        margin-bottom: 0;
+    }
+
+    .results-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+    }
+
+    .pagination-info {
+        font-size: 14px;
+    }
+
+    .pagination-controls {
+        display: flex;
+        gap: 5px;
+    }
+    
+    /* New styles for expandable text */
+    .full-text {
+        white-space: pre-wrap;
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 5px;
+    }
+    
+    .expand-text, .collapse-text {
+        padding: 0;
+        font-size: 0.8rem;
+    }
+    
+    /* Styles for match indicators */
+    .match-exact {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+    
+    .match-strong {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+    
+    .match-moderate {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+    
+    .match-weak {
+        background-color: #ffe5d0;
+        color: #7d4a00;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+    
+    .match-different {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+    
+    .match-error {
+        background-color: #e9ecef;
+        color: #495057;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+    
+    .similarity-score {
+        font-size: 0.85rem;
+        margin-left: 5px;
+        color: #6c757d;
+    }
+    
+    .validation-reasoning {
+        font-size: 0.85rem;
+        margin-top: 5px;
+        color: #6c757d;
+        font-style: italic;
+        background-color: #f8f9fa;
+        padding: 5px;
+        border-radius: 3px;
+        border-left: 3px solid #dee2e6;
+    }
+    
+    /* Model reply styling */
+    .reply-container {
+        position: relative;
+    }
+    
+    .reply-preview, .reply-full {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    
+    .reply-full {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 5px;
+        border-left: 3px solid #007bff;
+    }
+    
+    .show-more-btn, .show-less-btn {
+        color: #007bff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .show-more-btn:hover, .show-less-btn:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}

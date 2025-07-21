@@ -1,0 +1,609 @@
+{% extends "base.html" %}
+
+{% block title %}Model Performance Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .chart-container {
+        height: 300px;
+        width: 100%;
+    }
+    
+    .performance-metric {
+        position: relative;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        background: white;
+        box-shadow: var(--shadow);
+    }
+    
+    .metric-trend {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .trend-up {
+        background-color: var(--success);
+        color: white;
+    }
+    
+    .trend-down {
+        background-color: var(--danger);
+        color: white;
+    }
+
+    .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--gray-500);
+    }
+    
+    .model-row:hover {
+        background-color: #f9fafb;
+    }
+    
+    .no-data-message {
+        text-align: center;
+        padding: 2rem;
+        color: #6b7280;
+        font-style: italic;
+    }
+    
+    .chart-legend {
+        display: flex;
+        justify-content: center;
+        margin-top: 1rem;
+    }
+    
+    .chart-legend-item {
+        display: flex;
+        align-items: center;
+        margin: 0 0.5rem;
+    }
+    
+    .chart-legend-color {
+        width: 1rem;
+        height: 1rem;
+        border-radius: 0.25rem;
+        margin-right: 0.5rem;
+    }
+
+    .sortable {
+        cursor: pointer;
+        position: relative;
+        padding-right: 1.5rem;
+    }
+
+    .sortable::after {
+        content: '↕';
+        position: absolute;
+        right: 0.5rem;
+        color: #9CA3AF;
+    }
+
+    .sortable.asc::after {
+        content: '↑';
+        color: #4B5563;
+    }
+
+    .sortable.desc::after {
+        content: '↓';
+        color: #4B5563;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+        
+<!-- Admin: Projects Table -->
+<div class="container mx-auto px-4 py-8">
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-xl font-semibold mb-4">All Projects</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Code</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Name</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Description</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for project in projects_page %}
+                    <tr>
+                        <td class="px-4 py-2">{{ project.code }}</td>
+                        <td class="px-4 py-2">{{ project.name }}</td>
+                        <td class="px-4 py-2">{{ project.description|default:"-" }}</td>
+                        <td class="px-4 py-2">
+                            {% if project.is_active %}
+                                <span class="inline-block px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-semibold">Active</span>
+                            {% else %}
+                                <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs font-semibold">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2">
+                            <form method="post" action="" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="toggle_project" value="{{ project.id }}">
+                                <button type="submit" class="px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 transition">
+                                    {% if project.is_active %}Deactivate{% else %}Activate{% endif %}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-gray-400 py-6">No projects found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <!-- Pagination Controls -->
+        <div class="flex justify-center items-center mt-6 space-x-2">
+            {% if projects_page.has_previous %}
+                <a href="?project_page={{ projects_page.previous_page_number }}{% if users_page %}&user_page={{ users_page.number }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">&laquo; Prev</a>
+            {% endif %}
+            {% for num in projects_page.paginator.page_range %}
+                {% if num == projects_page.number %}
+                    <span class="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold shadow">{{ num }}</span>
+                {% elif num >= projects_page.number|add:'-2' and num <= projects_page.number|add:'2' %}
+                    <a href="?project_page={{ num }}{% if users_page %}&user_page={{ users_page.number }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">{{ num }}</a>
+                {% elif num == 1 or num == projects_page.paginator.num_pages %}
+                    <a href="?project_page={{ num }}{% if users_page %}&user_page={{ users_page.number }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">{{ num }}</a>
+                {% elif num == projects_page.number|add:'-3' or num == projects_page.number|add:'3' %}
+                    <span class="px-2">...</span>
+                {% endif %}
+            {% endfor %}
+            {% if projects_page.has_next %}
+                <a href="?project_page={{ projects_page.next_page_number }}{% if users_page %}&user_page={{ users_page.number }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">Next &raquo;</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Admin: Users Table -->
+    <div class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-xl font-semibold mb-4">All Users & Roles</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Username</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Email</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Role(s)</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Active</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for user in users_page %}
+                    <tr>
+                        <td class="px-4 py-2">{{ user.username }}</td>
+                        <td class="px-4 py-2">{{ user.email|default:"-" }}</td>
+                        <td class="px-4 py-2">
+                            {% if user.groups.all %}
+                                {% for group in user.groups.all %}
+                                    <span class="inline-block px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold mr-1">{{ group.name }}</span>
+                                {% empty %}
+                                    <span class="text-gray-400">No role</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-gray-400">No role</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2">
+                            {% if user.is_active %}
+                                <span class="inline-block px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-semibold">Active</span>
+                            {% else %}
+                                <span class="inline-block px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs font-semibold">Inactive</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-gray-400 py-6">No users found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <!-- Pagination Controls -->
+        <div class="flex justify-center items-center mt-6 space-x-2">
+            {% if users_page.has_previous %}
+                <a href="?user_page={{ users_page.previous_page_number }}{% if projects_page %}&project_page={{ projects_page.number }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">&laquo; Prev</a>
+            {% endif %}
+            {% for num in users_page.paginator.page_range %}
+                {% if num == users_page.number %}
+                    <span class="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold shadow">{{ num }}</span>
+                {% elif num >= users_page.number|add:'-2' and num <= users_page.number|add:'2' %}
+                    <a href="?user_page={{ num }}{% if projects_page %}&project_page={{ projects_page.number }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">{{ num }}</a>
+                {% elif num == 1 or num == users_page.paginator.num_pages %}
+                    <a href="?user_page={{ num }}{% if projects_page %}&project_page={{ projects_page.number }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">{{ num }}</a>
+                {% elif num == users_page.number|add:'-3' or num == users_page.number|add:'3' %}
+                    <span class="px-2">...</span>
+                {% endif %}
+            {% endfor %}
+            {% if users_page.has_next %}
+                <a href="?user_page={{ users_page.next_page_number }}{% if projects_page %}&project_page={{ projects_page.number }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">Next &raquo;</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let responseTimeChart;
+let currentModelSort = { column: null, direction: 'asc' };
+let currentUserSort = { column: null, direction: 'asc' };
+
+// Debug function to log information
+function debugLog(message, data = null) {
+    console.log(message, data);
+}
+
+function updateMetrics(data) {
+    debugLog('Updating metrics with data', data);
+    
+    // Update key metrics
+    document.getElementById('accuracyValue').textContent = data.metrics.accuracy.toFixed(1) + '%';
+    document.getElementById('responseTimeValue').textContent = data.metrics.response_time.toFixed(2) + 's';
+    document.getElementById('errorRateValue').textContent = data.metrics.error_rate.toFixed(1) + '%';
+    document.getElementById('throughputValue').textContent = data.metrics.throughput.toFixed(1);
+
+    // Update trend values
+    document.getElementById('accuracyTrendValue').textContent = '100%';
+    document.getElementById('responseTimeTrendValue').textContent = '0%';
+    document.getElementById('errorRateTrendValue').textContent = '0%';
+    document.getElementById('throughputTrendValue').textContent = '0%';
+
+    // Update trend indicators
+    const accuracyTrend = document.getElementById('accuracyTrend');
+    const responseTimeTrend = document.getElementById('responseTimeTrend');
+    const errorRateTrend = document.getElementById('errorRateTrend');
+    const throughputTrend = document.getElementById('throughputTrend');
+
+    // Update trend indicators based on metrics
+    updateTrendIndicator(accuracyTrend, data.metrics.accuracy > 90);
+    updateTrendIndicator(responseTimeTrend, data.metrics.response_time < 2);
+    updateTrendIndicator(errorRateTrend, data.metrics.error_rate < 5);
+    updateTrendIndicator(throughputTrend, data.metrics.throughput > 0);
+}
+
+function updateTrendIndicator(element, isPositive) {
+    const icon = element.querySelector('i');
+    
+    if (isPositive) {
+        element.className = 'metric-trend trend-up';
+        icon.className = 'fas fa-arrow-up mr-1';
+    } else {
+        element.className = 'metric-trend trend-down';
+        icon.className = 'fas fa-arrow-down mr-1';
+    }
+}
+
+function updateCharts(data) {
+    debugLog('Updating charts with data', data);
+    
+    // Filter out days with no data
+    const filteredTrends = data.daily_trends.filter(d => d.total > 0);
+    
+    // If no data, show a message
+    if (filteredTrends.length === 0) {
+        document.getElementById('responseTimeChart').innerHTML = '<div class="no-data-message">No data available for the selected period</div>';
+        return;
+    }
+
+    // Response Time Chart
+    const responseTimeCtx = document.getElementById('responseTimeChart');
+    if (responseTimeChart) {
+        responseTimeChart.destroy();
+    }
+    
+    responseTimeChart = new Chart(responseTimeCtx, {
+        type: 'line',
+        data: {
+            labels: filteredTrends.map(d => d.date),
+            datasets: [{
+                label: 'Response Time (s)',
+                data: filteredTrends.map(d => d.total > 0 ? d.total / (d.successful || 1) : 0),
+                borderColor: 'rgb(16, 185, 129)',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.1,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Response Time (s)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Response Time: ${context.parsed.y.toFixed(2)}s`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function sortTable(tableId, data, sortConfig) {
+    const tbody = document.getElementById(tableId);
+    const table = document.getElementById(tableId === 'modelComparisonBody' ? 'modelComparisonTable' : 'userAnalyticsTable');
+    const rows = Array.from(tbody.getElementsByTagName('tr'));
+    
+    // Remove existing sort classes from all headers
+    table.querySelectorAll('.sortable').forEach(th => {
+        th.classList.remove('asc', 'desc');
+    });
+    
+    // Add sort class to current column
+    const currentTh = table.querySelector(`[data-sort="${sortConfig.column}"]`);
+    if (currentTh) {
+        currentTh.classList.add(sortConfig.direction);
+    }
+    
+    // Sort the rows
+    rows.sort((a, b) => {
+        const aValue = a.cells[getColumnIndex(sortConfig.column)].textContent.trim();
+        const bValue = b.cells[getColumnIndex(sortConfig.column)].textContent.trim();
+        
+        // Handle numeric values
+        if (['accuracy', 'response_time', 'error_rate', 'total_evaluations', 'success_rate', 'avg_response_time'].includes(sortConfig.column)) {
+            const aNum = parseFloat(aValue.replace('%', '').replace('s', ''));
+            const bNum = parseFloat(bValue.replace('%', '').replace('s', ''));
+            return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+        
+        // Handle string values
+        return sortConfig.direction === 'asc' 
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue);
+    });
+    
+    // Clear and reorder the rows
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+function getColumnIndex(columnName) {
+    const columnMap = {
+        'model': 0,
+        'accuracy': 1,
+        'response_time': 2,
+        'error_rate': 3,
+        'total_evaluations': 4,
+        'username': 0,
+        'success_rate': 2,
+        'avg_response_time': 3,
+        'models_used': 4
+    };
+    return columnMap[columnName];
+}
+
+function setupTableSorting() {
+    // Model comparison table sorting
+    const modelTable = document.getElementById('modelComparisonTable');
+    if (modelTable) {
+        modelTable.querySelectorAll('.sortable').forEach(th => {
+            th.addEventListener('click', () => {
+                const column = th.dataset.sort;
+                if (currentModelSort.column === column) {
+                    currentModelSort.direction = currentModelSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentModelSort.column = column;
+                    currentModelSort.direction = 'asc';
+                }
+                sortTable('modelComparisonBody', null, currentModelSort);
+            });
+        });
+    }
+    
+    // User analytics table sorting
+    const userTable = document.getElementById('userAnalyticsTable');
+    if (userTable) {
+        userTable.querySelectorAll('.sortable').forEach(th => {
+            th.addEventListener('click', () => {
+                const column = th.dataset.sort;
+                if (currentUserSort.column === column) {
+                    currentUserSort.direction = currentUserSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentUserSort.column = column;
+                    currentUserSort.direction = 'asc';
+                }
+                sortTable('userAnalyticsBody', null, currentUserSort);
+            });
+        });
+    }
+}
+
+function updateModelComparison(data) {
+    debugLog('Updating model comparison with data', data);
+    
+    const tbody = document.getElementById('modelComparisonBody');
+    tbody.innerHTML = '';
+
+    if (data.model_metrics.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="px-6 py-4 text-center text-gray-500">No model data available</td>
+            </tr>
+        `;
+        return;
+    }
+
+    data.model_metrics.forEach(model => {
+        const row = document.createElement('tr');
+        row.className = 'model-row';
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${model.model_name}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${model.accuracy.toFixed(1)}%</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${model.response_time.toFixed(2)}s</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${model.error_rate.toFixed(1)}%</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${model.total_evaluations}</td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // Apply current sort if exists
+    if (currentModelSort.column) {
+        sortTable('modelComparisonBody', null, currentModelSort);
+    }
+}
+
+function updateUserAnalytics(data) {
+    debugLog('Updating user analytics with data', data);
+    const tbody = document.getElementById('userAnalyticsBody');
+    
+    if (!data || !data.user_metrics || data.user_metrics.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">No user analytics data available</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.user_metrics.map(user => `
+        <tr>
+            <td>${user.username}</td>
+            <td>${user.total_evaluations}</td>
+            <td>${user.success_rate.toFixed(1)}%</td>
+            <td>${user.avg_response_time.toFixed(2)}s</td>
+            <td>${user.models_used}</td>
+        </tr>
+    `).join('');
+
+    // Apply current sort if exists
+    if (currentUserSort.column) {
+        sortTable('userAnalyticsBody', null, currentUserSort);
+    }
+}
+
+function loadDashboardData() {
+    debugLog('Fetching dashboard data from /get_model_analytics/');
+    
+    // Fetch model analytics data
+    fetch('get_model_analytics/', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+        .then(response => {
+            debugLog('Model analytics response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            debugLog('Received model analytics data:', data);
+            if (data.success) {
+                updateMetrics(data);
+                updateCharts(data);
+                updateModelComparison(data);
+            } else {
+                debugLog('Failed to load model analytics data:', data.error);
+                console.error('Failed to load model analytics data:', data.error);
+            }
+        })
+        .catch(error => {
+            debugLog('Error loading model analytics data:', error.message);
+            console.error('Error loading model analytics data:', error);
+        });
+    
+    // Fetch user analytics data separately
+    debugLog('Fetching user analytics data from /get_user_analytics/');
+    
+    fetch('get_user_analytics/', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+        .then(response => {
+            debugLog('User analytics response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            debugLog('Received user analytics data:', data);
+            if (data.success) {
+                updateUserAnalytics(data);
+            } else {
+                debugLog('Failed to load user analytics data:', data.error);
+                console.error('Failed to load user analytics data:', data.error);
+                document.getElementById('userAnalyticsBody').innerHTML = 
+                    '<tr><td colspan="5" class="text-center">Error loading user analytics data</td></tr>';
+            }
+        })
+        .catch(error => {
+            debugLog('Error loading user analytics data:', error.message);
+            console.error('Error loading user analytics data:', error);
+            document.getElementById('userAnalyticsBody').innerHTML = 
+                '<tr><td colspan="5" class="text-center">Error loading user analytics data: ' + error.message + '</td></tr>';
+        });
+}
+
+// Function to get the CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Load initial data
+debugLog('Initializing dashboard...');
+loadDashboardData();
+setupTableSorting();
+
+// Refresh data every 5 minutes
+setInterval(loadDashboardData, 5 * 60 * 1000);
+</script>
+{% endblock %}

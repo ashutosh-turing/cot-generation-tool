@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LLM Evaluation Dashboard{% endblock %}</title>
+    
+    <!-- Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Tailwind CSS - for compatibility with existing code -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/processor/css/style.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEwMCwyMCBBMTUsMTUgMCAxLDEgMTAwLDIwIE0xNjAsMjAgQTE1LDE1IDAgMSwxIDE2MCwyMCBNNDAsMjAgQTE1LDE1IDAgMSwxIDQwLDIwIE0xMzAsNTAgQTE1LDE1IDAgMSwxIDEzMCw1MCBNNzAsNTAgQTE1LDE1IDAgMSwxIDcwLDUwIE0xMDAsODAgQTE1LDE1IDAgMSwxIDEwMCw4MCBNMTYwLDgwIEExNSwxNSAwIDEsMSAxNjAsODAgTTQwLDgwIEExNSwxNSAwIDEsMSA0MCw4MCBNMTMwLDExMCBBMTUsMTUgMCAxLDEgMTMwLDExMCBNNzAsMTEwIEExNSwxNSAwIDEsMSA3MCwxMTAgTTEwMCwxNDAgQTE1LDE1IDAgMSwxIDEwMCwxNDAgTTEwMCwxNzAgQTE1LDE1IDAgMSwxIDEwMCwxNzAgTTE5MCw1MCBBMTUsMTUgMCAxLDEgMTkwLDUwIE0xMCw1MCBBMTUsMTUgMCAxLDEgMTAsNTAgTTEwLDE0MCBBMTUsMTUgMCAxLDEgMTAsMTQwIE0xNjAsMTcwIEExNSwxNSAwIDEsMSAxNjAsMTcwIiBzdHJva2U9IiMyNTYzZWIiIHN0cm9rZS13aWR0aD0iMTUiIGZpbGw9Im5vbmUiLz48L3N2Zz4=">
+    
+    <!-- Additional Styles -->
+    <style>
+        /* Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 250px;
+            background-image: linear-gradient(to bottom, var(--bg-sidebar-gradient-from), var(--bg-sidebar-gradient-to));
+            color: var(--text-light);
+            transition: all 0.3s ease;
+            z-index: 50;
+            box-shadow: var(--shadow);
+        }
+        
+        .sidebar-collapsed {
+            width: 80px;
+        }
+        
+        .content {
+            margin-left: 250px;
+            transition: all 0.3s ease;
+            min-height: 100vh;
+            background-color: var(--bg-light);
+        }
+        
+        .content-expanded {
+            margin-left: 80px;
+        }
+        
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-radius: 0.375rem;
+            margin: 0.25rem 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: var(--text-light);
+            text-decoration: none;
+        }
+        
+        .menu-item:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+            transform: translateX(3px);
+        }
+        
+        .menu-item.active {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            border-left: 3px solid white;
+        }
+        
+        .menu-item i, .menu-item svg {
+            width: 24px;
+            text-align: center;
+            margin-right: 12px;
+            font-size: 1.1rem;
+        }
+        
+        .menu-text {
+            opacity: 1;
+            transition: opacity 0.2s ease;
+            font-size: 0.95rem;
+        }
+        
+        .sidebar-collapsed .menu-text {
+            display: none;
+            opacity: 0;
+        }
+        
+        .section-header {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin: 1.5rem 1rem 0.5rem;
+            font-weight: 600;
+        }
+        
+        /* Flash Message Animation */
+        @keyframes fadeInDown {
+            0% {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-fade-in-down {
+            animation: fadeInDown 0.5s ease-out;
+        }
+        
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar-visible {
+                transform: translateX(0);
+            }
+            
+            .content {
+                margin-left: 0;
+            }
+        }
+        
+        .avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+        
+        .pulse {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--success);
+            box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+        
+        .brand-gradient {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        /* Modal overlay and animation */
+#settings-modal {
+    background: rgba(59, 130, 246, 0.10); /* blue-500 at 10% */
+    backdrop-filter: blur(2px);
+    animation: fadeInModal 0.25s;
+}
+@keyframes fadeInModal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+#settings-modal .modal-content {
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 8px 32px 0 rgba(59, 130, 246, 0.10);
+    border: 2px solid #3b82f6;
+    padding: 2.2rem 2rem 2rem 2rem;
+    max-width: 600px;
+    width: 100%;
+    position: relative;
+    animation: popIn 0.3s cubic-bezier(.68,-0.55,.27,1.55);
+}
+@keyframes popIn {
+    0% { transform: scale(0.97); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+#settings-modal h3 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #2563eb; /* blue-600 */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.2rem;
+}
+#settings-modal .close-btn {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 1.5rem;
+    border-radius: 50%;
+    transition: background 0.2s, color 0.2s;
+    padding: 0.25rem 0.5rem;
+    position: absolute;
+    top: 1.2rem;
+    right: 1.2rem;
+    cursor: pointer;
+}
+#settings-modal .close-btn:hover {
+    background: #e0e7ff;
+    color: #2563eb;
+}
+#streams-select {
+    min-height: 110px;
+    background: #f8fafc;
+    border-radius: 0.5rem;
+    border: 1.5px solid #3b82f6;
+    font-size: 1rem;
+    transition: border 0.2s;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+#streams-select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px #3b82f6;
+}
+#streams-select option {
+    padding: 0.5rem 2.5rem 0.5rem 1.5rem;
+    border-radius: 0.375rem;
+    margin: 0.2rem 0;
+    position: relative;
+    transition: background 0.2s, color 0.2s;
+}
+#streams-select option[selected], #streams-select option:checked {
+    background-color: #3b82f6 !important;
+    color: #fff !important;
+    font-weight: 600;
+}
+#streams-select option.selected-check {
+    background-image: url('data:image/svg+xml;utf8,<svg fill="none" height="18" viewBox="0 0 18 18" width="18" xmlns="http://www.w3.org/2000/svg"><path d="M5 9l3 3 5-5" stroke="%23fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+}
+#settings-modal .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+#settings-modal .modal-actions button {
+    padding: 0.6rem 1.5rem;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+#settings-modal .modal-actions .cancel-btn {
+    background: #f1f5f9;
+    color: #334155;
+    border: none;
+}
+#settings-modal .modal-actions .cancel-btn:hover {
+    background: #e0e7ff;
+    color: #2563eb;
+}
+#settings-modal .modal-actions .save-btn {
+    background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+    color: #fff;
+    border: none;
+    box-shadow: 0 2px 8px 0 rgba(59,130,246,0.08);
+}
+#settings-modal .modal-actions .save-btn:hover {
+    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+}
+#settings-status {
+    margin-top: 1rem;
+    text-align: center;
+    font-weight: 500;
+}
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body {% block body_attrs %}{% endblock %}>
+    <!-- Mobile menu toggle -->
+    <div class="md:hidden fixed bottom-4 right-4 z-50">
+        <button id="mobile-menu-toggle" class="bg-primary text-white p-3 rounded-full shadow-lg">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar">
+        <!-- Logo Section -->
+        <div class="p-4 flex items-center justify-between border-b border-gray-700">
+            <div class="flex items-center">
+                <div class="sidebar-logo h-10 w-10 flex items-center justify-center mr-3">
+                    <svg width="40" height="40" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M100,20 A15,15 0 1,1 100,20 M160,20 A15,15 0 1,1 160,20 M40,20 A15,15 0 1,1 40,20 M130,50 A15,15 0 1,1 130,50 M70,50 A15,15 0 1,1 70,50 M100,80 A15,15 0 1,1 100,80 M160,80 A15,15 0 1,1 160,80 M40,80 A15,15 0 1,1 40,80 M130,110 A15,15 0 1,1 130,110 M70,110 A15,15 0 1,1 70,110 M100,140 A15,15 0 1,1 100,140 M100,170 A15,15 0 1,1 100,170 M190,50 A15,15 0 1,1 190,50 M10,50 A15,15 0 1,1 10,50 M10,140 A15,15 0 1,1 10,140 M160,170 A15,15 0 1,1 160,170" stroke="currentColor" stroke-width="15" fill="none" class="text-white" />
+                    </svg>
+                </div>
+                <h1 class="text-xl font-bold text-white menu-text">CoT:: Turing</h1>
+            </div>
+            <button id="sidebar-toggle" class="text-gray-400 hover:text-white">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+        </div>
+        
+        <!-- User Section -->
+        <div class="p-4 border-b border-gray-700">
+            <div class="flex items-center">
+                <div class="avatar">
+                    {% if user.is_authenticated %}
+                        {{ user.username.0|upper }}
+                    {% else %}
+                        ?
+                    {% endif %}
+                </div>
+                <div class="ml-3 menu-text">
+                    <div class="flex items-center">
+                        <p class="text-sm font-medium">
+                            {% if user.is_authenticated %}
+                                {{ user.username }}
+                            {% else %}
+                                Guest
+                            {% endif %}
+                        </p>
+                        {% if user.is_authenticated %}
+                            <span class="ml-2 pulse"></span>
+                        {% endif %}
+                    </div>
+                    <p class="text-xs text-gray-400">
+                        {% if user.is_authenticated %}
+                            {{ user.email }}
+                        {% else %}
+                            Not logged in
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Menu Items -->
+        <div class="p-2">
+            <p class="section-header menu-text">Main Menu</p>
+            {% if user_group == 'admin' %}
+                <a href="/" class="menu-item {% if request.path == '/' %}active{% endif %}">
+                    <i class="fas fa-home"></i>
+                    <span class="menu-text">Dashboard</span>
+                </a>
+                <a href="/task-sync/" class="menu-item {% if request.path == '/task-sync/' %}active{% endif %}">
+                    <i class="fas fa-link"></i>
+                    <span class="menu-text">Task Sync Config</span>
+                </a>
+            {% elif user_group == 'pod_lead' %}
+                <a href="{% url 'reviewer_dashboard' %}" class="menu-item {% if request.path == '/reviewer/' %}active{% endif %}">
+                    <i class="fas fa-home"></i>
+                    <span class="menu-text">Dashboard</span>
+                </a>
+            {% elif user_group == 'trainer' %}
+                <a href="/dashboard/tasks" class="menu-item {% if request.path == '/dashboard/tasks/' %}active{% endif %}">
+                    <i class="fas fa-tasks"></i>
+                    <span class="menu-text">Task Dashboard</span>
+                </a>
+            {% endif %}
+<a href="/modal_playground/" class="menu-item {% if request.path == '/modal_playground/' %}active{% endif %}">
+    <i class="fas fa-flask"></i>
+    <span class="menu-text">Modal Playground</span>
+</a>
+        </div>
+        
+        <!-- Bottom Section -->
+        <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700">
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="menu-item text-gray-400 hover:text-white w-full">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span class="menu-text">Logout</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="content" class="content">
+        <!-- Top Nav Bar -->
+        <div class="bg-white shadow-sm px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center">
+                <button id="mobile-sidebar-toggle" class="mr-4 text-gray-500 md:hidden">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h2 class="text-lg font-medium text-gray-800">
+                    {% if request.path == '/' %}
+                        Dashboard
+                    {% elif request.path == '/model_evaluation/' %}
+                        Model Analysis
+                    {% elif request.path == '/ground_truth/' %}
+                        Ground Truth
+                    {% elif request.path == '/convert_jsons/' %}
+                        Convert JSONs
+                    {% elif request.path == '/validation_check/' %}
+                        Validation Check
+                    {% elif request.path == '/logical_checks/' %}
+                        Logical Check
+                    {% elif request.path == '/processor/upload/' %}
+                        Colab CSV Upload
+                    {% elif request.path == '/reports/' %}
+                        Analytics Reports
+                    {% else %}
+                        Dashboard
+                    {% endif %}
+                </h2>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="relative">
+                    <button class="text-gray-500 hover:text-gray-700 p-1">
+                        <i class="far fa-bell"></i>
+                    </button>
+                    <div class="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></div>
+                </div>
+                <div class="relative">
+                    <button id="settings-btn" class="text-gray-500 hover:text-gray-700 p-1">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+                <div class="h-8 w-px bg-gray-200"></div>
+                <div class="flex items-center">
+                    <div class="avatar mr-2">
+                        {{ user.username.0|upper }}
+                    </div>
+                    <div class="text-sm font-medium text-gray-700">{{ user.username }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Flash Messages -->
+        {% if messages %}
+        <div class="fixed top-20 right-4 z-50">
+            {% for message in messages %}
+            <div class="{% if message.tags == 'success' %}bg-green-100 text-green-700 border-l-4 border-green-500{% else %}bg-red-100 text-red-700 border-l-4 border-red-500{% endif %} 
+                        px-6 py-4 rounded-lg shadow-md mb-4 
+                        flex items-center justify-between
+                        animate-fade-in-down" 
+                 role="alert">
+                <span class="flex items-center">
+                    {% if message.tags == 'success' %}
+                    <i class="fas fa-check-circle mr-2"></i>
+                    {% else %}
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    {% endif %}
+                    {{ message }}
+                </span>
+                <button class="text-gray-400 hover:text-gray-600 ml-4" onclick="this.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <!-- Page Content -->
+        <div class="p-6">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full bg-gray-50 border-t border-gray-200 py-4 mt-12">
+        <div class="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between text-gray-500 text-sm">
+            <div class="mb-2 md:mb-0">
+                &copy; {{ now|date:"Y" }} LLM Evaluation Dashboard. All rights reserved.
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="https://github.com/ashutosh-turing/eval" target="_blank" class="hover:text-blue-600 transition">GitHub</a>
+                <span class="hidden md:inline">|</span>
+                <a href="mailto:support@example.com" class="hover:text-blue-600 transition">Contact Support</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Settings Modal for Streams and Subjects -->
+    <div id="settings-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+        <div class="modal-content" style="max-width:600px;">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <i class="fas fa-sliders-h text-indigo-500"></i> Select Streams and Subjects
+                </h3>
+                <button id="close-settings-modal" class="close-btn" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="streams-form">
+                <div class="mb-4 mt-4">
+                    <label for="streams-select" class="block text-base font-medium text-gray-700 mb-2">Choose your preferred Streams and Subjects:</label>
+                    <select id="streams-select" name="streams" multiple>
+                        {% for stream in streams_and_subjects %}
+                        <option value="{{ stream.id }}" {% if stream.id in preferred_streams %}selected class="selected-check"{% endif %}>{{ stream.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-xs text-gray-500 mt-2">Hold Ctrl (Windows) or Command (Mac) to select multiple.</p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancel-settings" class="cancel-btn">Cancel</button>
+                    <button type="submit" class="save-btn">Save</button>
+                </div>
+                <div id="settings-status" class="mt-3 text-sm hidden"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sidebar toggle
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.getElementById('sidebar');
+            const content = document.getElementById('content');
+            
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('sidebar-collapsed');
+                    content.classList.toggle('content-expanded');
+                    
+                    // Toggle icon
+                    const icon = this.querySelector('i');
+                    if (sidebar.classList.contains('sidebar-collapsed')) {
+                        icon.classList.remove('fa-chevron-left');
+                        icon.classList.add('fa-chevron-right');
+                    } else {
+                        icon.classList.remove('fa-chevron-right');
+                        icon.classList.add('fa-chevron-left');
+                    }
+                });
+            }
+            
+            // Mobile menu toggle
+            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+            const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
+            
+            if (mobileMenuToggle) {
+                mobileMenuToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('sidebar-visible');
+                });
+            }
+            
+            if (mobileSidebarToggle) {
+                mobileSidebarToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('sidebar-visible');
+                });
+            }
+            
+            // Auto-hide flash messages after 5 seconds
+            const flashMessages = document.querySelectorAll('[role="alert"]');
+            flashMessages.forEach(message => {
+                setTimeout(() => {
+                    message.style.opacity = '0';
+                    message.style.transition = 'opacity 0.5s ease';
+                    setTimeout(() => {
+                        message.remove();
+                    }, 500);
+                }, 5000);
+            });
+
+            // Settings modal logic
+            const settingsBtn = document.getElementById('settings-btn');
+            const settingsModal = document.getElementById('settings-modal');
+            const closeSettingsModal = document.getElementById('close-settings-modal');
+            const cancelSettings = document.getElementById('cancel-settings');
+            settingsBtn.addEventListener('click', function() {
+                // Restore previous selection in the modal
+                const select = document.getElementById('streams-select');
+                if (select && window.preferredStreams) {
+                    Array.from(select.options).forEach(option => {
+                        // Convert both to string for comparison
+                        option.selected = window.preferredStreams.map(String).includes(String(option.value));
+                    });
+                }
+                settingsModal.classList.remove('hidden');
+            });
+            closeSettingsModal.addEventListener('click', function() {
+                settingsModal.classList.add('hidden');
+            });
+            cancelSettings.addEventListener('click', function() {
+                settingsModal.classList.add('hidden');
+            });
+            // Save handler (AJAX to persist user preferences)
+            document.getElementById('streams-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const select = document.getElementById('streams-select');
+                const selected = Array.from(select.selectedOptions).map(opt => opt.value);
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+                const params = new URLSearchParams();
+                selected.forEach(val => params.append('streams', val));
+                fetch('/save_user_preferences/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: params
+                })
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('settings-status').textContent = 'Preferences saved!';
+                    document.getElementById('settings-status').classList.remove('hidden');
+                    setTimeout(() => {
+                        settingsModal.classList.add('hidden');
+                        document.getElementById('settings-status').classList.add('hidden');
+                        window.location.reload(); // Reload to update system messages
+                    }, 1200);
+                })
+                .catch(() => {
+                    document.getElementById('settings-status').textContent = 'Error saving preferences.';
+                    document.getElementById('settings-status').classList.remove('hidden');
+                });
+            });
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+
+    <!-- On page load, store preferredStreams from template context -->
+    <script>
+        window.preferredStreams = [];
+        try {
+            window.preferredStreams = JSON.parse('{{ preferred_streams|safe|escapejs }}');
+        } catch (e) {}
+    </script>
+</body>
+</html>

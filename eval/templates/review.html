@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="reviewer-review-root">
+    
+    <!-- Header Section -->
+    <div class="mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            Code Review Analysis
+          </h1>
+          <p class="mt-2 text-lg text-gray-600">AI-powered code review and quality assessment</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+          <div class="flex items-center space-x-2 px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200">
+            <i class="fas fa-hashtag text-blue-500"></i>
+            <span class="text-sm font-medium text-gray-700">Question ID:</span>
+            <span class="text-sm font-bold text-blue-600">{{ question_id }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+      
+      <!-- Left Column - Input Section -->
+      <div class="xl:col-span-1 space-y-6">
+
+        <!-- System Message Section -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+          <div class="flex items-center mb-4">
+            <div class="p-2 bg-indigo-100 rounded-lg mr-3">
+              <i class="fas fa-message text-indigo-600 text-lg"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800">System Message</h3>
+          </div>
+          <div>
+            <select name="system_message" id="system_message" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200">
+              {% if system_messages %}
+                {% for sm in system_messages %}
+                  <option value="{{ sm.content|escape }}">{{ sm.name }}</option>
+                {% endfor %}
+              {% endif %}
+              <option value="custom">Custom</option>
+            </select>
+            <div id="custom-system-message-container" class="hidden mt-3">
+              <label for="custom_system_message" class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-pen mr-1 text-indigo-500"></i>
+                Custom System Message
+              </label>
+              <textarea name="custom_system_message" id="custom_system_message" rows="3" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 resize-none p-3" placeholder="Enter your custom system message..."></textarea>
+            </div>
+          </div>
+          <hr class="dotted-divider">
+        </div>
+          <div class="flex items-center mb-4">
+            <div class="p-2 bg-orange-100 rounded-lg mr-3">
+              <i class="fab fa-google text-orange-600 text-lg"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800">Google Colab Link</h3>
+          </div>
+          
+          <div class="space-y-4">
+            <div>
+              <input type="url" 
+                     class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200" 
+                     id="colab-link" 
+                     placeholder="https://colab.research.google.com/drive/...">
+            </div>
+            
+            <button class="w-full inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-xl shadow-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200" 
+                    id="fetch-colab-btn">
+              <i class="fas fa-cloud-download-alt mr-2"></i>
+              Fetch Content
+            </button>
+            
+            <div id="colab-fetch-status" class="text-sm text-center"></div>
+          </div>
+        </div>
+
+        <!-- Additional Context Section -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+          <div class="flex items-center mb-4">
+            <div class="p-2 bg-teal-100 rounded-lg mr-3">
+              <i class="fas fa-comment-alt text-teal-600 text-lg"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800">Additional Context</h3>
+          </div>
+          
+          <div class="space-y-4">
+            <div>
+              <label for="additional-context" class="block text-sm font-medium text-gray-700 mb-2">
+                Provide context for better analysis (optional)
+              </label>
+              <textarea 
+                id="additional-context" 
+                rows="4" 
+                class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 resize-none" 
+                placeholder="e.g., This is a machine learning project focusing on image classification. Please pay attention to data preprocessing and model architecture..."></textarea>
+            </div>
+            <div class="text-xs text-gray-500">
+              <i class="fas fa-info-circle mr-1"></i>
+              This context will be included in the analysis to provide more targeted feedback.
+            </div>
+          </div>
+        </div>
+
+        <!-- Model Selection Section -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center">
+              <div class="p-2 bg-purple-100 rounded-lg mr-3">
+                <i class="fas fa-robot text-purple-600 text-lg"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800">LLM Models</h3>
+            </div>
+            <button class="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200" 
+                    id="refresh-models-btn">
+              <i class="fas fa-sync-alt mr-1"></i>
+              Refresh
+            </button>
+          </div>
+          
+          <!-- Temperature Setting -->
+          <div class="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div class="flex items-center justify-between mb-2">
+              <label for="temperature-slider" class="text-sm font-medium text-gray-700">
+                <i class="fas fa-thermometer-half mr-1 text-orange-500"></i>
+                Temperature
+              </label>
+              <span id="temperature-value" class="text-sm font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded-full">0.7</span>
+            </div>
+            <input 
+              type="range" 
+              id="temperature-slider" 
+              min="0" 
+              max="2" 
+              step="0.1" 
+              value="0.7" 
+              class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
+            <div class="flex justify-between text-xs text-gray-500 mt-1">
+              <span>0.0 (Focused)</span>
+              <span>1.0 (Balanced)</span>
+              <span>2.0 (Creative)</span>
+            </div>
+            <div class="text-xs text-gray-500 mt-2">
+              <i class="fas fa-info-circle mr-1"></i>
+              Controls randomness: lower values for more focused responses, higher for more creative ones.
+            </div>
+          </div>
+          
+          <div id="llm-models-list" class="space-y-3 h-48 overflow-y-auto">
+            <div class="flex items-center justify-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span class="ml-3 text-gray-500">Loading models...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+          <button class="w-full inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 transform hover:scale-105" 
+                  id="run-review-btn">
+            <i class="fas fa-play mr-2"></i>
+            Run Analysis
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Column - Content and Results -->
+      <div class="xl:col-span-2 space-y-6">
+        
+        <!-- Colab Content Preview -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div class="flex items-center">
+              <div class="p-2 bg-blue-100 rounded-lg mr-3">
+                <i class="fas fa-file-code text-blue-600 text-lg"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800">Content Preview</h3>
+            </div>
+          </div>
+          
+          <div id="colab-content-container" class="p-6 h-96 overflow-y-auto">
+            <div id="colab-content-markdown" class="prose prose-sm max-w-none">
+              <div class="flex flex-col items-center justify-center py-12 text-gray-400">
+                <i class="fas fa-file-alt text-4xl mb-4"></i>
+                <p class="text-lg font-medium">No content loaded</p>
+                <p class="text-sm">Fetch a Google Colab notebook to see the preview here</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="review-results-section" class="space-y-6">
+          <!-- Results will be dynamically inserted here -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/marked.min.js' %}"></script>
+<script src="{% static 'js/review.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Show/hide custom system message textarea
+  const systemMessageSelect = document.getElementById('system_message');
+  const customSystemMessageContainer = document.getElementById('custom-system-message-container');
+  if (systemMessageSelect && customSystemMessageContainer) {
+    systemMessageSelect.addEventListener('change', function() {
+      if (this.value === 'custom') {
+        customSystemMessageContainer.classList.remove('hidden');
+      } else {
+        customSystemMessageContainer.classList.add('hidden');
+      }
+    });
+  }
+});
+</script>
+<style>
+  .prose pre {
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  .model-result-section {
+    @apply bg-white rounded-2xl shadow-lg overflow-hidden;
+  }
+  .model-result-header {
+    @apply p-4 border-b border-gray-200 flex justify-between items-center;
+  }
+  .model-result-title {
+    @apply text-lg font-bold text-gray-800 flex items-center;
+  }
+  .model-result-content {
+    @apply p-6 prose prose-sm max-w-none;
+    max-height: 20rem;
+    overflow-y: auto;
+  }
+  .dotted-divider {
+    border: none;
+    border-top: 2px dotted #cbd5e1;
+    margin: 1.5rem 0;
+  }
+</style>
+{% endblock %}

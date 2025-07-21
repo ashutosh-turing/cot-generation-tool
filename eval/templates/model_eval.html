@@ -1,0 +1,2759 @@
+{% extends "index.html" %}
+
+{% block content %}
+<!-- Add Fontawesome CDN -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+<!-- Add Marked.js for Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<!-- Add Tailwind Typography for better markdown styling -->
+<link href="https://cdn.jsdelivr.net/npm/@tailwindcss/typography@0.5.9/dist/typography.min.css" rel="stylesheet">
+
+<style>
+    /* Improved animations */
+    .flash {
+        animation: flash-animation 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    
+    @keyframes flash-animation {
+        0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+        50% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0.3); }
+        100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+    
+    .animate-fade-in {
+        animation: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    @keyframes fade-in {
+        0% { opacity: 0; transform: translateY(12px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Subtle hover effects for interactive elements */
+    .interactive-hover {
+        transition: all 0.2s ease;
+    }
+    
+    .interactive-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    /* Enhanced status badges */
+    .status-badge {
+        transition: all 0.3s ease;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+    }
+    
+    .status-badge.success {
+        background-color: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+    
+    .status-badge.error {
+        background-color: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+    }
+    
+    .status-badge.pending {
+        background-color: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+    }
+    
+    /* Improved History Sidebar Styles */
+    .history-sidebar {
+        position: fixed;
+        top: 64px;
+        right: -380px;
+        width: 380px;
+        height: calc(100vh - 64px);
+        background-color: white;
+        box-shadow: -5px 0 20px rgba(0, 0, 0, 0.08);
+        z-index: 998;
+        transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        overflow-y: auto;
+        padding: 1.75rem;
+        border-left: 1px solid #e5e7eb;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f8fafc;
+    }
+    
+    .history-sidebar::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .history-sidebar::-webkit-scrollbar-track {
+        background: #f8fafc;
+    }
+    
+    .history-sidebar::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 6px;
+    }
+
+    .history-sidebar.active {
+        right: 0;
+        display: block !important;
+    }
+
+    .history-item {
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .history-item:hover {
+        background-color: #f3f4f6;
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        border-color: #d1d5db;
+    }
+    
+    .history-item::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, #3b82f6, #60a5fa);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.3s ease;
+    }
+    
+    .history-item:hover::after {
+        transform: scaleX(1);
+    }
+
+    .history-model-badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        background-color: #e0f2fe;
+        color: #0369a1;
+        margin-bottom: 0.5rem;
+        border: 1px solid #bae6fd;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        letter-spacing: 0.025em;
+    }
+
+    .history-date {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 0.5rem;
+    }
+
+    .history-prompt {
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: #374151;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    /* Enhanced Modal Styles */
+    .history-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(4px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .history-modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .history-modal-container {
+        background-color: white;
+        border-radius: 0.75rem;
+        max-width: 850px;
+        width: 92%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        padding: 1.75rem;
+        position: relative;
+        transform: scale(0.95) translateY(10px);
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f8fafc;
+    }
+    
+    .history-modal-container::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .history-modal-container::-webkit-scrollbar-track {
+        background: #f8fafc;
+    }
+    
+    .history-modal-container::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 6px;
+    }
+
+    .history-modal-overlay.active .history-modal-container {
+        transform: scale(1) translateY(0);
+    }
+    
+    /* Enhanced button styles */
+    .modal-btn {
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .modal-btn::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: currentColor;
+        transform: scaleX(0);
+        transform-origin: right;
+        transition: transform 0.3s ease;
+    }
+    
+    .modal-btn:hover::after {
+        transform: scaleX(1);
+        transform-origin: left;
+    }
+    
+    #close-modal {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-radius: 50%;
+    }
+    
+    #close-modal:hover {
+        background-color: #fee2e2;
+        color: #b91c1c;
+        transform: rotate(90deg);
+    }
+    
+    #use-this-prompt-btn:hover,
+    #copy-prompt-btn:hover,
+    #copy-system-btn:hover,
+    #copy-all-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    #use-this-prompt-btn:active,
+    #copy-prompt-btn:active,
+    #copy-system-btn:active,
+    #copy-all-btn:active {
+        transform: translateY(-1px);
+    }
+
+    /* Improved highlight animation for copy buttons */
+    .copy-flash {
+        animation: copy-flash 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes copy-flash {
+        0% { background-color: #10B981; color: white; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+        70% { background-color: #10B981; color: white; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+        100% { background-color: initial; color: initial; box-shadow: none; }
+    }
+
+    /* Save button styles */
+    .save-to-history-btn {
+        transition: all 0.2s ease;
+    }
+
+    .save-to-history-btn:hover {
+        transform: translateY(-1px);
+    }
+
+    .save-to-history-btn:active {
+        transform: translateY(0);
+    }
+
+    /* Toggle button styling */
+    .history-toggle-button {
+        position: relative;
+    }
+
+    .history-toggle-button .badge {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        height: 8px;
+        width: 8px;
+        border-radius: 50%;
+        background-color: #3B82F6;
+    }
+    
+    /* Improved code display */
+    pre {
+        position: relative;
+        transition: all 0.2s ease;
+    }
+    
+    pre:hover {
+        transform: scale(1.01);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    /* Improved server log styling */
+    #server-logs {
+        font-family: 'Courier New', monospace;
+        line-height: 1.5;
+        transition: height 0.3s ease;
+    }
+    
+    /* Progress bar animation */
+    .bg-blue-600 {
+        transition: width 0.5s ease-in-out;
+    }
+    
+    /* Better form controls */
+    textarea:focus, select:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    }
+    
+    /* Button hover effect */
+    button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    button:active {
+        transform: translateY(0);
+    }
+
+    /* Button flash animation */
+    .flash-button {
+        background-color: #1E40AF !important;
+        transform: scale(0.95);
+        transition: all 0.2s ease;
+    }
+    
+    /* Editor styling */
+    #edit-response-textarea {
+        font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        line-height: 1.5;
+        tab-size: 2;
+    }
+    
+    .format-btn {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    
+    .format-btn:hover {
+        background-color: #e5e7eb;
+        color: #1e40af;
+    }
+    
+    .format-btn:active {
+        transform: scale(0.95);
+    }
+    
+    /* Preview panel styling */
+    #preview-content {
+        line-height: 1.6;
+    }
+    
+    #preview-content pre {
+        background-color: #f3f4f6;
+        border-radius: 0.375rem;
+        padding: 0.75rem;
+        overflow-x: auto;
+    }
+    
+    #preview-content code {
+        font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        font-size: 0.875rem;
+        padding: 0.125rem 0.25rem;
+        background-color: #f3f4f6;
+        border-radius: 0.25rem;
+    }
+    
+    #preview-content blockquote {
+        border-left: 4px solid #d1d5db;
+        padding-left: 1rem;
+        color: #4b5563;
+        font-style: italic;
+    }
+    
+    /* Make history buttons more prominent */
+    #history-toggle, #mobile-history-toggle, #fixed-history-toggle {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    #history-toggle:hover, #mobile-history-toggle:hover, #fixed-history-toggle:hover {
+        transform: scale(1.05);
+        background-color: #2563EB;
+    }
+    
+    /* Ensure sidebar has proper transitions */
+    #history-sidebar {
+        transition: transform 0.3s ease-in-out;
+    }
+    
+    /* Enhanced styles for prompt, system message, and response sections */
+    .prompt-section {
+        background-color: #f0f9ff; /* Light blue background */
+        border: 1px solid #bae6fd;
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    .prompt-section:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border-color: #93c5fd;
+    }
+    
+    .system-section {
+        background-color: #f0fdf4; /* Light green background */
+        border: 1px solid #bbf7d0;
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    .system-section:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border-color: #86efac;
+    }
+    
+    .response-section {
+        background-color: #faf5ff; /* Light purple background */
+        border: 1px solid #e9d5ff;
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    .response-section:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border-color: #d8b4fe;
+    }
+    
+    /* Edited badge styling */
+    .edited-badge {
+        background-color: #e9d5ff;
+        color: #6b21a8;
+    }
+    
+    /* Edit history styling */
+    .edit-history-details {
+        max-height: 200px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f8fafc;
+    }
+    
+    .edit-history-details::-webkit-scrollbar {
+        width: 4px;
+    }
+    
+    .edit-history-details::-webkit-scrollbar-track {
+        background: #f8fafc;
+    }
+    
+    .edit-history-details::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 4px;
+    }
+    
+    .edit-history-item {
+        border-left: 2px solid #e9d5ff;
+        transition: all 0.2s ease;
+    }
+    
+    .edit-history-item:hover {
+        border-left-color: #a855f7;
+        background-color: #f5f3ff;
+    }
+    
+    .toggle-edit-history {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .toggle-edit-history:hover {
+        text-decoration: underline;
+    }
+    
+    .prompt-header, .system-header, .response-header {
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        color: #1e40af; /* Dark blue for headers */
+        letter-spacing: 0.025em;
+        display: flex;
+        align-items: center;
+    }
+    
+    .prompt-header::before {
+        content: '💬';
+        margin-right: 0.5rem;
+    }
+    
+    .system-header::before {
+        content: '⚙️';
+        margin-right: 0.5rem;
+    }
+    
+    .response-header::before {
+        content: '🤖';
+        margin-right: 0.5rem;
+    }
+    
+    .prompt-content, .system-content, .response-content {
+        color: #1e3a8a; /* Dark blue for content */
+        line-height: 1.7;
+        font-size: 0.95rem;
+    }
+    
+    .error-content {
+        background-color: #fef2f2; /* Light red background */
+        border: 1px solid #fecaca;
+        color: #b91c1c; /* Dark red for error text */
+    }
+</style>
+
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-2 text-gray-800 flex items-center">
+        <span class="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Model Analysis Dashboard</span>
+        <span class="ml-3 px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Beta</span>
+    </h1>
+    <p class="text-gray-600 mb-8 text-lg">Evaluate and compare LLM model performance with customizable prompts</p>
+    
+    <form id="evaluationForm" class="space-y-8" method="POST" onsubmit="return false;">
+        {% csrf_token %}
+        
+        <!-- In-page History Button -->
+        <div class="flex justify-end mb-4">
+            <button type="button" id="in-page-history-btn" class="flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-md hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all duration-300 interactive-hover">
+                <i class="fas fa-history mr-2"></i> View Analysis History
+            </button>
+        </div>
+        
+        <!-- LLM Models Section -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between mb-4 border border-gray-200 rounded-lg p-5 transition-all hover:shadow-md bg-gradient-to-br from-white to-blue-50">
+                <h2 class="text-2xl font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-robot text-blue-500 mr-3"></i>
+                    Available LLM Models
+                </h2>
+                <button type="button" id="toggle-models" class="p-2 rounded-full text-gray-600 hover:text-blue-600 hover:bg-blue-100 focus:outline-none transition-colors">
+                    <i class="fas fa-minus-circle text-xl" id="toggle-icon"></i>
+                </button>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-6 border border-gray-100" id="models-container">
+                <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                    {% for model in llm_models %}
+                    <div class="border border-gray-200 rounded-lg p-5 transition-all hover:shadow-lg relative overflow-hidden bg-gradient-to-br from-white to-blue-50 interactive-hover">
+                        <div class="absolute top-0 right-0 p-2">
+                            <input type="checkbox" id="model-{{ model.id }}" name="models[]" value="{{ model.id }}"
+                                class="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        </div>
+                        
+                        <div class="pl-2 pr-6">
+                            <label for="model-{{ model.id }}" class="block cursor-pointer">
+                                <div class="flex items-center mb-2">
+                                    <span class="text-lg font-medium text-gray-900">{{ model.name }}</span>
+                                    {% if model.is_active %}
+                                    <span class="ml-2 px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 border border-green-200 shadow-sm">Active</span>
+                                    {% else %}
+                                    <span class="ml-2 px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 border border-red-200 shadow-sm">Inactive</span>
+                                    {% endif %}
+                                </div>
+                                
+                                {% if model.temperature %}
+                                <div class="flex items-center text-sm text-gray-600 mb-1">
+                                    <i class="fas fa-thermometer-half mr-2"></i>
+                                    <span>Temperature: {{ model.temperature }}</span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if model.description %}
+                                <p class="mt-2 text-sm text-gray-500">{{ model.description }}</p>
+                                {% endif %}
+                            </label>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-span-full text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                        <i class="fas fa-robot text-4xl mb-3 text-gray-300"></i>
+                        <p>No LLM models available</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- User Prompt Input -->
+        <div class="bg-white rounded-lg shadow-lg p-6 border border-gray-200 transition-all hover:shadow-lg">
+            <div class="flex items-center justify-between mb-3">
+                <label for="manualPrompt" class="text-lg font-medium text-gray-800 flex items-center">
+                    <i class="fas fa-comment-alt text-blue-500 mr-2"></i>
+                    User Prompt
+                </label>
+                <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 border border-red-200 shadow-sm font-semibold">Required</span>
+            </div>
+            <textarea id="manualPrompt" name="manual_prompt_text" rows="6" class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm" placeholder="Enter the user prompt for the models here..." required></textarea>
+        </div>
+
+        <!-- System Message Selection -->
+        <div class="bg-white rounded-lg shadow-lg p-6 border border-gray-200 transition-all hover:shadow-lg">
+            <div class="flex items-center justify-between mb-3">
+                <label for="systemMessageSelect" class="text-lg font-medium text-gray-800 flex items-center">
+                    <i class="fas fa-cog text-blue-500 mr-2"></i>
+                    System Message
+                </label>
+                <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 border border-blue-200 shadow-sm font-semibold">Optional</span>
+            </div>
+            
+            <div class="relative">
+                <select id="systemMessageSelect" name="system_message_id" class="appearance-none bg-gradient-to-br from-white to-blue-50 block w-full px-4 py-3 pr-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm">
+                    <option value="">-- None --</option>
+                    <option value="custom">-- Custom --</option>
+                    {% for msg in default_system_messages %}
+                        <option value="{{ msg.id }}" data-content="{{ msg.content|escape }}">{{ msg.name }}</option>
+                    {% endfor %}
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+            </div>
+            
+            <div class="mt-4 transition-all" id="customMessageContainer">
+                <textarea id="customSystemMessage" name="custom_system_message" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hidden shadow-sm" placeholder="Enter your custom system message here..."></textarea>
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="bg-white rounded-lg shadow-lg p-6 border border-gray-200 transition-all hover:shadow-lg">
+            <div class="flex justify-between items-center">
+                <span class="text-gray-700 italic flex items-center">
+                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                    Click to analyze all selected models with the provided prompt
+                </span>
+                <button type="submit" id="evaluateButton"
+                    class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all interactive-hover">
+                    <i class="fas fa-chart-line mr-2"></i> Analyze Selected Models
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Loading Indicator (Hidden by default) -->
+    <div id="loadingIndicator" class="hidden mt-8">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <h3 class="text-lg font-semibold text-gray-800">Processing your request</h3>
+                </div>
+                <span id="elapsed-time-display" class="text-sm font-medium text-gray-500">00:00</span>
+            </div>
+            
+            <!-- Overall Progress -->
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-700">Overall Progress:</span>
+                    <span class="text-sm font-bold text-blue-700" id="static-progress-counter">0/0 completed</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" id="static-progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <!-- Model Status Cards -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Model Status:</h4>
+                <div id="model-status-list" class="border border-gray-200 rounded-md p-3 max-h-48 overflow-y-auto">
+                    <!-- Individual model status will be added here -->
+                </div>
+            </div>
+            
+            <!-- Server Logs -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-sm font-medium text-gray-700">Processing Logs:</h4>
+                    <button id="clear-logs" class="text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 p-1 rounded transition-colors">Clear</button>
+                </div>
+                <div id="server-logs" class="bg-gray-900 text-gray-300 font-mono text-xs p-3 rounded-md h-40 overflow-y-auto whitespace-pre-wrap leading-5">
+                    <!-- Server logs will be added here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Message (Hidden by default) -->
+    <div id="errorMessage" class="hidden mt-8">
+        <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-red-700" id="errorText"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section (Hidden by default) -->
+    <div id="resultsSection" class="hidden mt-8">
+        <h2 class="text-2xl font-semibold mb-4">Analysis Results</h2>
+        <div id="resultsContainer" class="space-y-4">
+            <!-- Results will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <!-- History Sidebar Toggle Button (Mobile/Responsive) -->
+    <div class="md:hidden fixed bottom-20 right-4 z-40">
+        <button id="mobile-history-toggle" class="bg-blue-600 text-white p-3 rounded-full shadow-lg">
+            <i class="fas fa-history"></i>
+        </button>
+    </div>
+    
+    <!-- History Sidebar -->
+    <div id="history-sidebar" class="history-sidebar">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-gray-800">Analysis History</h3>
+            <button id="close-history" class="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="history-items-container" class="space-y-4">
+            <div class="flex items-center justify-center h-40 text-gray-400">
+                <p>Loading history...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Details Modal -->
+    <div id="history-modal" class="history-modal-overlay">
+        <div class="history-modal-container">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800" id="modal-title">Analysis Details</h3>
+                <button id="close-modal" class="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-300">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="mb-4">
+                <span id="modal-model-badge" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    Model Name
+                </span>
+                <span id="modal-date" class="text-sm text-gray-500 ml-2">Date</span>
+            </div>
+            <div class="mb-4">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Prompt:</h4>
+                <div id="modal-prompt" class="prompt-section">
+                    <div class="prompt-content">
+                        <pre class="bg-transparent p-0 overflow-x-auto text-sm my-2 border-0"><code class="text-gray-800">${promptText}</code></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">System Instructions:</h4>
+                <div id="modal-system" class="system-section">
+                    <div class="system-content">
+                        <pre class="bg-transparent p-0 overflow-x-auto text-xs my-2 border-0"><code>${systemMessage}</code></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Response:</h4>
+                <div id="modal-response" class="response-section">
+                    <div class="response-content">
+                        <pre class="bg-transparent p-0 overflow-x-auto text-sm my-2 border-0"><code class="text-gray-800">${result.response || 'No response data'}</code></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Metrics:</h4>
+                <div id="modal-metrics" class="bg-gray-50 p-3 rounded-md text-sm"></div>
+            </div>
+            <div class="flex justify-end mt-6">
+                <button id="use-this-prompt-btn" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-md hover:from-blue-700 hover:to-indigo-700 mr-3 shadow-md hover:shadow-lg transition-all duration-300 modal-btn">
+                    <i class="fas fa-sync-alt mr-1"></i> Use This Prompt
+                </button>
+                <button id="copy-prompt-btn" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 mr-3 shadow hover:shadow-md transition-all duration-300 modal-btn">
+                    <i class="far fa-copy mr-1"></i> Copy Prompt
+                </button>
+                <button id="copy-system-btn" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 mr-3 shadow hover:shadow-md transition-all duration-300 modal-btn">
+                    <i class="far fa-copy mr-1"></i> Copy System
+                </button>
+                <button id="copy-all-btn" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 shadow hover:shadow-md transition-all duration-300 modal-btn">
+                    <i class="far fa-copy mr-1"></i> Copy All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript for handling form submission and displaying results -->
+    <script>
+window.addEventListener('load', function() {
+    console.log('Window loaded - setting up history functionality');
+    
+    // Debug - check if history sidebar exists
+    const sidebar = document.getElementById('history-sidebar');
+    console.log('History sidebar element found:', !!sidebar);
+    
+    // Set up form submission handler
+    const evaluationForm = document.getElementById('evaluationForm');
+    if (evaluationForm) {
+        console.log('Form found, setting up submission handler');
+        
+        evaluationForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Get selected models
+            const selectedModels = [];
+            document.querySelectorAll('input[name="models[]"]:checked').forEach(checkbox => {
+                selectedModels.push(checkbox.value);
+            });
+            
+            if (selectedModels.length === 0) {
+                showError('Please select at least one model to evaluate.');
+                return;
+            }
+            
+            const promptText = document.getElementById('manualPrompt').value.trim();
+            if (!promptText) {
+                showError('Please enter a prompt.');
+                return;
+            }
+            
+            // Determine the system message to send
+            let systemMessageContent = '';
+            const systemSelect = document.getElementById('systemMessageSelect');
+            const customSystemInput = document.getElementById('customSystemMessage');
+            if (systemSelect.value === 'custom') {
+                systemMessageContent = customSystemInput.value.trim();
+            } else if (systemSelect.value) { // This block runs when selecting a DB message
+                const selectedOption = systemSelect.options[systemSelect.selectedIndex];
+                // Get content from data-content attribute or fallback to text
+                systemMessageContent = selectedOption.getAttribute('data-content') || selectedOption.text;
+                console.log('Selected system message from dropdown:', systemMessageContent);
+            }
+            // If systemSelect.value is empty (e.g., '-- None --'), systemMessageContent remains ''
+            
+            // Prepare data for the initial POST request
+            const requestData = {
+                models: selectedModels,
+                manual_prompt: promptText,       // The user's prompt
+                system_message: systemMessageContent // The selected or custom system message
+            };
+            
+            console.log('Submitting evaluation request with data:', requestData);
+            // Show loading indicator and hide results section
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('errorMessage').classList.add('hidden');
+            
+            console.log('Submitting evaluation request with data:', requestData);
+
+            // Reset counters and progress
+            document.getElementById('static-progress-counter').textContent = '0/' + selectedModels.length + ' completed';
+            document.getElementById('static-progress-bar').style.width = '0%';
+            
+            // Clear status list and logs
+            const statusList = document.getElementById('model-status-list');
+            if (statusList) {
+                statusList.innerHTML = '';
+            }
+            const serverLogs = document.getElementById('server-logs');
+            if (serverLogs) {
+                serverLogs.innerHTML = '';
+            }
+            
+            // Make the initial request to start the evaluation
+            
+            // Clear previous results
+            const resultsContainer = document.getElementById('resultsContainer');
+            if (resultsContainer) {
+                resultsContainer.innerHTML = '';
+            }
+            
+            // Track processed results to prevent duplicates
+            const processedResults = new Set();
+            
+            // Start timer
+            let seconds = 0;
+            const timerDisplay = document.getElementById('elapsed-time-display');
+            const timer = setInterval(() => {
+                seconds++;
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                timerDisplay.textContent = 
+                    (minutes < 10 ? '0' : '') + minutes + ':' + 
+                    (remainingSeconds < 10 ? '0' : '') + remainingSeconds;
+            }, 1000);
+            
+            // Make the initial request to start the evaluation
+            fetch('/evaluate_models/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(requestData) // Send the prepared data
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Try to get more detailed error information if available
+                    return response.text().then(text => {
+                        try {
+                            // Try to parse as JSON first
+                            const errorData = JSON.parse(text);
+                            throw new Error(errorData.error || errorData.message || 'Network response was not ok: ' + response.statusText);
+                        } catch (e) {
+                            // If not JSON, use the text or status
+                            throw new Error(text || 'Network response was not ok: ' + response.statusText);
+                        }
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Evaluation initiated with session:', data.session_id);
+                
+                // Store the session ID globally for later use
+                window.currentSessionId = data.session_id;
+                
+                // Store in session storage as well for persistence
+                try {
+                    sessionStorage.setItem('currentSessionId', data.session_id);
+                } catch (e) {
+                    console.warn('Could not store session ID in sessionStorage:', e);
+                }
+                
+                // Start polling for results
+                let currentIndex = 0;
+                const pollForResults = () => {
+                    fetch(`/get_model_results/${data.session_id}?last_seen=${currentIndex}`)
+                        .then(response => {
+                            if (response.status === 204) {
+                                // No content yet, keep polling
+                                setTimeout(pollForResults, 1000);
+                                return { results: [], has_more: true };
+                            }
+                            if (!response.ok) {
+                                // Try to get more detailed error information
+                                return response.text().then(text => {
+                                    try {
+                                        // Try to parse as JSON first
+                                        const errorData = JSON.parse(text);
+                                        throw new Error(errorData.error || errorData.message || 'Error fetching results: ' + response.statusText);
+                                    } catch (e) {
+                                        // If not JSON, use the text or status
+                                        throw new Error(text || 'Error fetching results: ' + response.statusText);
+                                    }
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(resultsData => {
+                            if (!resultsData) {
+                                console.error('Received empty response');
+                                setTimeout(pollForResults, 1000);
+                                return;
+                            }
+                            
+                            if (resultsData.error) {
+                                throw new Error(resultsData.error);
+                            }
+                            
+                            console.log('Received results data:', resultsData);
+                            
+                            // Update progress
+                            const completed = resultsData.completed || 0;
+                            const total = resultsData.total || selectedModels.length;
+                            document.getElementById('static-progress-counter').textContent = 
+                                completed + '/' + total + ' completed';
+                            document.getElementById('static-progress-bar').style.width = 
+                                (completed / total * 100) + '%';
+                            
+                            // Process any new results
+                            if (resultsData.results && resultsData.results.length > 0) {
+                                // Update the results section
+                                if (document.getElementById('resultsSection').classList.contains('hidden')) {
+                                    document.getElementById('resultsSection').classList.remove('hidden');
+                                }
+                                
+                                // Process each result
+                                resultsData.results.forEach(result => {
+                                    // Check if result is valid
+                                    if (!result) {
+                                        console.error('Received invalid result');
+                                        return;
+                                    }
+                                    
+                                    // Create a unique identifier for this result
+                                    const resultId = `${result.model_id || 'unknown'}-${result.model_name}`;
+                                    
+                                    // Skip if we've already processed this result
+                                    if (processedResults.has(resultId)) {
+                                        console.log('Skipping duplicate result:', resultId);
+                                        return;
+                                    }
+                                    
+                                    // Mark this result as processed
+                                    processedResults.add(resultId);
+                                    
+                                    console.log('Processing result:', result);
+                                    
+                                    // Add to model status list
+                                    addModelStatus(result);
+                                    
+                                    // Add to server logs
+                                    const timeInfo = result.time_taken ? ` in ${result.time_taken}s` : '';
+                                    addToServerLogs(`Model ${result.model_name} ${result.status || 'processed'}${timeInfo}`);
+                                    
+                                    // Add to results container
+                                    addResultCard(result);
+                                });
+                                
+                                // Update the current index
+                                currentIndex = resultsData.current_index || (currentIndex + resultsData.results.length);
+                            }
+                            
+                            // Continue polling if there are more results expected
+                            if (resultsData.has_more) {
+                                setTimeout(pollForResults, 1000);
+                            } else {
+                                // All done
+                                clearInterval(timer);
+                                document.getElementById('loadingIndicator').classList.add('hidden');
+                                addToServerLogs('All evaluations completed!');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching results:', error);
+                            showError(error.message || 'An error occurred while fetching results.');
+                            clearInterval(timer);
+                            document.getElementById('loadingIndicator').classList.add('hidden');
+                        });
+                };
+                
+                // Start polling
+                pollForResults();
+            })
+            .catch(error => {
+                console.error('Error submitting evaluation:', error);
+                showError(error.message || 'An error occurred while submitting the evaluation.');
+                clearInterval(timer);
+                document.getElementById('loadingIndicator').classList.add('hidden');
+            });
+        });
+    } else {
+        console.error('Evaluation form not found');
+    }
+    
+    // Helper function to show error
+    function showError(message) {
+        console.error('Error:', message);
+        
+        const errorElement = document.getElementById('errorMessage');
+        const errorTextElement = document.getElementById('errorText');
+        
+        // Hide loading indicator if it's visible
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        if (loadingIndicator && !loadingIndicator.classList.contains('hidden')) {
+            loadingIndicator.classList.add('hidden');
+        }
+        
+        if (errorElement && errorTextElement) {
+            errorTextElement.textContent = message;
+            errorElement.classList.remove('hidden');
+            
+            // Scroll to error message
+            errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            console.error('Error elements not found');
+            alert(message);
+        }
+    }
+    
+    // Helper function to add model status
+    function addModelStatus(result) {
+        const statusList = document.getElementById('model-status-list');
+        
+        if (!statusList) return;
+        
+        const statusItem = document.createElement('div');
+        statusItem.className = 'flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0';
+        
+        let statusClass = 'bg-gray-100 text-gray-800'; // Default
+        let statusText = 'Processing';
+        
+        if (result.status === 'completed') {
+            statusClass = 'bg-green-100 text-green-800';
+            statusText = 'Completed';
+        } else if (result.status === 'error') {
+            statusClass = 'bg-red-100 text-red-800';
+            statusText = 'Error';
+        }
+        
+        statusItem.innerHTML = `
+            <span class="font-medium">${result.model_name}</span>
+            <span class="status-badge px-2 py-1 text-xs rounded-full ${statusClass}">${statusText}</span>
+        `;
+        
+        statusList.appendChild(statusItem);
+    }
+    
+    // Helper function to add to server logs
+    function addToServerLogs(message) {
+        const logs = document.getElementById('server-logs');
+        
+        if (!logs) return;
+        
+        const timestamp = new Date().toLocaleTimeString();
+        const logItem = document.createElement('div');
+        logItem.textContent = `[${timestamp}] ${message}`;
+        
+        logs.appendChild(logItem);
+        logs.scrollTop = logs.scrollHeight; // Auto-scroll to bottom
+    }
+    
+    // Helper function to add result card
+    function addResultCard(result) {
+        const container = document.getElementById('resultsContainer');
+        
+        if (!container) return;
+        
+        console.log('Adding result card for:', result.model_name, result);
+        
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-lg shadow-md p-6 animate-fade-in mb-6 border border-gray-200 hover:shadow-md transition-shadow duration-200';
+        // Ensure we have a valid ID for the card that matches what we'll use for the response ID
+        const responseId = result.id || result.response_id || result.evaluation_id || '';
+        card.id = `result-card-${responseId || result.model_id || 'unknown'}-${Date.now()}`; // Unique ID
+        console.log('Created result card with ID:', card.id, 'for response ID:', responseId);
+        
+        let statusBadge = '';
+        if (result.status === 'completed') {
+            statusBadge = `<span class="status-badge success px-2 py-1 rounded-full text-xs font-medium">Completed in ${result.time_taken}s</span>`;
+        } else if (result.status === 'error') {
+            statusBadge = `<span class="status-badge error px-2 py-1 rounded-full text-xs font-medium">Error</span>`;
+        }
+        
+        // Get the prompt text from the form input
+        const promptText = document.getElementById('manualPrompt').value.trim();
+        
+        // Get the correct system message that was used in the request
+        let systemMessage = '';
+        
+        // First try to get system_instructions from the result object if available
+        if (result.system_instructions) {
+            systemMessage = result.system_instructions;
+            console.log('Using system_instructions from result:', systemMessage);
+        } else {
+            // Otherwise try to determine what was selected
+            const systemSelect = document.getElementById('systemMessageSelect');
+            if (systemSelect.value === 'custom') {
+                // Custom system message was used
+                systemMessage = document.getElementById('customSystemMessage').value.trim();
+                console.log('Using custom system message input:', systemMessage);
+            } else if (systemSelect.value) {
+                // System message from dropdown was used
+                const selectedOption = systemSelect.options[systemSelect.selectedIndex];
+                systemMessage = selectedOption.getAttribute('data-content') || selectedOption.text;
+                console.log('Using system message from dropdown:', systemMessage);
+            }
+        }
+        
+        // Format metrics if available
+        let metricsHtml = '';
+        const metrics = result.metrics || result.evaluation_metrics || {};
+        if (Object.keys(metrics).length > 0) {
+            metricsHtml = `
+                <div class="mt-4 border-t border-gray-200 pt-4">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Metrics:</h4>
+                    <div class="grid grid-cols-2 gap-2">
+            `;
+            
+            for (const [key, value] of Object.entries(metrics)) {
+                metricsHtml += `
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-gray-600">${key}:</span>
+                        <span class="text-xs text-gray-800">${value}</span>
+                    </div>
+                `;
+            }
+            
+            metricsHtml += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        card.innerHTML = `
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-lg font-semibold text-gray-800">${result.model_name}</h3>
+                </div>
+                ${statusBadge}
+            </div>
+            
+            <div class="prompt-section">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="prompt-header">Prompt:</h4>
+                    <button class="copy-prompt-button text-gray-500 hover:text-blue-600 hover:bg-blue-50 p-1 rounded transition-colors" title="Copy prompt">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="stroke-[2] size-4">
+                            <rect x="3" y="8" width="13" height="13" rx="4" stroke="currentColor"></rect>
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M13 2.00004L12.8842 2.00002C12.0666 1.99982 11.5094 1.99968 11.0246 2.09611C9.92585 2.31466 8.95982 2.88816 8.25008 3.69274C7.90896 4.07944 7.62676 4.51983 7.41722 5.00004H9.76392C10.189 4.52493 10.7628 4.18736 11.4147 4.05768C11.6802 4.00488 12.0228 4.00004 13 4.00004H14.6C15.7366 4.00004 16.5289 4.00081 17.1458 4.05121C17.7509 4.10066 18.0986 4.19283 18.362 4.32702C18.9265 4.61464 19.3854 5.07358 19.673 5.63807C19.8072 5.90142 19.8994 6.24911 19.9488 6.85428C19.9992 7.47112 20 8.26343 20 9.40004V11C20 11.9773 19.9952 12.3199 19.9424 12.5853C19.8127 13.2373 19.4748 13.8114 19 14.2361V16.5829C20.4795 15.9374 21.5804 14.602 21.9039 12.9755C22.0004 12.4907 22.0002 11.9334 22 11.1158L22 11V9.40004V9.35725C22 8.27346 22 7.3993 21.9422 6.69141C21.8826 5.96256 21.7568 5.32238 21.455 4.73008C20.9757 3.78927 20.2108 3.02437 19.27 2.545C18.6777 2.24322 18.0375 2.1174 17.3086 2.05785C16.6007 2.00002 15.7266 2.00003 14.6428 2.00004L14.6 2.00004H13Z" fill="currentColor"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="prompt-content"><pre class="bg-transparent p-0 overflow-x-auto text-sm my-2 border-0"><code class="text-gray-800">${promptText}</code></pre></div>
+            </div>
+            
+            <div class="system-section mt-2">
+                <h4 class="system-header">System Message:</h4>
+                <div class="system-content"><pre class="bg-transparent p-0 overflow-x-auto text-xs my-2 border-0"><code>${systemMessage}</code></pre></div>
+            </div>
+            
+            <div class="response-section">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="response-header">Response:</h4>
+                    <div class="flex space-x-2">
+                        <button class="edit-response-button text-gray-500 hover:text-blue-600 hover:bg-blue-50 p-1 rounded transition-colors" title="Edit response">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="stroke-[2] size-4">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <button class="copy-response-button text-gray-500 hover:text-blue-600 hover:bg-blue-50 p-1 rounded transition-colors" title="Copy response">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="stroke-[2] size-4">
+                                <rect x="3" y="8" width="13" height="13" rx="4" stroke="currentColor"></rect>
+                                <path fill-rule="evenodd" clip-rule="evenodd" d="M13 2.00004L12.8842 2.00002C12.0666 1.99982 11.5094 1.99968 11.0246 2.09611C9.92585 2.31466 8.95982 2.88816 8.25008 3.69274C7.90896 4.07944 7.62676 4.51983 7.41722 5.00004H9.76392C10.189 4.52493 10.7628 4.18736 11.4147 4.05768C11.6802 4.00488 12.0228 4.00004 13 4.00004H14.6C15.7366 4.00004 16.5289 4.00081 17.1458 4.05121C17.7509 4.10066 18.0986 4.19283 18.362 4.32702C18.9265 4.61464 19.3854 5.07358 19.673 5.63807C19.8072 5.90142 19.8994 6.24911 19.9488 6.85428C19.9992 7.47112 20 8.26343 20 9.40004V11C20 11.9773 19.9952 12.3199 19.9424 12.5853C19.8127 13.2373 19.4748 13.8114 19 14.2361V16.5829C20.4795 15.9374 21.5804 14.602 21.9039 12.9755C22.0004 12.4907 22.0002 11.9334 22 11.1158L22 11V9.40004V9.35725C22 8.27346 22 7.3993 21.9422 6.69141C21.8826 5.96256 21.7568 5.32238 21.455 4.73008C20.9757 3.78927 20.2108 3.02437 19.27 2.545C18.6777 2.24322 18.0375 2.1174 17.3086 2.05785C16.6007 2.00002 15.7266 2.00003 14.6428 2.00004L14.6 2.00004H13Z" fill="currentColor"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                ${result.error ? 
+                    `<div class="error-content p-3 rounded-md text-sm mb-4">${result.error}</div>` : 
+                    `<div class="response-content"><pre class="bg-transparent p-0 overflow-x-auto text-sm my-2 border-0"><code class="text-gray-800">${result.response || 'No response data'}</code></pre></div>`
+                }
+            </div>
+            
+            <div class="flex flex-wrap gap-4 text-sm text-gray-500 mt-3">
+                <div class="timing-info flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Response time: ${result.time_taken || '0'}s
+                </div>
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    ${new Date().toLocaleTimeString()}
+                </div>
+                <div class="flex items-center">
+                    <button class="transfer-to-colab-btn text-blue-600 hover:text-blue-800 hover:underline flex items-center" data-response-id="${result.id}">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+                        </svg>
+                        Transfer to Colab
+                    </button>
+                </div>
+            </div>
+            ${metricsHtml}
+        `;
+        
+        // Prepend the new card to show latest results at the top
+        if (container.firstChild) {
+            container.insertBefore(card, container.firstChild);
+        } else {
+            container.appendChild(card);
+        }
+        
+        // Add click handlers for buttons
+        const copyPromptBtn = card.querySelector('.copy-prompt-button');
+        if (copyPromptBtn) {
+            copyPromptBtn.addEventListener('click', function() {
+                copyTextToClipboard(promptText, copyPromptBtn);
+            });
+        }
+        
+        const copyResponseBtn = card.querySelector('.copy-response-button');
+        if (copyResponseBtn) {
+            copyResponseBtn.addEventListener('click', function() {
+                copyTextToClipboard(result.response || '', copyResponseBtn);
+            });
+        }
+        
+        const editResponseBtn = card.querySelector('.edit-response-button');
+        if (editResponseBtn) {
+            editResponseBtn.addEventListener('click', function() {
+                openEditResponseModal(result, card.id);
+            });
+        }
+        
+        // Flash animation for the new card
+        setTimeout(() => {
+            card.classList.add('flash');
+            setTimeout(() => card.classList.remove('flash'), 1000);
+        }, 100);
+    }
+    
+    // Helper function for copying text to clipboard with fallback
+    function copyTextToClipboard(text, button) {
+        console.log('Copying text to clipboard:', text.substring(0, 50) + '...');
+        
+        // Create a temporary textarea element
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        
+        // Set positioning to be absolute and off-screen
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.pointerEvents = 'none';
+        
+        // Add to DOM, select content, and try to copy
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        
+        let successful = false;
+        
+        try {
+            // Try the modern clipboard API first
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text)
+                    .then(() => {
+                        console.log('Text copied to clipboard successfully using Clipboard API');
+                        showCopyFeedback(button);
+                    })
+                    .catch(err => {
+                        console.error('Clipboard API failed:', err);
+                        // Fall back to document.execCommand
+                        successful = document.execCommand('copy');
+                        console.log('Fallback copy was ' + (successful ? 'successful' : 'unsuccessful'));
+                        if (successful) showCopyFeedback(button);
+                    })
+                    .finally(() => {
+                        // Clean up
+                        document.body.removeChild(textarea);
+                    });
+            } else {
+                // If Clipboard API is not available, use execCommand
+                successful = document.execCommand('copy');
+                console.log('execCommand copy was ' + (successful ? 'successful' : 'unsuccessful'));
+                if (successful) showCopyFeedback(button);
+                document.body.removeChild(textarea);
+            }
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            document.body.removeChild(textarea);
+        }
+    }
+    
+    // Helper function to show copy feedback animation
+    function showCopyFeedback(button) {
+        if (!button) return;
+        
+        // Save original inner HTML
+        const originalHTML = button.innerHTML;
+        
+        // Change to checkmark icon
+        button.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="stroke-[2] size-4 text-green-500">
+                <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        `;
+        
+        // Restore after 1 second
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+        }, 1000);
+    }
+    
+    // Clear logs button
+    const clearLogsBtn = document.getElementById('clear-logs');
+    if (clearLogsBtn) {
+        clearLogsBtn.addEventListener('click', function() {
+            document.getElementById('server-logs').innerHTML = '';
+        });
+    }
+    
+    // Define loadEvaluationHistory function
+    function loadEvaluationHistory() {
+        console.log('Loading evaluation history');
+        const historyContainer = document.getElementById('history-items-container');
+        
+        if (!historyContainer) {
+            console.error('History container not found');
+            return;
+        }
+        
+        // Show loading state
+        historyContainer.innerHTML = '<div class="flex items-center justify-center h-40 text-gray-400"><p>Loading history...</p></div>';
+        
+        // Fetch history data
+        console.log('Fetching history data');
+        fetch('/get_evaluation_history/')
+            .then(response => {
+                console.log('Received response:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Parsed history data:', data);
+                if (data.success && data.history && data.history.length > 0) {
+                    // Clear loading state
+                    historyContainer.innerHTML = '';
+                    
+                    // Add history items
+                    data.history.forEach(item => {
+                        const date = new Date(item.created_at);
+                        const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        
+                        const historyItem = document.createElement('div');
+                        historyItem.className = 'history-item';
+                        historyItem.dataset.id = item.id;
+                        
+                        // Add edited badge if the response has been edited
+                        const editedBadge = item.is_edited ? 
+                            '<span class="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800 ml-2">Edited</span>' : '';
+                        
+                        historyItem.innerHTML = `
+                            <div class="flex items-center">
+                                <div class="history-model-badge">${item.model_name}</div>
+                                ${editedBadge}
+                            </div>
+                            <div class="history-prompt">${item.prompt}</div>
+                            <div class="history-date">${formattedDate}</div>
+                        `;
+                        
+                        // Add click event to show details
+                        historyItem.addEventListener('click', function() {
+                            console.log('History item clicked:', item.id);
+                            showHistoryDetails(item.id);
+                        });
+                        
+                        historyContainer.appendChild(historyItem);
+                    });
+                } else {
+                    historyContainer.innerHTML = '<div class="flex flex-col items-center justify-center h-40 text-gray-400"><i class="fas fa-history text-2xl mb-2"></i><p>No analysis history yet</p></div>';
+                    console.log('No history data found or success was false');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading history:', error);
+                historyContainer.innerHTML = '<div class="flex items-center justify-center h-40 text-red-400"><p>Error loading history</p></div>';
+            });
+    }
+    
+    // Function to provide visual feedback when button is clicked
+    function flashButton(button) {
+        if (!button) return;
+        
+        button.classList.add('flash-button');
+        setTimeout(() => {
+            button.classList.remove('flash-button');
+        }, 300);
+    }
+    
+    // Function to toggle history sidebar
+    function toggleHistorySidebar() {
+        console.log('Toggle history sidebar called');
+        const sidebar = document.getElementById('history-sidebar');
+        
+        if (!sidebar) {
+            console.error('History sidebar element not found');
+            return;
+        }
+        
+        const isHidden = !sidebar.classList.contains('active');
+        console.log('Sidebar is currently hidden:', isHidden);
+        
+        if (isHidden) {
+            // Show sidebar
+            sidebar.classList.add('active');
+            loadEvaluationHistory(); // Load history data when showing
+            console.log('Showing sidebar');
+        } else {
+            // Hide sidebar
+            sidebar.classList.remove('active');
+            console.log('Hiding sidebar');
+        }
+    }
+    
+    // Setup event listeners for history buttons
+    const historyButton = document.getElementById('history-toggle');
+    const mobileHistoryButton = document.getElementById('mobile-history-toggle');
+    const inPageHistoryButton = document.getElementById('in-page-history-btn');
+    
+    console.log('History buttons found:', {
+        main: !!historyButton,
+        mobile: !!mobileHistoryButton,
+        inPage: !!inPageHistoryButton
+    });
+    
+    if (historyButton) {
+        historyButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Main history button clicked');
+            flashButton(historyButton);
+            toggleHistorySidebar();
+        });
+    }
+    
+    if (mobileHistoryButton) {
+        mobileHistoryButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Mobile history button clicked');
+            flashButton(mobileHistoryButton);
+            toggleHistorySidebar();
+        });
+    }
+    
+    if (inPageHistoryButton) {
+        inPageHistoryButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('In-page history button clicked');
+            flashButton(inPageHistoryButton);
+            toggleHistorySidebar();
+        });
+    }
+    
+    // Add event listener for close button
+    const closeHistoryButton = document.getElementById('close-history');
+    if (closeHistoryButton) {
+        closeHistoryButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Close history button clicked');
+            toggleHistorySidebar();
+        });
+    }
+    
+    // Function to show history item details
+    function showHistoryDetails(itemId) {
+        console.log('Showing details for history item:', itemId);
+        
+        // Store the current item ID for later use
+        window.currentHistoryItemId = itemId;
+        
+        // Get the modal elements
+        const modal = document.getElementById('history-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modelBadge = document.getElementById('modal-model-badge');
+        const dateSpan = document.getElementById('modal-date');
+        const promptDiv = document.getElementById('modal-prompt');
+        const systemDiv = document.getElementById('modal-system');
+        const responseDiv = document.getElementById('modal-response');
+        const metricsDiv = document.getElementById('modal-metrics');
+        
+        if (!modal) {
+            console.error('History modal not found');
+            return;
+        }
+        
+        // Show loading state
+        modalTitle.textContent = 'Loading Details...';
+        promptDiv.textContent = 'Loading...';
+        systemDiv.textContent = 'Loading...';
+        responseDiv.textContent = 'Loading...';
+        metricsDiv.textContent = 'Loading...';
+        
+        // Show the modal
+        modal.classList.add('active');
+        
+        // Also fetch previously selected streams and subjects
+        console.log('Fetching previously selected streams and subjects for item:', itemId);
+        
+        // Fetch the details for this history item
+        fetch(`/get_evaluation_history/?id=${itemId}`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('Received history details:', data);
+                
+                if (data.success && data.history && data.history.length > 0) {
+                    const item = data.history[0];
+                    
+                    // Update modal content
+                    modalTitle.textContent = 'Analysis Details';
+                    modelBadge.textContent = item.model_name;
+                    
+                    const date = new Date(item.created_at);
+                    dateSpan.textContent = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    
+                    // Apply new styling to modal content
+                    promptDiv.className = 'prompt-section';
+                    promptDiv.innerHTML = `<h4 class="prompt-header">Prompt:</h4><div class="prompt-content">${item.prompt}</div>`;
+                    
+                    systemDiv.className = 'system-section';
+                    systemDiv.innerHTML = `<h4 class="system-header">System Message:</h4><div class="system-content">${item.system_instructions || 'No system instructions'}</div>`;
+                    
+                    responseDiv.className = 'response-section';
+                    
+                    // Check if the response has been edited
+                    const isEdited = item.is_edited || false;
+                    const editBadge = isEdited ? '<span class="edited-badge ml-2 px-2 py-1 rounded-full text-xs font-medium">Edited</span>' : '';
+                    
+                    // Use formatted_response if available, otherwise use regular response
+                    // Make sure to handle HTML content properly
+                    let responseContent = item.formatted_response || item.response;
+                    
+                    // If the content appears to be HTML (contains tags), don't escape it
+                    if (!responseContent.includes('<') && !responseContent.includes('>')) {
+                        // If it's plain text, wrap in a pre tag for proper formatting
+                        responseContent = `<pre class="bg-transparent p-0 overflow-x-auto text-sm my-2 border-0"><code class="text-gray-800">${responseContent}</code></pre>`;
+                    }
+                    
+                    responseDiv.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="response-header">Response:${editBadge}</h4>
+                            <button class="edit-history-response-button text-gray-500 hover:text-blue-600 hover:bg-blue-50 p-1 rounded transition-colors" title="Edit response">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="stroke-[2] size-4">
+                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="response-content">${responseContent}</div>
+                    `;
+                    
+                    // Add edit history if available
+                    if (item.edit_history && item.edit_history.length > 0) {
+                        const historySection = document.createElement('div');
+                        historySection.className = 'mt-3 border-t border-gray-200 pt-3';
+                        historySection.innerHTML = `
+                            <div class="flex items-center mb-2">
+                                <h5 class="text-sm font-medium text-gray-700">Edit History (${item.edit_history.length})</h5>
+                                <button class="toggle-edit-history ml-2 text-xs text-blue-600 hover:text-blue-800">Show</button>
+                            </div>
+                            <div class="edit-history-details hidden space-y-2">
+                                ${item.edit_history.map((edit, index) => {
+                                    const editDate = new Date(edit.edited_at);
+                                    const formattedEditDate = editDate.toLocaleDateString() + ' ' + editDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                    return `
+                                        <div class="edit-history-item p-2 bg-gray-50 rounded text-xs">
+                                            <div class="flex justify-between text-gray-500 mb-1">
+                                                <span>Edit #${item.edit_history.length - index}</span>
+                                                <span>${formattedEditDate} by ${edit.editor || 'Unknown'}</span>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        `;
+                        responseDiv.appendChild(historySection);
+                        
+                        // Add toggle functionality for edit history
+                        const toggleButton = historySection.querySelector('.toggle-edit-history');
+                        const historyDetails = historySection.querySelector('.edit-history-details');
+                        
+                        if (toggleButton && historyDetails) {
+                            toggleButton.addEventListener('click', function() {
+                                if (historyDetails.classList.contains('hidden')) {
+                                    historyDetails.classList.remove('hidden');
+                                    toggleButton.textContent = 'Hide';
+                                } else {
+                                    historyDetails.classList.add('hidden');
+                                    toggleButton.textContent = 'Show';
+                                }
+                            });
+                        }
+                    }
+                    
+                    // Handle previously selected streams and subjects if available
+                    let streamsHtml = '';
+                    if (item.selected_streams && Array.isArray(item.selected_streams) && item.selected_streams.length > 0) {
+                        console.log('Found previously selected streams:', item.selected_streams);
+                        
+                        // Create a more detailed display with selection options
+                        streamsHtml = `
+                            <div class="mt-4 border-t border-gray-200 pt-4">
+                                <h4 class="text-sm font-medium text-gray-700 mb-2">Selected Streams:</h4>
+                                <div class="mb-4">
+                                    <select id="modal-streams-select" name="modal-streams" multiple class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                        ${item.all_streams ? item.all_streams.map(stream => 
+                                            `<option value="${stream.id}" ${item.selected_streams.includes(stream.id) ? 'selected' : ''}>${stream.name}</option>`
+                                        ).join('') : ''}
+                                    </select>
+                                    <p class="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Command (Mac) to select multiple.</p>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    ${item.selected_streams.map(stream => {
+                                        let streamName = stream;
+                                        if (item.all_streams && Array.isArray(item.all_streams)) {
+                                            const foundStream = item.all_streams.find(s => s.id === stream);
+                                            if (foundStream && foundStream.name) {
+                                                streamName = foundStream.name;
+                                            }
+                                        }
+                                        return `<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">${streamName}</span>`;
+                                    }).join('')}
+                                </div>
+                            </div>`;
+                    }
+                    
+                    let subjectsHtml = '';
+                    if (item.selected_subjects && Array.isArray(item.selected_subjects) && item.selected_subjects.length > 0) {
+                        console.log('Found previously selected subjects:', item.selected_subjects);
+                        
+                        // Create a more detailed display with selection options
+                        subjectsHtml = `
+                            <div class="mt-4 border-t border-gray-200 pt-4">
+                                <h4 class="text-sm font-medium text-gray-700 mb-2">Selected Subjects:</h4>
+                                <div class="mb-4">
+                                    <select id="modal-subjects-select" name="modal-subjects" multiple class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                        ${item.all_subjects ? item.all_subjects.map(subject => 
+                                            `<option value="${subject.id}" ${item.selected_subjects.includes(subject.id) ? 'selected' : ''}>${subject.name}</option>`
+                                        ).join('') : ''}
+                                    </select>
+                                    <p class="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Command (Mac) to select multiple.</p>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    ${item.selected_subjects.map(subject => {
+                                        let subjectName = subject;
+                                        if (item.all_subjects && Array.isArray(item.all_subjects)) {
+                                            const foundSubject = item.all_subjects.find(s => s.id === subject);
+                                            if (foundSubject && foundSubject.name) {
+                                                subjectName = foundSubject.name;
+                                            }
+                                        }
+                                        return `<span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">${subjectName}</span>`;
+                                    }).join('')}
+                                </div>
+                            </div>`;
+                    }
+                    
+                    // Add streams and subjects sections to the modal if they exist
+                    if (streamsHtml || subjectsHtml) {
+                        // First, remove any existing selections div to avoid duplicates
+                        const existingSelectionsDiv = document.querySelector('.modal-selections-div');
+                        if (existingSelectionsDiv) {
+                            existingSelectionsDiv.remove();
+                        }
+                        
+                        const selectionsDiv = document.createElement('div');
+                        selectionsDiv.className = 'mb-4 modal-selections-div';
+                        selectionsDiv.innerHTML = streamsHtml + subjectsHtml;
+                        
+                        // Insert before metrics div
+                        const metricsContainer = document.querySelector('#modal-metrics');
+                        if (metricsContainer && metricsContainer.parentNode) {
+                            metricsContainer.parentNode.insertBefore(selectionsDiv, metricsContainer);
+                        } else {
+                            console.warn('Could not find metrics container to insert selections');
+                            // Fallback - append to modal container
+                            const modalContainer = document.querySelector('.history-modal-container');
+                            if (modalContainer) {
+                                modalContainer.appendChild(selectionsDiv);
+                            }
+                        }
+                    }
+                    
+                    // Format metrics if available
+                    if (item.evaluation_metrics && typeof item.evaluation_metrics === 'object') {
+                        let metricsHtml = '';
+                        for (const [key, value] of Object.entries(item.evaluation_metrics)) {
+                            metricsHtml += `<div class="flex justify-between mb-1">
+                                <span class="font-medium">${key}:</span>
+                                <span>${value}</span>
+                            </div>`;
+                        }
+                        metricsDiv.innerHTML = metricsHtml || 'No metrics available';
+                    } else {
+                        metricsDiv.textContent = 'No metrics available';
+                    }
+                    
+                    // Setup use this prompt button
+                    const usePromptBtn = document.getElementById('use-this-prompt-btn');
+                    if (usePromptBtn) {
+                        usePromptBtn.onclick = function() {
+                            document.getElementById('manualPrompt').value = item.prompt;
+                            document.getElementById('customSystemMessage').value = item.system_instructions || '';
+                            
+                            // Get the values from the modal selects if they exist, otherwise use the original values
+                            const modalStreamsSelect = document.getElementById('modal-streams-select');
+                            const modalSubjectsSelect = document.getElementById('modal-subjects-select');
+                            
+                            let streamsToRestore = item.selected_streams;
+                            let subjectsToRestore = item.selected_subjects;
+                            
+                            // If the modal selects exist, use their values instead
+                            if (modalStreamsSelect) {
+                                streamsToRestore = Array.from(modalStreamsSelect.selectedOptions).map(option => option.value);
+                                console.log('Using streams from modal select:', streamsToRestore);
+                            }
+                            
+                            if (modalSubjectsSelect) {
+                                subjectsToRestore = Array.from(modalSubjectsSelect.selectedOptions).map(option => option.value);
+                                console.log('Using subjects from modal select:', subjectsToRestore);
+                            }
+                            
+                            // Restore the selected streams and subjects
+                            if (streamsToRestore && streamsToRestore.length > 0) {
+                                restoreSelectedStreams(streamsToRestore);
+                            }
+                            
+                            if (subjectsToRestore && subjectsToRestore.length > 0) {
+                                restoreSelectedSubjects(subjectsToRestore);
+                            }
+                            
+                            modal.classList.remove('active');
+                        };
+                    }
+                    
+                    // Setup copy buttons
+                    setupCopyButton('copy-prompt-btn', item.prompt);
+                    setupCopyButton('copy-system-btn', item.system_instructions || '');
+                    setupCopyButton('copy-all-btn', 
+                        `Prompt: ${item.prompt}\n\nSystem: ${item.system_instructions || ''}\n\nResponse: ${item.response}`);
+                    
+                } else {
+                    modalTitle.textContent = 'Error';
+                    promptDiv.textContent = 'Could not load details for this item';
+                    systemDiv.textContent = '';
+                    responseDiv.textContent = '';
+                    metricsDiv.textContent = '';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading history details:', error);
+                modalTitle.textContent = 'Error';
+                promptDiv.textContent = 'An error occurred while loading details';
+                systemDiv.textContent = '';
+                responseDiv.textContent = '';
+                metricsDiv.textContent = '';
+            });
+    }
+    
+    // Helper function for copy buttons
+    function setupCopyButton(buttonId, text) {
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.onclick = function() {
+                copyTextToClipboard(text, button);
+            };
+        }
+    }
+    
+    // Helper function to restore selected streams
+    function restoreSelectedStreams(streams) {
+        console.log('Restoring selected streams:', streams);
+        if (!streams || !Array.isArray(streams)) {
+            console.warn('Invalid streams data:', streams);
+            return;
+        }
+        
+        // Try to find the streams select element
+        const streamsSelect = document.getElementById('streams-select');
+        if (streamsSelect) {
+            // Deselect all options first
+            Array.from(streamsSelect.options).forEach(option => {
+                option.selected = false;
+            });
+            
+            // Select the ones that were previously selected
+            streams.forEach(streamId => {
+                const option = streamsSelect.querySelector(`option[value="${streamId}"]`);
+                if (option) {
+                    option.selected = true;
+                } else {
+                    console.warn(`Stream option with ID ${streamId} not found`);
+                }
+            });
+            
+            // Trigger change event to update any dependent UI
+            const event = new Event('change');
+            streamsSelect.dispatchEvent(event);
+        } else {
+            console.warn('Streams select element not found');
+            
+            // Fallback to checkbox handling if select not found
+            const streamCheckboxes = document.querySelectorAll('input[name="streams[]"]');
+            if (streamCheckboxes.length > 0) {
+                streamCheckboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                
+                streams.forEach(streamId => {
+                    const checkbox = document.querySelector(`input[name="streams[]"][value="${streamId}"]`);
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    } else {
+                        console.warn(`Stream checkbox with ID ${streamId} not found`);
+                    }
+                });
+            } else {
+                console.warn('No stream selection elements found');
+            }
+        }
+    }
+    
+    // Helper function to restore selected subjects
+    function restoreSelectedSubjects(subjects) {
+        console.log('Restoring selected subjects:', subjects);
+        if (!subjects || !Array.isArray(subjects)) {
+            console.warn('Invalid subjects data:', subjects);
+            return;
+        }
+        
+        // Try to find the subjects select element
+        const subjectsSelect = document.getElementById('subjects-select');
+        if (subjectsSelect) {
+            // Deselect all options first
+            Array.from(subjectsSelect.options).forEach(option => {
+                option.selected = false;
+            });
+            
+            // Select the ones that were previously selected
+            subjects.forEach(subjectId => {
+                const option = subjectsSelect.querySelector(`option[value="${subjectId}"]`);
+                if (option) {
+                    option.selected = true;
+                } else {
+                    console.warn(`Subject option with ID ${subjectId} not found`);
+                }
+            });
+            
+            // Trigger change event to update any dependent UI
+            const event = new Event('change');
+            subjectsSelect.dispatchEvent(event);
+        } else {
+            console.warn('Subjects select element not found');
+            
+            // Fallback to checkbox handling if select not found
+            const subjectCheckboxes = document.querySelectorAll('input[name="subjects[]"]');
+            if (subjectCheckboxes.length > 0) {
+                subjectCheckboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                
+                subjects.forEach(subjectId => {
+                    const checkbox = document.querySelector(`input[name="subjects[]"][value="${subjectId}"]`);
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    } else {
+                        console.warn(`Subject checkbox with ID ${subjectId} not found`);
+                    }
+                });
+            } else {
+                console.warn('No subject selection elements found');
+            }
+        }
+    }
+    
+    // Setup event delegation for Transfer to Colab buttons
+    document.addEventListener('click', function(event) {
+        // Check if the clicked element or its parent is a transfer-to-colab-btn
+        const button = event.target.closest('.transfer-to-colab-btn');
+        if (button) {
+            console.log('Transfer to Colab button clicked');
+            try {
+                const responseId = button.getAttribute('data-response-id');
+                console.log('Response ID:', responseId);
+                
+                // Get the response content directly from the button's data attribute
+                const responseContent = button.closest('.flex-wrap').previousElementSibling.querySelector('.response-content pre code')?.textContent || '';
+                console.log('Found response content:', responseContent.substring(0, 50) + '...');
+                
+                // Set the response content in the hidden field
+                document.getElementById('colab-transfer-content').value = responseContent;
+                
+                // Show the modal
+                document.getElementById('colab-transfer-modal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error opening Colab transfer modal:', error);
+                alert('There was an error preparing the content for transfer. Please try again.');
+            }
+        }
+    });
+    
+    // Function to open edit response modal
+    function openEditResponseModal(result, cardId) {
+        console.log('Opening edit modal for result:', result);
+        
+        const modal = document.getElementById('edit-response-modal');
+        const textarea = document.getElementById('edit-response-textarea');
+        const responseIdField = document.getElementById('edit-response-id');
+        const modelIdField = document.getElementById('edit-model-id');
+        const cardIdField = document.getElementById('edit-card-id');
+        
+        // Set the response content in the textarea
+        textarea.value = result.response || '';
+        
+        // Set the hidden fields
+        // Try different properties that might contain the response ID
+        const responseId = result.id || result.response_id || result.evaluation_id || '';
+        responseIdField.value = responseId;
+        
+        // Store the original result object for later reference
+        window.currentEditingResult = result;
+        
+        if (!responseId) {
+            console.warn('No response ID found in result object:', result);
+        }
+        
+        // Use model_name as a fallback if model_id is not available
+        modelIdField.value = result.model_id || result.model_name || '';
+        cardIdField.value = cardId || '';
+        
+        // Store the current session ID in a hidden field if available
+        if (window.currentSessionId) {
+            // Create the field if it doesn't exist
+            let sessionField = document.getElementById('edit-session-id');
+            if (!sessionField) {
+                sessionField = document.createElement('input');
+                sessionField.type = 'hidden';
+                sessionField.id = 'edit-session-id';
+                modal.querySelector('div').appendChild(sessionField);
+            }
+            sessionField.value = window.currentSessionId;
+        }
+        
+        // Reset to editor tab
+        document.getElementById('editor-tab').click();
+        
+        // Show the modal
+        modal.classList.remove('hidden');
+        
+        // Focus the textarea
+        textarea.focus();
+        
+        // Update preview if needed
+        updatePreview();
+    }
+    
+    // Function to update the preview panel with rendered markdown
+    function updatePreview() {
+        const textarea = document.getElementById('edit-response-textarea');
+        const previewContent = document.getElementById('preview-content');
+        
+        if (!textarea || !previewContent) return;
+        
+        // Use marked.js to render markdown if available, otherwise use basic formatting
+        if (typeof marked !== 'undefined') {
+            previewContent.innerHTML = marked.parse(textarea.value);
+        } else {
+            // Basic formatting fallback
+            previewContent.innerHTML = textarea.value
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/~~(.*?)~~/g, '<del>$1</del>');
+        }
+    }
+    
+    // Function to apply formatting to selected text in textarea
+    function applyFormatting(formatType, formatValue = null) {
+        const textarea = document.getElementById('edit-response-textarea');
+        if (!textarea) return;
+        
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selectedText = textarea.value.substring(start, end);
+        let replacement = '';
+        
+        switch (formatType) {
+            case 'bold':
+                replacement = `**${selectedText}**`;
+                break;
+            case 'italic':
+                replacement = `*${selectedText}*`;
+                break;
+            case 'strikethrough':
+                replacement = `~~${selectedText}~~`;
+                break;
+            case 'heading':
+                const level = formatValue || 1;
+                const hashes = '#'.repeat(level);
+                replacement = `${hashes} ${selectedText}`;
+                break;
+            case 'list':
+                const listType = formatValue || 'ul';
+                const lines = selectedText.split('\n');
+                if (listType === 'ul') {
+                    replacement = lines.map(line => `- ${line}`).join('\n');
+                } else if (listType === 'ol') {
+                    replacement = lines.map((line, i) => `${i+1}. ${line}`).join('\n');
+                } else if (listType === 'task') {
+                    replacement = lines.map(line => `- [ ] ${line}`).join('\n');
+                }
+                break;
+            case 'link':
+                replacement = selectedText ? `[${selectedText}](url)` : '[link text](url)';
+                break;
+            case 'image':
+                replacement = `![${selectedText || 'alt text'}](image-url)`;
+                break;
+            case 'code':
+                replacement = selectedText ? `\`${selectedText}\`` : '`code`';
+                break;
+            case 'codeblock':
+                replacement = selectedText ? 
+                    "```\n" + selectedText + "\n```" : 
+                    "```\ncode block\n```";
+                break;
+            default:
+                return;
+        }
+        
+        // Insert the formatted text
+        textarea.focus();
+        document.execCommand('insertText', false, replacement);
+        
+        // Update preview if it's visible
+        if (!document.getElementById('preview-panel').classList.contains('hidden')) {
+            updatePreview();
+        }
+    }
+    
+    // Function to save edited response
+    function saveEditedResponse() {
+        let responseId = document.getElementById('edit-response-id').value;
+        const modelId = document.getElementById('edit-model-id').value;
+        const cardId = document.getElementById('edit-card-id').value;
+        const editedContent = document.getElementById('edit-response-textarea').value;
+        const statusElement = document.getElementById('edit-status');
+        
+        // If responseId is still empty, try to get it from the stored result object
+        if (!responseId && window.currentEditingResult) {
+            responseId = window.currentEditingResult.id || 
+                         window.currentEditingResult.response_id || 
+                         window.currentEditingResult.evaluation_id;
+            console.log('Retrieved response ID from stored result object:', responseId);
+        }
+        
+        // If still no responseId, try to generate one
+        if (!responseId) {
+            // Generate a UUID as a fallback
+            responseId = 'generated-' + Date.now() + '-' + Math.random().toString(36).substring(2, 15);
+            console.log('Generated fallback response ID:', responseId);
+        }
+        
+        console.log('Saving edited response:', {
+            responseId,
+            modelId,
+            editedContent: editedContent.substring(0, 50) + '...'
+        });
+        
+        if (!responseId) {
+            statusElement.textContent = 'Error: Missing response ID';
+            statusElement.classList.remove('hidden', 'text-blue-500', 'text-green-500');
+            statusElement.classList.add('text-red-500');
+            console.error('Missing response ID when trying to save edited response');
+            return;
+        }
+        
+        // Show loading state
+        statusElement.textContent = 'Saving changes...';
+        statusElement.classList.remove('hidden', 'text-red-500', 'text-green-500');
+        statusElement.classList.add('text-blue-500');
+        
+        // Make API call to save the edited response
+        fetch('/save_edited_response/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                response_id: responseId,
+                model_id: modelId || responseId,
+                edited_content: editedContent,
+                session_id: document.getElementById('edit-session-id')?.value || window.currentSessionId || ''
+            })
+        })
+        .then(response => {
+            // Check if the response is OK before trying to parse JSON
+            if (!response.ok) {
+                // Try to get more detailed error information
+                return response.text().then(text => {
+                    // Check if the response starts with HTML
+                    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+                        throw new Error('Server returned an HTML error page. Please check server logs.');
+                    }
+                    
+                    try {
+                        // Try to parse as JSON
+                        const errorData = JSON.parse(text);
+                        throw new Error(errorData.error || errorData.message || 'Server error: ' + response.status);
+                    } catch (e) {
+                        // If not valid JSON, return the text or status
+                        throw new Error(text || 'Server error: ' + response.status);
+                    }
+                });
+            }
+            
+            // If response is OK, parse as JSON
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                let successMessage = 'Changes saved successfully!';
+                if (data.db_updated) {
+                    successMessage += ' (Saved to database)';
+                }
+                statusElement.textContent = successMessage;
+                statusElement.classList.remove('text-blue-500');
+                statusElement.classList.add('text-green-500');
+                
+                // Update the response in the card
+                const card = document.getElementById(cardId);
+                if (card) {
+                    const responseContent = card.querySelector('.response-content');
+                    if (responseContent) {
+                        responseContent.innerHTML = `<pre class="bg-transparent p-0 overflow-x-auto text-sm my-2 border-0"><code class="text-gray-800">${editedContent}</code></pre>`;
+                    }
+                    
+                    // Add an "edited" badge if not already present
+                    const headerDiv = card.querySelector('.flex.justify-between.items-center.mb-3');
+                    if (headerDiv) {
+                        let editedBadge = headerDiv.querySelector('.edited-badge');
+                        if (!editedBadge) {
+                            const statusBadge = headerDiv.querySelector('.status-badge');
+                            if (statusBadge) {
+                                editedBadge = document.createElement('span');
+                                editedBadge.className = 'edited-badge ml-2 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800';
+                                editedBadge.textContent = 'Edited';
+                                statusBadge.parentNode.insertBefore(editedBadge, statusBadge.nextSibling);
+                            }
+                        }
+                    }
+                }
+                
+                // Auto-close after 1.5 seconds
+                setTimeout(() => {
+                    document.getElementById('edit-response-modal').classList.add('hidden');
+                    statusElement.classList.add('hidden');
+                    
+                    // Refresh history sidebar if it's open
+                    if (document.getElementById('history-sidebar').classList.contains('active')) {
+                        loadEvaluationHistory();
+                    }
+                }, 1500);
+            } else {
+                statusElement.textContent = `Error: ${data.error || 'Unknown error occurred'}`;
+                statusElement.classList.remove('text-blue-500');
+                statusElement.classList.add('text-red-500');
+            }
+        })
+        .catch(error => {
+            console.error('Error saving edited response:', error);
+            statusElement.textContent = `Error: ${error.message || 'Failed to connect to server'}`;
+            statusElement.classList.remove('text-blue-500');
+            statusElement.classList.add('text-red-500');
+        });
+    }
+    
+    // Setup event listeners for Edit modal buttons
+    document.addEventListener('click', function(event) {
+        // Close edit modal buttons
+        if (event.target.id === 'close-edit-modal' || event.target.closest('#close-edit-modal')) {
+            document.getElementById('edit-response-modal').classList.add('hidden');
+        }
+        
+        if (event.target.id === 'cancel-edit') {
+            document.getElementById('edit-response-modal').classList.add('hidden');
+        }
+        
+        if (event.target.id === 'save-edit') {
+            saveEditedResponse();
+        }
+        
+        // Tab switching
+        if (event.target.id === 'editor-tab') {
+            document.getElementById('editor-tab').classList.add('text-blue-600', 'border-blue-600');
+            document.getElementById('editor-tab').classList.remove('text-gray-500', 'border-transparent');
+            document.getElementById('preview-tab').classList.add('text-gray-500', 'border-transparent');
+            document.getElementById('preview-tab').classList.remove('text-blue-600', 'border-blue-600');
+            
+            document.getElementById('editor-panel').classList.remove('hidden');
+            document.getElementById('preview-panel').classList.add('hidden');
+            document.getElementById('formatting-toolbar').classList.remove('hidden');
+        }
+        
+        if (event.target.id === 'preview-tab') {
+            document.getElementById('preview-tab').classList.add('text-blue-600', 'border-blue-600');
+            document.getElementById('preview-tab').classList.remove('text-gray-500', 'border-transparent');
+            document.getElementById('editor-tab').classList.add('text-gray-500', 'border-transparent');
+            document.getElementById('editor-tab').classList.remove('text-blue-600', 'border-blue-600');
+            
+            document.getElementById('preview-panel').classList.remove('hidden');
+            document.getElementById('editor-panel').classList.add('hidden');
+            document.getElementById('formatting-toolbar').classList.add('hidden');
+            
+            // Update preview content
+            updatePreview();
+        }
+        
+        // Formatting buttons
+        if (event.target.classList.contains('format-btn') || event.target.closest('.format-btn')) {
+            const button = event.target.classList.contains('format-btn') ? 
+                event.target : event.target.closest('.format-btn');
+            
+            const formatType = button.getAttribute('data-format');
+            const formatValue = button.getAttribute('data-level') || button.getAttribute('data-list-type');
+            
+            applyFormatting(formatType, formatValue);
+        }
+        
+        // Clear formatting button
+        if (event.target.id === 'clear-formatting' || event.target.closest('#clear-formatting')) {
+            const textarea = document.getElementById('edit-response-textarea');
+            if (textarea) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const selectedText = textarea.value.substring(start, end);
+                
+                // Remove markdown formatting
+                let cleanText = selectedText
+                    .replace(/\*\*(.*?)\*\*/g, '$1') // Bold
+                    .replace(/\*(.*?)\*/g, '$1')     // Italic
+                    .replace(/~~(.*?)~~/g, '$1')     // Strikethrough
+                    .replace(/^#+\s+/gm, '')         // Headings
+                    .replace(/^\s*[-*+]\s+/gm, '')   // Unordered lists
+                    .replace(/^\s*\d+\.\s+/gm, '')   // Ordered lists
+                    .replace(/^\s*- \[ \]\s+/gm, '') // Task lists
+                    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Links
+                    .replace(/!\[([^\]]+)\]\([^)]+\)/g, '$1') // Images
+                    .replace(/`([^`]+)`/g, '$1')     // Inline code
+                    .replace(/```[\s\S]*?```/g, function(match) {
+                        return match.replace(/```/g, '').trim(); // Code blocks
+                    });
+                
+                textarea.focus();
+                document.execCommand('insertText', false, cleanText);
+                
+                // Update preview if it's visible
+                if (!document.getElementById('preview-panel').classList.contains('hidden')) {
+                    updatePreview();
+                }
+            }
+        }
+        
+        // Search and replace functionality
+        if (event.target.id === 'search-btn') {
+            const searchText = document.getElementById('search-text').value;
+            const textarea = document.getElementById('edit-response-textarea');
+            
+            if (searchText && textarea) {
+                const content = textarea.value;
+                const position = content.indexOf(searchText, textarea.selectionEnd);
+                
+                if (position !== -1) {
+                    textarea.focus();
+                    textarea.setSelectionRange(position, position + searchText.length);
+                } else {
+                    // If not found from current position, start from beginning
+                    const firstPosition = content.indexOf(searchText);
+                    if (firstPosition !== -1) {
+                        textarea.focus();
+                        textarea.setSelectionRange(firstPosition, firstPosition + searchText.length);
+                    } else {
+                        alert('Text not found');
+                    }
+                }
+            }
+        }
+        
+        if (event.target.id === 'replace-btn') {
+            const searchText = document.getElementById('search-text').value;
+            const replaceText = document.getElementById('replace-text').value;
+            const textarea = document.getElementById('edit-response-textarea');
+            
+            if (searchText && textarea) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const selectedText = textarea.value.substring(start, end);
+                
+                if (selectedText === searchText) {
+                    textarea.focus();
+                    document.execCommand('insertText', false, replaceText);
+                    
+                    // Update preview if it's visible
+                    if (!document.getElementById('preview-panel').classList.contains('hidden')) {
+                        updatePreview();
+                    }
+                } else {
+                    // If selection doesn't match, try to find the text
+                    document.getElementById('search-btn').click();
+                }
+            }
+        }
+        
+        if (event.target.id === 'replace-all-btn') {
+            const searchText = document.getElementById('search-text').value;
+            const replaceText = document.getElementById('replace-text').value;
+            const textarea = document.getElementById('edit-response-textarea');
+            
+            if (searchText && textarea) {
+                const content = textarea.value;
+                const newContent = content.split(searchText).join(replaceText);
+                
+                textarea.value = newContent;
+                
+                // Update preview if it's visible
+                if (!document.getElementById('preview-panel').classList.contains('hidden')) {
+                    updatePreview();
+                }
+            }
+        }
+    });
+    
+    // Add event listener for textarea changes to update preview in real-time
+    document.addEventListener('DOMContentLoaded', function() {
+        const textarea = document.getElementById('edit-response-textarea');
+        if (textarea) {
+            textarea.addEventListener('input', function() {
+                if (!document.getElementById('preview-panel').classList.contains('hidden')) {
+                    updatePreview();
+                }
+            });
+        }
+    });
+    
+    // Setup event listeners for Colab modal buttons - using event delegation for reliability
+    document.addEventListener('click', function(event) {
+        // Close modal buttons
+        if (event.target.id === 'close-colab-modal' || event.target.closest('#close-colab-modal')) {
+            document.getElementById('colab-transfer-modal').classList.add('hidden');
+        }
+        
+        // Edit response button in history modal
+        if (event.target.classList.contains('edit-history-response-button') || event.target.closest('.edit-history-response-button')) {
+            // Get the current item from the modal
+            const modalTitle = document.getElementById('modal-title');
+            const modelBadge = document.getElementById('modal-model-badge');
+            const responseContent = document.querySelector('#modal-response .response-content');
+            
+            if (responseContent) {
+                // Create a result object with the necessary properties
+                const result = {
+                    id: window.currentHistoryItemId, // We'll set this when showing history details
+                    model_name: modelBadge.textContent,
+                    response: responseContent.innerHTML
+                };
+                
+                // Close the history modal
+                document.getElementById('history-modal').classList.remove('active');
+                
+                // Open the edit modal
+                openEditResponseModal(result);
+            }
+        }
+        
+        if (event.target.id === 'cancel-colab-transfer') {
+            document.getElementById('colab-transfer-modal').classList.add('hidden');
+        }
+        
+        // Transfer button
+        if (event.target.id === 'submit-colab-transfer') {
+            const colabUrl = document.getElementById('colab-url-input').value;
+            const markdownContent = document.getElementById('colab-transfer-content').value;
+            
+            if (!colabUrl) {
+                alert('Please enter a valid Colab URL');
+                return;
+            }
+            
+            // Extract the file ID from the Colab URL
+            const match = /\/drive\/([^/?]+)/.exec(colabUrl);
+            if (!match) {
+                alert('Invalid Colab URL format. Expected format: https://colab.research.google.com/drive/FILE_ID');
+                return;
+            }
+            
+            const fileId = match[1];
+            const statusElement = document.getElementById('colab-transfer-status');
+            
+            // Show loading state
+            statusElement.textContent = 'Transferring to Colab...';
+            statusElement.classList.remove('hidden', 'text-red-500', 'text-green-500');
+            statusElement.classList.add('text-blue-500');
+            
+            // Make API call to Google Drive API
+            fetch('/api/transfer-to-colab/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    file_id: fileId,
+                    markdown_content: markdownContent,
+                    multiple_cells: document.getElementById('multiple-cells-checkbox').checked,
+                    cell_separator: '---'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusElement.textContent = 'Successfully transferred to Colab!';
+                    statusElement.classList.remove('text-blue-500');
+                    statusElement.classList.add('text-green-500');
+                    
+                    // Clear the input field
+                    document.getElementById('colab-url-input').value = '';
+                    
+                    // Auto-close after 3 seconds
+                    setTimeout(() => {
+                        document.getElementById('colab-transfer-modal').classList.add('hidden');
+                    }, 3000);
+                } else {
+                    statusElement.textContent = `Error: ${data.error || 'Unknown error occurred'}`;
+                    statusElement.classList.remove('text-blue-500');
+                    statusElement.classList.add('text-red-500');
+                }
+            })
+            .catch(error => {
+                statusElement.textContent = `Error: ${error.message || 'Failed to connect to server'}`;
+                statusElement.classList.remove('text-blue-500');
+                statusElement.classList.add('text-red-500');
+            });
+        }
+    });
+    
+    // Setup close modal button
+    const closeModalButton = document.getElementById('close-modal');
+    if (closeModalButton) {
+        closeModalButton.addEventListener('click', function() {
+            document.getElementById('history-modal').classList.remove('active');
+        });
+    }
+    
+    // System Message Logic
+    const systemMessageSelect = document.getElementById('systemMessageSelect');
+    const customSystemMessage = document.getElementById('customSystemMessage');
+    if (systemMessageSelect && customSystemMessage) {
+        systemMessageSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customSystemMessage.classList.remove('hidden');
+                customSystemMessage.focus();
+            } else {
+                customSystemMessage.classList.add('hidden');
+                customSystemMessage.value = ''; // Clear custom input if a default is selected
+            }
+        });
+    }
+    
+    // Initialize
+    console.log('History functionality initialized');
+    
+    // Pre-fetch history data when page loads
+    loadEvaluationHistory();
+    
+    // Add event listener for toggle models button
+    const toggleModelsButton = document.getElementById('toggle-models');
+    if (toggleModelsButton) {
+        toggleModelsButton.addEventListener('click', function() {
+            const modelsContainer = document.getElementById('models-container');
+            if (modelsContainer) {
+                if (modelsContainer.classList.contains('hidden')) {
+                    modelsContainer.classList.remove('hidden');
+                    toggleModelsButton.innerHTML = '<i class="fas fa-minus-circle text-xl"></i>';
+                } else {
+                    modelsContainer.classList.add('hidden');
+                    toggleModelsButton.innerHTML = '<i class="fas fa-plus-circle text-xl"></i>';
+                }
+            }
+        });
+    }
+});
+
+// Script for model evaluation page
+</script>
+
+<!-- Edit Response Modal -->
+<div id="edit-response-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">Edit Response</h3>
+            <button id="close-edit-modal" class="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="border-b border-gray-200 mb-4">
+            <ul class="flex -mb-px">
+                <li class="mr-1">
+                    <button id="editor-tab" class="inline-block py-2 px-4 text-blue-600 border-b-2 border-blue-600 rounded-t-lg font-medium">Editor</button>
+                </li>
+                <li class="mr-1">
+                    <button id="preview-tab" class="inline-block py-2 px-4 text-gray-500 hover:text-gray-700 border-b-2 border-transparent rounded-t-lg font-medium">Preview</button>
+                </li>
+            </ul>
+        </div>
+        
+        <!-- Formatting Toolbar -->
+        <div id="formatting-toolbar" class="flex flex-wrap gap-1 mb-2 p-1 border border-gray-200 rounded-md bg-gray-50">
+            <button type="button" data-format="bold" class="format-btn p-1 rounded hover:bg-gray-200" title="Bold">
+                <i class="fas fa-bold"></i>
+            </button>
+            <button type="button" data-format="italic" class="format-btn p-1 rounded hover:bg-gray-200" title="Italic">
+                <i class="fas fa-italic"></i>
+            </button>
+            <button type="button" data-format="strikethrough" class="format-btn p-1 rounded hover:bg-gray-200" title="Strikethrough">
+                <i class="fas fa-strikethrough"></i>
+            </button>
+            <span class="border-r border-gray-300 mx-1"></span>
+            <button type="button" data-format="heading" data-level="1" class="format-btn p-1 rounded hover:bg-gray-200" title="Heading 1">
+                <i class="fas fa-heading"></i><sub>1</sub>
+            </button>
+            <button type="button" data-format="heading" data-level="2" class="format-btn p-1 rounded hover:bg-gray-200" title="Heading 2">
+                <i class="fas fa-heading"></i><sub>2</sub>
+            </button>
+            <button type="button" data-format="heading" data-level="3" class="format-btn p-1 rounded hover:bg-gray-200" title="Heading 3">
+                <i class="fas fa-heading"></i><sub>3</sub>
+            </button>
+            <span class="border-r border-gray-300 mx-1"></span>
+            <button type="button" data-format="list" data-list-type="ul" class="format-btn p-1 rounded hover:bg-gray-200" title="Bullet List">
+                <i class="fas fa-list-ul"></i>
+            </button>
+            <button type="button" data-format="list" data-list-type="ol" class="format-btn p-1 rounded hover:bg-gray-200" title="Numbered List">
+                <i class="fas fa-list-ol"></i>
+            </button>
+            <button type="button" data-format="list" data-list-type="task" class="format-btn p-1 rounded hover:bg-gray-200" title="Task List">
+                <i class="fas fa-tasks"></i>
+            </button>
+            <span class="border-r border-gray-300 mx-1"></span>
+            <button type="button" data-format="link" class="format-btn p-1 rounded hover:bg-gray-200" title="Insert Link">
+                <i class="fas fa-link"></i>
+            </button>
+            <button type="button" data-format="image" class="format-btn p-1 rounded hover:bg-gray-200" title="Insert Image">
+                <i class="fas fa-image"></i>
+            </button>
+            <button type="button" data-format="code" class="format-btn p-1 rounded hover:bg-gray-200" title="Code">
+                <i class="fas fa-code"></i>
+            </button>
+            <button type="button" data-format="codeblock" class="format-btn p-1 rounded hover:bg-gray-200" title="Code Block">
+                <i class="fas fa-file-code"></i>
+            </button>
+            <span class="border-r border-gray-300 mx-1"></span>
+            <button type="button" id="clear-formatting" class="p-1 rounded hover:bg-gray-200 text-red-500" title="Clear Formatting">
+                <i class="fas fa-remove-format"></i>
+            </button>
+        </div>
+        
+        <!-- Search and Replace -->
+        <div class="flex items-center mb-2 gap-2">
+            <div class="flex-1">
+                <input type="text" id="search-text" placeholder="Search..." class="w-full px-2 py-1 border border-gray-300 rounded-md text-sm">
+            </div>
+            <div class="flex-1">
+                <input type="text" id="replace-text" placeholder="Replace with..." class="w-full px-2 py-1 border border-gray-300 rounded-md text-sm">
+            </div>
+            <button id="search-btn" class="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200">Find</button>
+            <button id="replace-btn" class="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200">Replace</button>
+            <button id="replace-all-btn" class="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200">Replace All</button>
+        </div>
+        
+        <!-- Editor and Preview Panels -->
+        <div id="editor-panel" class="mb-4">
+            <textarea id="edit-response-textarea" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-64 font-mono text-sm"></textarea>
+        </div>
+        
+        <div id="preview-panel" class="mb-4 hidden">
+            <div id="preview-content" class="w-full px-3 py-2 border border-gray-300 rounded-md h-64 overflow-y-auto prose prose-sm max-w-none"></div>
+        </div>
+        
+        <!-- Hidden fields to store metadata -->
+        <input type="hidden" id="edit-response-id">
+        <input type="hidden" id="edit-model-id">
+        <input type="hidden" id="edit-card-id">
+        
+        <div class="flex justify-end space-x-3">
+            <button id="cancel-edit" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
+            <button id="save-edit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Save Changes</button>
+        </div>
+        
+        <div id="edit-status" class="mt-3 text-sm hidden"></div>
+    </div>
+</div>
+
+<!-- Colab Transfer Modal -->
+<div id="colab-transfer-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-800">Transfer to Colab</h3>
+            <button id="close-colab-modal" class="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="mb-4">
+            <label for="colab-url-input" class="block text-sm font-medium text-gray-700 mb-1">Colab Notebook URL</label>
+            <input type="text" id="colab-url-input" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                   placeholder="https://colab.research.google.com/drive/FILE_ID">
+            <p class="text-xs text-gray-500 mt-1">Enter the URL of your Colab notebook where you want to transfer this content.</p>
+        </div>
+        
+        <div class="mb-4">
+            <div class="flex items-center">
+                <input type="checkbox" id="multiple-cells-checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                <label for="multiple-cells-checkbox" class="ml-2 block text-sm text-gray-700">Split into multiple cells</label>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Separate cells using "---" (three dashes) in your content.</p>
+        </div>
+        
+        <!-- Hidden field to store the response content -->
+        <input type="hidden" id="colab-transfer-content">
+        
+        <div class="flex justify-end space-x-3">
+            <button id="cancel-colab-transfer" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
+            <button id="submit-colab-transfer" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Transfer</button>
+        </div>
+        
+        <div id="colab-transfer-status" class="mt-3 text-sm hidden"></div>
+    </div>
+</div>
+{% endblock %}

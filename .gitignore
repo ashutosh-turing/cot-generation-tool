@@ -1,0 +1,49 @@
+# SQLite database files
+# *.db
+# *.sqlite
+# *.sqlite3
+*.db-shm
+*.db-wal
+
+# PVC files
+*.pvc
+
+# Additional SQLite-related files
+*.db-journal
+
+# Python cache files (good to include these as well)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+*.env
+env/
+.venv
+venv/
+.env.local
+.env.*.local
+
+# IDE specific files (optional but recommended)
+.vscode/
+.idea/
+
+*.json
+*.ipynb
+*.log
+*.csv
+*.tsv
+*.yaml
+*.yml
+*.xml
+*/processor/download_container/*
+processor/download_container/*
+eval/processor/migrations/*
+eval/static/
+lib/*
+.aider*
+
+service_account.json
+.env

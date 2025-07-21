@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+
+{% block title %}Logical Checks | LLM Evaluation Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .expand-icon {
+        transition: transform 0.3s ease;
+    }
+    
+    .json-file-item {
+        transition: background-color 0.2s ease;
+    }
+    
+    .json-file-item:hover {
+        background-color: var(--bg-white);
+    }
+    
+    .analysis-result {
+        margin-bottom: 1.5rem;
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .loading {
+        display: inline-block;
+        position: relative;
+        width: 80px;
+        height: 30px;
+    }
+    
+    .loading div {
+        position: absolute;
+        top: 10px;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: var(--primary);
+        animation-timing-function: cubic-bezier(0, 1, 1, 0);
+    }
+    
+    .loading div:nth-child(1) {
+        left: 8px;
+        animation: loading1 0.6s infinite;
+    }
+    
+    .loading div:nth-child(2) {
+        left: 8px;
+        animation: loading2 0.6s infinite;
+    }
+    
+    .loading div:nth-child(3) {
+        left: 32px;
+        animation: loading2 0.6s infinite;
+    }
+    
+    .loading div:nth-child(4) {
+        left: 56px;
+        animation: loading3 0.6s infinite;
+    }
+    
+    @keyframes loading1 {
+        0% { transform: scale(0); }
+        100% { transform: scale(1); }
+    }
+    
+    @keyframes loading3 {
+        0% { transform: scale(1); }
+        100% { transform: scale(0); }
+    }
+    
+    @keyframes loading2 {
+        0% { transform: translate(0, 0); }
+        100% { transform: translate(24px, 0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Logic Check</h1>
+        <p class="text-gray-600">Analyze the logic in JSON files to ensure consistency and correctness.</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Logic Analysis</h2>
+        </div>
+        
+        <form id="logicCheckForm" method="POST" action="{% url 'perform_logical_analysis' %}">
+            {% csrf_token %}
+            
+            <!-- JSON Files Section -->
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-700">Available JSON Files</h3>
+                    <button type="button" onclick="toggleVisibility('jsonFiles')" class="btn-secondary text-sm py-1 px-3 flex items-center space-x-2">
+                        <span>Show Files</span>
+                        <i class="fas fa-chevron-down expand-icon transition-transform"></i>
+                    </button>
+                </div>
+    
+                <div id="jsonFiles" class="hidden">
+                    {% if json_files %}
+                        <!-- Select All Option -->
+                        <div class="flex items-center mb-4 p-3 bg-gray-50 rounded-lg">
+                            <input type="checkbox" 
+                                id="selectAllJsons" 
+                                onclick="toggleSelectAll(this)" 
+                                class="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary-light">
+                            <label for="selectAllJsons" class="ml-2 text-gray-700 font-medium">Select All Files</label>
+                        </div>
+    
+                        <div class="space-y-2 mt-3 max-h-96 overflow-y-auto pr-2">
+                            {% for file in json_files %}
+                                <div class="json-file-item flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:shadow-sm">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" 
+                                            name="json_files" 
+                                            value="{{ file }}"
+                                            id="json_{{ file }}"
+                                            class="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary-light">
+                                        <label for="json_{{ file }}" class="ml-3 text-gray-700">{{ file }}</label>
+                                    </div>
+                                    <span class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">JSON</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="p-6 text-center bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                            <p class="text-gray-500">No JSON files are available for analysis.</p>
+                            <p class="text-gray-400 text-sm mt-1">Upload JSON files first using the Convert JSON feature.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+    
+            <!-- Analyse Logic Button -->
+            <div class="flex justify-end mt-6">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-brain mr-2"></i> Analyze Logic
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Analysis Results Section -->
+    <div id="analysisResults" class="card mt-6 hidden">
+        <div class="card-header">
+            <h2 class="card-title">Analysis Results</h2>
+        </div>
+        <div id="resultsContent" class="p-4">
+            <!-- Results will be populated here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleVisibility(id) {
+        const element = document.getElementById(id);
+        const button = document.querySelector(`[onclick="toggleVisibility('${id}')"]`);
+        const expandIcon = button.querySelector('.expand-icon');
+        const buttonText = button.querySelector('span');
+        
+        element.classList.toggle('hidden');
+        
+        if (element.classList.contains('hidden')) {
+            expandIcon.style.transform = 'rotate(0deg)';
+            buttonText.textContent = 'Show Files';
+        } else {
+            expandIcon.style.transform = 'rotate(180deg)';
+            buttonText.textContent = 'Hide Files';
+        }
+    }
+
+    function toggleSelectAll(source) {
+        const checkboxes = document.querySelectorAll('input[name="json_files"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = source.checked;
+        });
+    }
+
+    // Submit form via AJAX and update the page with results
+    document.getElementById('logicCheckForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        // Show results section with a loading indicator
+        const resultsDiv = document.getElementById('analysisResults');
+        const resultsContent = document.getElementById('resultsContent');
+        resultsDiv.classList.remove('hidden');
+        
+        // Create loading animation
+        resultsContent.innerHTML = `
+            <div class="flex items-center justify-center p-6">
+                <div class="text-center">
+                    <div class="loading"><div></div><div></div><div></div><div></div></div>
+                    <p class="text-gray-600 mt-3">Analyzing logic in selected files...</p>
+                </div>
+            </div>`;
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            let resultsHtml = '';
+            if (data.analysis_results) {
+                resultsHtml = '<div class="space-y-6">';
+                for (const [filename, result] of Object.entries(data.analysis_results)) {
+                    resultsHtml += `
+                        <div class="analysis-result">
+                            <div class="flex items-center mb-2">
+                                <i class="fas fa-file-code text-blue-500 mr-2"></i>
+                                <h3 class="font-semibold text-lg text-gray-800">${filename}</h3>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 overflow-x-auto">
+                                <pre class="text-gray-700 whitespace-pre-wrap" style="font-family: var(--font-mono);">${result}</pre>
+                            </div>
+                        </div>`;
+                }
+                resultsHtml += '</div>';
+            } else if (data.error) {
+                resultsHtml = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        <span>${data.error}</span>
+                    </div>`;
+            }
+            resultsContent.innerHTML = resultsHtml;
+        })
+        .catch(error => {
+            resultsContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span>Error: ${error.message}</span>
+                </div>`;
+        });
+    });
+</script>
+{% endblock %}

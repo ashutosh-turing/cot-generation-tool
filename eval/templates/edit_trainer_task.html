@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Task{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-xl">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800">Edit Task</h2>
+    {% if errors %}
+        <div class="mb-4">
+            <ul class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                {% for error in errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+        <div>
+            <label class="block text-gray-700 font-semibold mb-1">Question Id</label>
+            <input type="text" name="question_id" value="{{ task.question_id }}" readonly class="w-full border rounded px-3 py-2 bg-gray-100 text-gray-700" />
+        </div>
+        <div>
+            <label class="block text-gray-700 font-semibold mb-1">Question Prompt</label>
+            <div class="w-full border rounded px-3 py-2 bg-gray-50 text-gray-800 min-h-[80px] whitespace-pre-line" style="white-space: pre-line;">
+                {{ question_prompt|default:"No prompt available." }}
+            </div>
+        </div>
+        <div>
+            <label class="block text-gray-700 font-semibold mb-1">Google Colab Link</label>
+            <input type="url" name="problem_link" value="{{ form.problem_link }}" required class="w-full border rounded px-3 py-2" placeholder="https://colab.research.google.com/..." />
+        </div>
+        <div>
+            <label class="block text-gray-700 font-semibold mb-1">Submission Id <span class="text-red-500">*</span></label>
+            <input type="text" name="codeforces_submission_id" value="{{ form.codeforces_submission_id }}" required class="w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+            <label class="block text-gray-700 font-semibold mb-1">Status <span class="text-red-500">*</span></label>
+            <select name="completed" required class="w-full border rounded px-3 py-2">
+                <option value="">-- Select Status --</option>
+                <option value="In Progress" {% if form.completed == "In Progress" %}selected{% endif %}>In Progress</option>
+                <option value="Ready for Review" {% if form.completed == "Ready for Review" %}selected{% endif %}>Ready for Review</option>
+            </select>
+        </div>
+        <div class="flex justify-end">
+            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-semibold">Save</button>
+        </div>
+    </form>
+    <div class="mt-6">
+        <a href="{% url 'trainer_dashboard' %}" class="text-blue-500 hover:underline">&larr; Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}

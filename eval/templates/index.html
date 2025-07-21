@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}LLM Analysis Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .chart-container {
+        height: 300px;
+        width: 100%;
+    }
+    
+    .activity-item {
+        position: relative;
+        padding-left: 2rem;
+        padding-bottom: 1.5rem;
+    }
+    
+    .activity-item::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: var(--primary);
+        z-index: 1;
+    }
+    
+    .activity-item::after {
+        content: "";
+        position: absolute;
+        left: 5px;
+        top: 12px;
+        bottom: 0;
+        width: 2px;
+        background-color: var(--border-color);
+    }
+    
+    .activity-item:last-child::after {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Dashboard Content -->
+<div class="container mx-auto">
+    <!-- Welcome Message -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">Welcome back, {{ user.first_name|default:user.username }}</h1>
+        <p class="text-gray-600 mt-1">Here's what's happening with your LLM evaluation projects.</p>
+    </div>
+    
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="stat-card bg-white rounded-lg shadow p-6">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Total Models</p>
+                    <h3 class="text-2xl font-bold text-gray-800">12</h3>
+                </div>
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                    <i class="fas fa-robot"></i>
+                </div>
+            </div>
+            <div class="flex items-center mt-4">
+                <span class="text-green-500 text-sm font-medium flex items-center">
+                    <i class="fas fa-arrow-up mr-1"></i> 16%
+                </span>
+                <span class="text-gray-400 text-sm ml-2">from last month</span>
+            </div>
+        </div>
+        
+        <div class="stat-card bg-white rounded-lg shadow p-6">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Tasks Created</p>
+                    <h3 class="text-2xl font-bold text-gray-800">284</h3>
+                </div>
+                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                    <i class="fas fa-tasks"></i>
+                </div>
+            </div>
+            <div class="flex items-center mt-4">
+                <span class="text-green-500 text-sm font-medium flex items-center">
+                    <i class="fas fa-arrow-up mr-1"></i> 22%
+                </span>
+                <span class="text-gray-400 text-sm ml-2">from last month</span>
+            </div>
+        </div>
+        
+        <div class="stat-card bg-white rounded-lg shadow p-6">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Analyses</p>
+                    <h3 class="text-2xl font-bold text-gray-800">1,580</h3>
+                </div>
+                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+            </div>
+            <div class="flex items-center mt-4">
+                <span class="text-green-500 text-sm font-medium flex items-center">
+                    <i class="fas fa-arrow-up mr-1"></i> 8%
+                </span>
+                <span class="text-gray-400 text-sm ml-2">from last month</span>
+            </div>
+        </div>
+        
+        <div class="stat-card bg-white rounded-lg shadow p-6">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Success Rate</p>
+                    <h3 class="text-2xl font-bold text-gray-800">92.8%</h3>
+                </div>
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+            <div class="flex items-center mt-4">
+                <span class="text-red-500 text-sm font-medium flex items-center">
+                    <i class="fas fa-arrow-down mr-1"></i> 3%
+                </span>
+                <span class="text-gray-400 text-sm ml-2">from last month</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Model Performance Trend</h2>
+                <button class="text-sm text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+            </div>
+            <div class="chart-container" id="performanceChart">
+                <!-- Chart will be rendered here -->
+                <div class="flex items-center justify-center h-full text-gray-400">
+                    <p>Chart data loading...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Task Completion Rate</h2>
+                <button class="text-sm text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+            </div>
+            <div class="chart-container" id="completionChart">
+                <!-- Chart will be rendered here -->
+                <div class="flex items-center justify-center h-full text-gray-400">
+                    <p>Chart data loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bottom Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Recent Activities -->
+        <div class="card col-span-1">
+            <div class="card-header">
+                <h2 class="card-title">Recent Activities</h2>
+                <a href="#" class="text-xs text-primary hover:text-primary-dark">View all</a>
+            </div>
+            <div class="space-y-0">
+                <div class="activity-item">
+                    <div class="mb-1 text-sm font-semibold text-gray-800">New model added</div>
+                    <p class="text-sm text-gray-600">Claude 3.7 Sonnet has been added to the evaluation pool</p>
+                    <span class="text-xs text-gray-400">2 hours ago</span>
+                </div>
+                <div class="activity-item">
+                    <div class="mb-1 text-sm font-semibold text-gray-800">Task batch completed</div>
+                    <p class="text-sm text-gray-600">Penguin reasoning tasks evaluation completed</p>
+                    <span class="text-xs text-gray-400">5 hours ago</span>
+                </div>
+                <div class="activity-item">
+                    <div class="mb-1 text-sm font-semibold text-gray-800">New report available</div>
+                    <p class="text-sm text-gray-600">March 2025 performance report is ready to view</p>
+                    <span class="text-xs text-gray-400">1 day ago</span>
+                </div>
+                <div class="activity-item">
+                    <div class="mb-1 text-sm font-semibold text-gray-800">System update</div>
+                    <p class="text-sm text-gray-600">Evaluation metrics have been updated</p>
+                    <span class="text-xs text-gray-400">2 days ago</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- JSON Files -->
+        <div class="card col-span-2">
+            <div class="card-header">
+                <h2 class="card-title">Available JSON Files</h2>
+                <a href="/convert_jsons" class="text-xs text-primary hover:text-primary-dark">Manage Files</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="text-left">Filename</th>
+                            <th class="text-left">Type</th>
+                            <th class="text-left">Size</th>
+                            <th class="text-left">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for file in json_files %}
+                        <tr>
+                            <td class="font-medium">{{ file }}</td>
+                            <td>Reasoning Task</td>
+                            <td>{{ file|length }} KB</td>
+                            <td>
+                                <span class="badge badge-success">Available</span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-gray-500">No JSON files available</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sample data for charts
+        setTimeout(() => {
+            // Performance Chart
+            const perfCtx = document.createElement('canvas');
+            document.getElementById('performanceChart').innerHTML = '';
+            document.getElementById('performanceChart').appendChild(perfCtx);
+            
+            new Chart(perfCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Claude',
+                        data: [85, 87, 90, 92, 94, 96],
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'GPT-4',
+                        data: [82, 84, 86, 89, 92, 95],
+                        borderColor: '#0ea5e9',
+                        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                    },
+                    scales: {
+                        y: {
+                            min: 70,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Completion Chart
+            const compCtx = document.createElement('canvas');
+            document.getElementById('completionChart').innerHTML = '';
+            document.getElementById('completionChart').appendChild(compCtx);
+            
+            new Chart(compCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Completed', 'In Progress', 'Failed'],
+                    datasets: [{
+                        data: [75, 20, 5],
+                        backgroundColor: [
+                            '#10b981',
+                            '#6366f1',
+                            '#ef4444'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }, 500);
+    });
+</script>
+{% endblock %}

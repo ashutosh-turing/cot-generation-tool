@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ground Truth Validation</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.10.0/dist/reset.css">
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/antd@5.10.0/dist/antd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.2/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ant-design/icons@5.2.6/dist/index.umd.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .app-layout {
+            min-height: 100vh;
+        }
+        .logo {
+            height: 32px;
+            margin: 16px;
+            background: rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .site-layout-content {
+            background-color: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin: 24px 16px;
+            min-height: calc(100vh - 112px);
+        }
+        .header {
+            margin-bottom: 24px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 16px;
+        }
+        .upload-area {
+            border: 2px dashed #d9d9d9;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 24px;
+            transition: border-color 0.3s;
+            background-color: #fafafa;
+        }
+        .upload-area:hover {
+            border-color: #1890ff;
+        }
+        .controls {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            align-items: flex-end;
+        }
+        .control-item {
+            flex: 1;
+        }
+        .table-container {
+            margin-top: 24px;
+        }
+        .progress-container {
+            margin: 24px 0;
+        }
+        .buttons-container {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { 
+            Upload, Button, message, Table, Select, InputNumber, Progress, 
+            Typography, Space, Divider, Card, Spin, notification,
+            Layout, Menu, Breadcrumb
+        } = antd;
+        const { Dragger } = Upload;
+        const { Title, Text, Paragraph } = Typography;
+        const { 
+            InboxOutlined, DownloadOutlined, ReloadOutlined,
+            ExperimentOutlined, DashboardOutlined, SettingOutlined,
+            FileTextOutlined, CheckCircleOutlined, AppstoreOutlined
+        } = icons;
+        
+        const { Header, Content, Footer, Sider } = Layout;
+
+        // Main App Component
+        const App = () => {
+            const [collapsed, setCollapsed] = useState(false);
+            const [selectedKey, setSelectedKey] = useState('ground-truth');
+            
+            return (
+                <Layout className="app-layout">
+                    <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} width={240}>
+                        <div className="logo">LLM EVAL</div>
+                        <Menu
+                            theme="dark"
+                            mode="inline"
+                            defaultSelectedKeys={['ground-truth']}
+                            selectedKeys={[selectedKey]}
+                            onSelect={({key}) => setSelectedKey(key)}
+                            items={[
+                                {
+                                    key: 'dashboard',
+                                    icon: <DashboardOutlined />,
+                                    label: 'Dashboard',
+                                },
+                                {
+                                    key: 'evaluation',
+                                    icon: <ExperimentOutlined />,
+                                    label: 'Evaluation',
+                                    children: [
+                                        {
+                                            key: 'ground-truth',
+                                            icon: <CheckCircleOutlined />,
+                                            label: 'Ground Truth Validation',
+                                        },
+                                        {
+                                            key: 'model-comparison',
+                                            icon: <AppstoreOutlined />,
+                                            label: 'Model Comparison',
+                                        }
+                                    ]
+                                },
+                                {
+                                    key: 'datasets',
+                                    icon: <FileTextOutlined />,
+                                    label: 'Datasets',
+                                },
+                                {
+                                    key: 'settings',
+                                    icon: <SettingOutlined />,
+                                    label: 'Settings',
+                                }
+                            ]}
+                        />
+                    </Sider>
+                    <Layout>
+                        <Header style={{ padding: 0, background: '#fff' }}>
+                            <Breadcrumb style={{ margin: '16px 24px' }}>
+                                <Breadcrumb.Item>Evaluation</Breadcrumb.Item>
+                                <Breadcrumb.Item>Ground Truth Validation</Breadcrumb.Item>
+                            </Breadcrumb>
+                        </Header>
+                        <Content>
+                            <div className="site-layout-content">
+                                {selectedKey === 'ground-truth' && <GroundTruthValidation />}
+                                {selectedKey !== 'ground-truth' && (
+                                    <div style={{ textAlign: 'center', padding: '100px 0' }}>
+                                        <Title level={3}>This page is under construction</Title>
+                                        <Paragraph>Please use the Ground Truth Validation feature</Paragraph>
+                                    </div>
+                                )}
+                            </div>
+                        </Content>
+                        <Footer style={{ textAlign: 'center' }}>
+                            LLM Evaluation Platform ©2025
+                        </Footer>
+                    </Layout>
+                </Layout>
+            );
+        };
+        
+        // Ground Truth Validation Component
+        const GroundTruthValidation = () => {
+            const [fileList, setFileList] = useState([]);
+            const [csvData, setCsvData] = useState(null);
+            const [previewData, setPreviewData] = useState([]);
+            const [models, setModels] = useState([]);
+            const [selectedModel, setSelectedModel] = useState(null);
+            const [numReplies, setNumReplies] = useState(1);
+            const [processing, setProcessing] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [results, setResults] = useState(null);
+            const [columns, setColumns] = useState([]);
+            const [validationError, setValidationError] = useState(null);
+            
+            // Fetch available models on component mount
+            useEffect(() => {
+                // In a real implementation, this would be an API call
+                // For demo purposes, we'll use mock data
+                const mockModels = [
+                    { id: 'gpt-4', display_name: 'GPT-4' },
+                    { id: 'gpt-3.5-turbo', display_name: 'GPT-3.5 Turbo' },
+                    { id: 'claude-3-opus', display_name: 'Claude 3 Opus' },
+                    { id: 'claude-3-sonnet', display_name: 'Claude 3 Sonnet' },
+                    { id: 'llama-3-70b', display_name: 'Llama 3 70B' }
+                ];
+                setModels(mockModels);
+            }, []);
+
+            // File upload props
+            const uploadProps = {
+                name: 'file',
+                multiple: false,
+                accept: '.csv',
+                fileList,
+                beforeUpload: (file) => {
+                    // Reset states
+                    setValidationError(null);
+                    setCsvData(null);
+                    setPreviewData([]);
+                    setResults(null);
+                    
+                    // Check file size (5MB limit)
+                    const isLt5M = file.size / 1024 / 1024 < 5;
+                    if (!isLt5M) {
+                        message.error('File must be smaller than 5MB!');
+                        return Upload.LIST_IGNORE;
+                    }
+                    
+                    // Parse CSV
+                    Papa.parse(file, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (result) => {
+                            // Validate CSV structure
+                            const headers = result.meta.fields.map(h => h.toLowerCase());
+                            if (!headers.includes('prompt') || !headers.includes('ground_truth')) {
+                                setValidationError('CSV must contain "prompt" and "ground_truth" columns');
+                                return;
+                            }
+                            
+                            // Store data and show preview
+                            setCsvData(result.data);
+                            setPreviewData(result.data.slice(0, 5));
+                            
+                            // Create columns for preview table
+                            const tableColumns = result.meta.fields.map(field => ({
+                                title: field,
+                                dataIndex: field,
+                                key: field,
+                                ellipsis: true,
+                            }));
+                            setColumns(tableColumns);
+                        },
+                        error: (error) => {
+                            message.error(`Error parsing CSV: ${error.message}`);
+                        }
+                    });
+                    
+                    // Update file list
+                    setFileList([file]);
+                    return false; // Prevent auto upload
+                },
+                onRemove: () => {
+                    setFileList([]);
+                    setCsvData(null);
+                    setPreviewData([]);
+                    setValidationError(null);
+                    setResults(null);
+                }
+            };
+
+            // Mock API call to generate responses
+            const generateResponses = async (prompt, modelId, n) => {
+                // In a real implementation, this would be an API call to /generate
+                // For demo purposes, we'll simulate a response
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        const replies = Array(n).fill(null).map((_, i) => 
+                            `Generated response ${i+1} for prompt: "${prompt.substring(0, 30)}..."`
+                        );
+                        resolve({ replies });
+                    }, 500); // Simulate network delay
+                });
+            };
+
+            // Process the CSV data
+            const processData = async () => {
+                if (!csvData || !selectedModel) {
+                    message.error('Please upload a CSV file and select a model');
+                    return;
+                }
+                
+                setProcessing(true);
+                setProgress(0);
+                
+                try {
+                    const enrichedData = [...csvData];
+                    const totalRows = enrichedData.length;
+                    
+                    // Process each row
+                    for (let i = 0; i < totalRows; i++) {
+                        const row = enrichedData[i];
+                        const prompt = row.prompt;
+                        
+                        // Generate responses
+                        const response = await generateResponses(prompt, selectedModel, numReplies);
+                        
+                        // Add replies to the row
+                        response.replies.forEach((reply, index) => {
+                            row[`reply_${index + 1}`] = reply;
+                        });
+                        
+                        // Update progress
+                        setProgress(Math.round(((i + 1) / totalRows) * 100));
+                    }
+                    
+                    // Create columns for results table
+                    const resultColumns = Object.keys(enrichedData[0]).map(field => ({
+                        title: field,
+                        dataIndex: field,
+                        key: field,
+                        ellipsis: true,
+                    }));
+                    
+                    setResults(enrichedData);
+                    setColumns(resultColumns);
+                    
+                    message.success('Processing complete!');
+                } catch (error) {
+                    message.error(`Error processing data: ${error.message}`);
+                } finally {
+                    setProcessing(false);
+                }
+            };
+
+            // Download enriched CSV
+            const downloadCSV = () => {
+                if (!results || results.length === 0) {
+                    message.error('No results to download');
+                    return;
+                }
+                
+                const csv = Papa.unparse(results);
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                
+                // Get original filename and add _validated suffix
+                const originalFilename = fileList[0].name;
+                const filename = originalFilename.replace('.csv', '_validated.csv');
+                
+                link.href = url;
+                link.setAttribute('download', filename);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            return (
+                <>
+                    <Title level={2}>Ground Truth Validation</Title>
+                    <Paragraph>
+                        Upload a CSV file with prompts and ground truth answers, generate model responses, 
+                        and download the enriched results.
+                    </Paragraph>
+                    
+                    <Card title="1. Upload CSV File" bordered={false}>
+                        <Dragger {...uploadProps} className="upload-area">
+                            <p className="ant-upload-drag-icon">
+                                <InboxOutlined />
+                            </p>
+                            <p className="ant-upload-text">Click or drag CSV file to this area to upload</p>
+                            <p className="ant-upload-hint">
+                                File must contain 'prompt' and 'ground_truth' columns (case-insensitive)
+                            </p>
+                        </Dragger>
+                        
+                        {validationError && (
+                            <div style={{ marginTop: 16, color: '#ff4d4f' }}>
+                                <Text type="danger">{validationError}</Text>
+                            </div>
+                        )}
+                        
+                        {previewData.length > 0 && (
+                            <div style={{ marginTop: 16 }}>
+                                <Title level={4}>Preview (first 5 rows)</Title>
+                                <Table 
+                                    dataSource={previewData.map((item, index) => ({ ...item, key: index }))} 
+                                    columns={columns} 
+                                    size="small" 
+                                    pagination={false}
+                                    scroll={{ x: true }}
+                                />
+                            </div>
+                        )}
+                    </Card>
+                    
+                    <Divider />
+                    
+                    <Card title="2. Configure Generation" bordered={false}>
+                        <div className="controls">
+                            <div className="control-item">
+                                <Text>Select Model</Text>
+                                <Select
+                                    placeholder="Select a model"
+                                    style={{ width: '100%', marginTop: 8 }}
+                                    onChange={setSelectedModel}
+                                    options={models.map(model => ({
+                                        value: model.id,
+                                        label: model.display_name
+                                    }))}
+                                    disabled={!csvData || processing}
+                                />
+                            </div>
+                            
+                            <div className="control-item">
+                                <Text>Number of Replies per Prompt</Text>
+                                <InputNumber
+                                    min={1}
+                                    max={5}
+                                    defaultValue={1}
+                                    style={{ width: '100%', marginTop: 8 }}
+                                    onChange={setNumReplies}
+                                    disabled={!csvData || processing}
+                                />
+                            </div>
+                            
+                            <div className="control-item" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <Button 
+                                    type="primary" 
+                                    onClick={processData}
+                                    disabled={!csvData || !selectedModel || processing}
+                                    loading={processing}
+                                >
+                                    Run Validation
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+                    
+                    {processing && (
+                        <div className="progress-container">
+                            <Progress percent={progress} status="active" />
+                            <Text>Processing {progress}% complete...</Text>
+                        </div>
+                    )}
+                    
+                    {results && results.length > 0 && (
+                        <Card title="3. Results" bordered={false} className="table-container">
+                            <Table 
+                                dataSource={results.map((item, index) => ({ ...item, key: index }))} 
+                                columns={columns} 
+                                pagination={{ pageSize: 10 }}
+                                scroll={{ x: true }}
+                            />
+                            
+                            <div className="buttons-container">
+                                <Button 
+                                    type="default" 
+                                    icon={<ReloadOutlined />}
+                                    onClick={() => {
+                                        setResults(null);
+                                        setProgress(0);
+                                    }}
+                                >
+                                    Clear Results
+                                </Button>
+                                <Button 
+                                    type="primary" 
+                                    icon={<DownloadOutlined />}
+                                    onClick={downloadCSV}
+                                >
+                                    Download CSV
+                                </Button>
+                            </div>
+                        </Card>
+                    )}
+                </>
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(
+            <App />,
+            document.getElementById('app')
+        );
+    </script>
+</body>
+</html>
