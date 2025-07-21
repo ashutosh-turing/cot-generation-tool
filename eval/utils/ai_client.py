@@ -68,8 +68,11 @@ class AnthropicClient(BaseAIClient):
 class GeminiClient(BaseAIClient):
     def __init__(self, api_key, model_name):
         super().__init__(api_key, model_name)
-        credentials_path = os.path.join(settings.BASE_DIR, 'service_account.json')
-        genai.configure(credentials=credentials_path)
+        # Use the API key from the database (passed as parameter) or fallback to settings
+        api_key_to_use = self.api_key if self.api_key else getattr(settings, 'GOOGLE_API_KEY', None)
+        if not api_key_to_use:
+            raise ValueError("No API key provided for Gemini model. Please set the API key in the LLMModel database record or in GOOGLE_API_KEY setting.")
+        genai.configure(api_key=api_key_to_use)
         self.client = genai.GenerativeModel(self.model_name)
 
     def get_response(self, messages, temperature=None):
