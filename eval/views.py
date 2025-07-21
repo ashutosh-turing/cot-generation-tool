@@ -32,16 +32,19 @@ def get_user_role(user):
     """
     Get the role for a given user.
     Returns 'admin', 'pod_lead', or 'trainer'.
+    Matches the logic in the user_group context processor.
     """
     if not user.is_authenticated:
         return None
-        
-    if user.groups.filter(name='admin').exists():
+
+    if user.is_superuser or user.is_staff or user.groups.filter(name='admin').exists():
         return 'admin'
     elif user.groups.filter(name='pod_lead').exists():
         return 'pod_lead'
+    elif user.groups.filter(name='trainer').exists():
+        return 'trainer'
     else:
-        return 'trainer'  # Default role
+        return None
 
 # Decorator to restrict view access based on user role
 def role_required(roles):
