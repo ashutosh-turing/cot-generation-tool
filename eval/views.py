@@ -69,7 +69,17 @@ model_results = {}
 model_results_queues = {}
 
 def is_not_trainer(user):
-    return not user.groups.filter(name='trainer').exists()
+    """
+    Check if user should have access to non-trainer views.
+    Admins and pod_leads have access regardless of trainer group membership.
+    Only pure trainers (without admin/pod_lead roles) are restricted.
+    """
+    user_role = get_user_role(user)
+    # Admins and pod_leads have access to all views
+    if user_role in ['admin', 'pod_lead']:
+        return True
+    # Pure trainers are restricted
+    return user_role != 'trainer'
 
 # (removed duplicate import of LLMModel)
 
@@ -458,7 +468,8 @@ def reviewer_dashboard(request):
 
 @login_required
 def task_sync_config_view(request):
-    if not request.user.is_superuser and not request.user.is_staff:
+    user_role = get_user_role(request.user)
+    if user_role != 'admin':
         return redirect('index')
     from .models import TaskSyncHistory, Project
     config = TaskSyncConfig.objects.first()
@@ -600,6 +611,9 @@ def index(request):
     from .models import Project
     from django.contrib.auth.models import User
     from django.core.paginator import Paginator
+    from django.contrib import messages
+    from django.urls import reverse
+    from django.contrib.auth import logout
 
     # Always allow superusers to access the dashboard regardless of email domain
     if request.user.is_superuser or get_user_role(request.user) == 'admin':
@@ -631,8 +645,6 @@ def index(request):
 
     # If not authenticated, redirect to login
     if not request.user.is_authenticated:
-        from django.contrib import messages
-        from django.urls import reverse
         messages.error(request, 'You must be logged in to access the dashboard.')
         return redirect(reverse('login'))
 
@@ -648,10 +660,6 @@ def index(request):
 
     # If not allowed, log the user out and redirect to login page with error message
     if not is_allowed:
-        from django.contrib.auth import logout
-        from django.contrib import messages
-        from django.urls import reverse
-
         messages.error(
             request,
             'Access restricted: Only Official Turing ID is allowed. '
@@ -2121,6 +2129,6 @@ def modal_playground(request):
         "selected_stream_id": selected_stream_id,
         "selected_subject_id": selected_subject_id,
         "system_messages": system_messages,
-        "llm_models": llm_models,
+        "llm_models": llm_models,  # Only active models are passed
     }
     return render(request, "modal_playground.html", context)

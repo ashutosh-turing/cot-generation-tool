@@ -364,6 +364,11 @@ document.addEventListener('DOMContentLoaded', function() {
                   </h3>
                 </div>
                 <div id="llm-markdown-${modelId}" class="markdown-content p-6 text-gray-700"></div>
+                <div class="p-4 bg-gray-50 flex justify-end">
+                  <button class="open-colab-modal-btn text-indigo-600 hover:underline font-semibold flex items-center gap-2 text-sm" data-model-id="${modelId}">
+                    <i class="fas fa-external-link-alt"></i> Transfer to Colab
+                  </button>
+                </div>
               `;
 
               // Render the result content
@@ -436,8 +441,106 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
   };
+
+  // Transfer to Colab modal functionality
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('open-colab-modal-btn')) {
+      const modelId = e.target.getAttribute('data-model-id');
+      document.getElementById('colab-modal').classList.remove('hidden');
+      document.getElementById('colab-modal').setAttribute('data-model-id', modelId);
+    }
+  });
+
+  document.getElementById('colab-transfer-form').onsubmit = async function(e) {
+    e.preventDefault();
+    const url = document.getElementById('colab_url').value.trim();
+    const split = document.getElementById('split_cells').checked;
+    let file_id = "";
+    const match = url.match(/\/drive\/([a-zA-Z0-9_-]+)/);
+    if (match) {
+      file_id = match[1];
+    }
+    const modelId = document.getElementById('colab-modal').getAttribute('data-model-id');
+    const llmContent = document.getElementById(`llm-markdown-${modelId}`) ? document.getElementById(`llm-markdown-${modelId}`).innerText : "";
+    const messageDiv = document.getElementById('colab-transfer-message');
+    messageDiv.innerHTML = '<div class="text-gray-500">Transferring to Colab...</div>';
+    try {
+      const response = await fetch('/api/transfer-to-colab/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          file_id: file_id,
+          markdown_content: llmContent,
+          multiple_cells: split,
+          cell_separator: "---"
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        messageDiv.innerHTML = `
+          <div class="bg-green-100 text-green-800 p-3 rounded mt-2">
+            <div class="mb-2">Notebook updated successfully on Colab. (Split: ${split ? "Yes" : "No"})</div>
+            <div class="max-h-48 overflow-y-auto bg-white border border-green-200 rounded p-2 mt-2">
+              <pre class="whitespace-pre-wrap text-xs">${result.message || ''}</pre>
+            </div>
+          </div>
+        `;
+      } else {
+        messageDiv.innerHTML = `<div class="bg-red-100 text-red-700 p-3 rounded mt-2">Error: ${result.error || 'Unknown error'}</div>`;
+      }
+    } catch (err) {
+      messageDiv.innerHTML = `<div class="bg-red-100 text-red-700 p-3 rounded mt-2">Error: ${err}</div>`;
+    }
+  };
+
+  function resetColabModal() {
+    document.getElementById('colab_url').value = "";
+    document.getElementById('split_cells').checked = false;
+    document.getElementById('colab-transfer-message').innerHTML = "";
+    document.getElementById('colab-modal').removeAttribute('data-model-id');
+  }
+
+  document.getElementById('close-colab-modal').onclick = function() {
+    document.getElementById('colab-modal').classList.add('hidden');
+    resetColabModal();
+  };
+
+  document.getElementById('cancel-colab-modal').onclick = function() {
+    document.getElementById('colab-modal').classList.add('hidden');
+    resetColabModal();
+  };
 });
 </script>
+
+<!-- Transfer to Colab Modal -->
+<div id="colab-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg relative transform transition-all duration-300 scale-95">
+    <button id="close-colab-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+    <div class="flex items-center mb-6">
+      <div class="p-2 bg-blue-100 rounded-lg mr-3">
+        <i class="fab fa-google text-blue-600 text-lg"></i>
+      </div>
+      <h3 class="text-xl font-bold text-gray-900">Transfer to Colab</h3>
+    </div>
+    <form id="colab-transfer-form" class="space-y-5">
+      <div>
+        <label for="colab_url" class="block text-sm font-medium text-gray-700 mb-2">Colab Notebook URL</label>
+        <input type="url" id="colab_url" name="colab_url" placeholder="https://colab.research.google.com/drive/FILE_ID" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200" required>
+        <p class="text-xs text-gray-500 mt-1.5">Enter the URL of your Colab notebook.</p>
+      </div>
+      <div class="flex items-center">
+        <input type="checkbox" id="split_cells" name="split_cells" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <label for="split_cells" class="ml-2 block text-sm text-gray-900">Split into multiple cells</label>
+      </div>
+      <p class="text-xs text-gray-500 -mt-2">Separate cells using "---" (three dashes) in your content.</p>
+      <div class="flex justify-end gap-3 pt-4">
+        <button type="button" id="cancel-colab-modal" class="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium transition-colors duration-200">Cancel</button>
+        <button type="submit" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 font-medium transition-all duration-200">Transfer</button>
+      </div>
+    </form>
+    <div id="colab-transfer-message" class="mt-4 text-center"></div>
+  </div>
+</div>
 {% endblock %}
 
 </final_file_content>
