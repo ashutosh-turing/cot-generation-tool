@@ -20,14 +20,13 @@ def user_group(request):
     """
     group = None
     if request.user.is_authenticated:
-        if request.user.is_superuser or request.user.is_staff:
+        user_groups = list(request.user.groups.values_list('name', flat=True))
+        if request.user.is_superuser or request.user.is_staff or 'admin' in user_groups:
             group = 'admin'
-        else:
-            user_groups = list(request.user.groups.values_list('name', flat=True))
-            if 'pod_lead' in user_groups:
-                group = 'pod_lead'
-            elif 'trainer' in user_groups:
-                group = 'trainer'
+        elif 'pod_lead' in user_groups:
+            group = 'pod_lead'
+        elif 'trainer' in user_groups:
+            group = 'trainer'
     return {'user_group': group}
 
 def websocket_url(request):
