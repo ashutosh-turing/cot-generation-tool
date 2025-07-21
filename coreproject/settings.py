@@ -19,6 +19,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from pathlib import Path
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Removed dotenv and .env dependency. All config should be fetched from DB or hardcoded as needed.
 
@@ -33,10 +35,10 @@ import os
 SECRET_KEY = 'django-insecure-v2-3mp*@_tl99u3prftl(n-#_#2ycozh!v$hasfq&6(7&9)&g+zo&'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG") or False
 
 # Google Cloud Project ID
-GOOGLE_CLOUD_PROJECT_ID = "FETCH_FROM_DB('GOOGLE_CLOUD_PROJECT_ID')"  # Replace with actual DB fetch
+GOOGLE_CLOUD_PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT_ID")
 
 # Google Cloud Service Account
 SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, 'service_account.json')

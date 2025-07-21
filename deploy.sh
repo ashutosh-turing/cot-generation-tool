@@ -9,7 +9,7 @@
 set -e
 
 # Localized V2 Configuration
-PROJECT_DIR="/var/www/cot-generation-tool"
+PROJECT_DIR="/home/cot-generation-tool"
 DB_PATH="$PROJECT_DIR/db_v2.sqlite3"
 BACKUP_DIR="$PROJECT_DIR/db_backups_v2"
 COMMIT_FILE="$PROJECT_DIR/last_deploy_commit_v2.txt"
@@ -198,4 +198,3 @@ else
     echo "  rollback - Rollback V2 to previous version"
     echo "  local    - Run V2 in local development mode"
     exit 1
-fi
