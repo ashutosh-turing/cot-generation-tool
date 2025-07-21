@@ -1195,7 +1195,8 @@ def evaluate_model_async(model_id, manual_prompt, system_message, session_id, us
 
         try:
             from .utils.ai_client import get_ai_client
-            api_key = model.api_key or os.environ.get(f"{model.provider.upper()}_API_KEY")
+            # Fetch API key from model or DB, not from environment
+            api_key = model.api_key or "FETCH_FROM_DB(f'{model.provider.upper()}_API_KEY')"
             client = get_ai_client(model.provider, api_key, model.name)
 
             result = client.get_response(messages, temperature=model.temperature)

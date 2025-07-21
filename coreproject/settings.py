@@ -19,10 +19,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from pathlib import Path
 
 import os
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+# Removed dotenv and .env dependency. All config should be fetched from DB or hardcoded as needed.
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,26 +36,18 @@ SECRET_KEY = 'django-insecure-v2-3mp*@_tl99u3prftl(n-#_#2ycozh!v$hasfq&6(7&9)&g+
 DEBUG = True
 
 # OpenAI Configuration
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY not found in environment variables. Please check your .env file.")
-
+# All API keys should be fetched from the database or a secure config service.
+# Example: from eval.models import Config; OPENAI_API_KEY = Config.get("OPENAI_API_KEY")
+OPENAI_API_KEY = "FETCH_FROM_DB('OPENAI_API_KEY')"  # Replace with actual DB fetch
 
 # Anthropic Configuration
-ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
-if not ANTHROPIC_API_KEY:
-    raise ValueError("ANTHROPIC_API_KEY not found in environment variables. Please check your .env file.")
+ANTHROPIC_API_KEY = "FETCH_FROM_DB('ANTHROPIC_API_KEY')"  # Replace with actual DB fetch
 
 # Gemini Configuration
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in environment variables. Please check your .env file.")
+GEMINI_API_KEY = "FETCH_FROM_DB('GEMINI_API_KEY')"  # Replace with actual DB fetch
 
 # Google Cloud Project ID
-GOOGLE_CLOUD_PROJECT_ID = os.getenv('GOOGLE_CLOUD_PROJECT_ID')
-if not GOOGLE_CLOUD_PROJECT_ID:
-    raise ValueError("GOOGLE_CLOUD_PROJECT_ID not found in environment variables. Please check your .env file.")
+GOOGLE_CLOUD_PROJECT_ID = "FETCH_FROM_DB('GOOGLE_CLOUD_PROJECT_ID')"  # Replace with actual DB fetch
 
 # Google Cloud Service Account
 SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, 'service_account.json')

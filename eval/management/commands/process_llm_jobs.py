@@ -49,7 +49,8 @@ def process_trainer_question_analysis(data):
 
         user = User.objects.get(id=user_id) if user_id else None
 
-        api_key = model_obj.api_key or os.environ.get(f"{model_obj.provider.upper()}_API_KEY")
+        # Use API key from model_obj only; all keys are managed in the database
+        api_key = model_obj.api_key
         client = get_ai_client(model_obj.provider, api_key, model_obj.name)
 
         messages = []
@@ -103,7 +104,8 @@ def process_trainer_question_analysis(data):
 
 def call_llm_api(model_obj, prompt, n):
     """A helper function to call the LLM API and get n responses."""
-    api_key = model_obj.api_key or os.environ.get(f"{model_obj.provider.upper()}_API_KEY")
+    # Use API key from model_obj only; all keys are managed in the database
+    api_key = model_obj.api_key
     client = get_ai_client(model_obj.provider, api_key, model_obj.name)
     
     messages = [{"role": "user", "content": prompt}]
