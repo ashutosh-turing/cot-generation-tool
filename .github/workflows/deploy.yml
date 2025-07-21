@@ -1,0 +1,33 @@
+name: Deploy to GCP VM
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          service_account_key: ${{ secrets.GOOGLE_SSH_MAC_PVT_KEY }}
+          project_id: turing-gpt
+
+      - name: Add SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GOOGLE_SSH_MAC_PVT_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Deploy via SSH
+        run: |
+          # Deploy using deploy.sh script in the correct project directory
+          gcloud compute ssh v2-cot-intance \
+            --zone us-central1-f \
+            --project turing-gpt \
+            --ssh-key-file ~/.ssh/id_rsa \
+            --command "cd /home/cot-generation-tool && ./deploy.sh deploy"

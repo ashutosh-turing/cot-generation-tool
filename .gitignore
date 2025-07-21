@@ -49,3 +49,7 @@ service_account.json
 .env
 lib64
 nohup.out
+
+# But NOT in .github/
+!.github/
+!.github/**
