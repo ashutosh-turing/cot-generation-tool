@@ -1,11 +1,51 @@
 import subprocess
 import sys
 import os
+import signal
+import time
+
+def kill_existing_processes():
+    """Kill any existing processes that might be using our ports."""
+    print("Checking for existing processes...")
+    
+    # Check for processes on port 8000
+    try:
+        result = subprocess.run(['lsof', '-i', ':8000'], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            print("Found processes using port 8000, attempting to terminate...")
+            lines = result.stdout.strip().split('\n')[1:]  # Skip header
+            pids = []
+            for line in lines:
+                parts = line.split()
+                if len(parts) > 1:
+                    try:
+                        pid = int(parts[1])
+                        pids.append(pid)
+                    except ValueError:
+                        continue
+            
+            for pid in set(pids):  # Remove duplicates
+                try:
+                    print(f"Terminating process {pid}...")
+                    os.kill(pid, signal.SIGTERM)
+                    time.sleep(1)  # Give it time to terminate gracefully
+                except ProcessLookupError:
+                    pass  # Process already terminated
+                except PermissionError:
+                    print(f"Permission denied to terminate process {pid}")
+    except FileNotFoundError:
+        print("lsof command not found, skipping port check")
+    except Exception as e:
+        print(f"Error checking for existing processes: {e}")
 
 def run_command(command, name):
     """Runs a command in a new process and returns the process object."""
     print(f"Starting {name}...")
-    return subprocess.Popen(command, shell=True, stdout=sys.stdout, stderr=sys.stderr)
+    try:
+        return subprocess.Popen(command, shell=True, stdout=sys.stdout, stderr=sys.stderr)
+    except Exception as e:
+        print(f"Error starting {name}: {e}")
+        return None
 
 def main():
     import argparse
@@ -21,7 +61,7 @@ def main():
     if args.mode == 'dev':
         # Development mode - run all services including gunicorn
         commands = {
-            "gunicorn": f"{venv_python} -m gunicorn coreproject.wsgi:application --bind 127.0.0.1:8000",
+            "gunicorn": f"gunicorn coreproject.wsgi:application --bind 127.0.0.1:8000",
             "sync_daemon": f"{venv_python} run_sync_daemon.py",
             "llm_jobs": f"{venv_python} manage.py process_llm_jobs"
         }
@@ -32,11 +72,18 @@ def main():
             "llm_jobs": f"{venv_python} manage.py process_llm_jobs"
         }
     
+    # Clean up any existing processes first
+    kill_existing_processes()
+    
     processes = {}
     try:
         print(f"Starting services for polling-based architecture in {args.mode} mode...")
         for name, cmd in commands.items():
-            processes[name] = run_command(cmd, name)
+            process = run_command(cmd, name)
+            if process:
+                processes[name] = process
+            else:
+                print(f"Failed to start {name}")
         
         print("All services started. Press Ctrl+C to stop all services.")
         

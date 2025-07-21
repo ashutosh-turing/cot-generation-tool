@@ -2085,7 +2085,43 @@ def review_question(request, question_id):
     Reviewer: Review a question by question_id.
     Renders the review page with input for Google Colab link, model selection, and review UI.
     """
-    return render(request, "review.html", {"question_id": question_id})
+    # Fetch system messages based on user preference (stream/subject)
+    preferred_streams = []
+    try:
+        prefs = request.user.preference
+        preferred_streams = prefs.streams_and_subjects.all()
+        print(f"DEBUG: User {request.user.username} has {preferred_streams.count()} preferred streams")
+    except Exception as e:
+        preferred_streams = []
+        print(f"DEBUG: No user preferences found: {e}")
+    
+    if preferred_streams:
+        system_messages = SystemMessage.objects.filter(category__in=preferred_streams).order_by('name')
+        print(f"DEBUG: Found {system_messages.count()} system messages for preferred streams")
+    else:
+        # Default to "Coding" stream if exists, else all
+        coding_messages = SystemMessage.objects.filter(category__name__icontains="coding").order_by('name')
+        if coding_messages.exists():
+            system_messages = coding_messages
+            print(f"DEBUG: Using {system_messages.count()} coding-related system messages")
+        else:
+            system_messages = SystemMessage.objects.all().order_by('name')
+            print(f"DEBUG: Using all {system_messages.count()} system messages")
+    
+    # Fetch all active LLM models
+    llm_models = LLMModel.objects.filter(is_active=True).order_by('name')
+    print(f"DEBUG: Found {llm_models.count()} active LLM models")
+    
+    # Debug: Print first few system messages
+    for i, sm in enumerate(system_messages[:3]):
+        print(f"DEBUG: System message {i+1}: {sm.name} - {sm.content[:50]}...")
+    
+    context = {
+        "question_id": question_id,
+        "system_messages": system_messages,
+        "llm_models": llm_models,
+    }
+    return render(request, "review.html", context)
 
 @require_GET
 def get_llm_models(request):

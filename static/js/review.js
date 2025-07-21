@@ -15,9 +15,51 @@ document.addEventListener("DOMContentLoaded", function () {
   let colabMarkdown = "";
 
   // Temperature slider functionality
-  temperatureSlider.addEventListener("input", function() {
-    temperatureValue.textContent = parseFloat(this.value).toFixed(1);
-  });
+  if (temperatureSlider && temperatureValue) {
+    temperatureSlider.addEventListener("input", function() {
+      temperatureValue.textContent = parseFloat(this.value).toFixed(1);
+    });
+  }
+
+  // Validation function to check if requirements are met
+  function validateRequirements() {
+    const hasColabContent = colabRawContent && colabRawContent.trim().length > 0;
+    const selectedModels = modelsList ? modelsList.querySelectorAll("input[type=checkbox]:checked") : [];
+    const hasSelectedModels = selectedModels.length > 0;
+    
+    const runButton = document.getElementById("run-review-btn");
+    const validationMessage = document.getElementById("validation-message");
+    
+    // Check if elements exist before trying to modify them
+    if (!runButton || !validationMessage) {
+      console.warn("Required elements not found for validation");
+      return;
+    }
+    
+    if (hasColabContent && hasSelectedModels) {
+      // Requirements met - enable button
+      runButton.disabled = false;
+      validationMessage.innerHTML = '<i class="fas fa-check-circle text-green-500 mr-1"></i>Ready to run analysis';
+      validationMessage.className = "mt-3 text-sm text-center text-green-600";
+    } else {
+      // Requirements not met - disable button and show appropriate message
+      runButton.disabled = true;
+      let message = "Please ";
+      let missingItems = [];
+      
+      if (!hasColabContent) {
+        missingItems.push("fetch Colab content");
+      }
+      if (!hasSelectedModels) {
+        missingItems.push("select at least one LLM model");
+      }
+      
+      message += missingItems.join(" and ") + " to proceed";
+      
+      validationMessage.innerHTML = '<i class="fas fa-exclamation-triangle text-amber-500 mr-1"></i>' + message;
+      validationMessage.className = "mt-3 text-sm text-center text-gray-500";
+    }
+  }
 
   // Utility: Get CSRF token from cookie
   function getCSRFToken() {
@@ -37,6 +79,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Load LLM models
   function loadModels() {
+    if (!modelsList) {
+      console.error("Models list element not found");
+      return;
+    }
+    
     modelsList.innerHTML = `
       <div class="flex items-center justify-center py-8">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -83,7 +130,12 @@ document.addEventListener("DOMContentLoaded", function () {
               if (e.target !== checkbox) {
                 checkbox.checked = !checkbox.checked;
               }
+              // Validate requirements when model selection changes
+              validateRequirements();
             });
+            
+            // Add change handler to checkbox for direct clicks
+            checkbox.addEventListener('change', validateRequirements);
             
             modelsList.appendChild(modelCard);
           });
@@ -96,6 +148,8 @@ document.addEventListener("DOMContentLoaded", function () {
             </div>
           `;
         }
+        // Validate requirements after models are loaded
+        validateRequirements();
       })
       .catch(() => {
         modelsList.innerHTML = `
@@ -105,11 +159,18 @@ document.addEventListener("DOMContentLoaded", function () {
             <p class="text-xs">Please try refreshing</p>
           </div>
         `;
+        // Validate requirements after error
+        validateRequirements();
       });
   }
 
-  refreshModelsBtn.addEventListener("click", loadModels);
+  if (refreshModelsBtn) {
+    refreshModelsBtn.addEventListener("click", loadModels);
+  }
   loadModels();
+
+  // Initial validation check
+  validateRequirements();
 
   // Fetch Colab content
   fetchColabBtn.addEventListener("click", function () {
@@ -151,14 +212,22 @@ document.addEventListener("DOMContentLoaded", function () {
           colabContentContainer.innerHTML = colabMarkdown;
           colabStatus.textContent = "Colab content loaded.";
           colabStatus.className = "ms-2 text-success";
+          // Validate requirements after content is loaded
+          validateRequirements();
         } else {
           colabStatus.textContent = data.error || "Failed to fetch Colab content.";
           colabStatus.className = "ms-2 text-danger";
+          // Clear content and validate
+          colabRawContent = "";
+          validateRequirements();
         }
       })
       .catch(() => {
         colabStatus.textContent = "Error fetching Colab content.";
         colabStatus.className = "ms-2 text-danger";
+        // Clear content and validate
+        colabRawContent = "";
+        validateRequirements();
       });
   });
 
@@ -353,81 +422,79 @@ document.addEventListener("DOMContentLoaded", function () {
               </div>
               
               <div class="p-6">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="space-y-6">
                   
                   <!-- Grammar Analysis -->
-                  <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100 h-80 flex flex-col">
+                  <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
                     <div class="flex items-center mb-3">
                       <div class="p-2 bg-blue-100 rounded-lg mr-3">
                         <i class="fas fa-spell-check text-blue-600"></i>
                       </div>
                       <h4 class="text-lg font-semibold text-gray-800">Grammar Analysis</h4>
                     </div>
-                    <div class="prose prose-sm max-w-none text-gray-700 overflow-y-auto flex-1">
+                    <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
                       ${window.marked && result.grammar ? window.marked.parse(result.grammar) : (result.grammar || "No grammar analysis available")}
                     </div>
                   </div>
                   
                   <!-- Plagiarism Check -->
-                  <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-5 border border-orange-100 h-80 flex flex-col">
+                  <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-5 border border-orange-100">
                     <div class="flex items-center mb-3">
                       <div class="p-2 bg-orange-100 rounded-lg mr-3">
                         <i class="fas fa-search text-orange-600"></i>
                       </div>
                       <h4 class="text-lg font-semibold text-gray-800">Plagiarism Check</h4>
                     </div>
-                    <div class="flex-1 overflow-y-auto">
-                      <div class="mb-3">
-                        <div class="flex items-center justify-between mb-2">
-                          <span class="text-sm font-medium text-gray-600">Similarity Score</span>
-                          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
-                            result.plagiarism_score > 50 ? 'bg-red-100 text-red-800' : 
-                            result.plagiarism_score > 25 ? 'bg-yellow-100 text-yellow-800' : 
-                            'bg-green-100 text-green-800'
-                          }">
-                            ${result.plagiarism_score != null ? result.plagiarism_score + "%" : "N/A"}
-                          </span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                          <div class="h-2 rounded-full ${
-                            result.plagiarism_score > 50 ? 'bg-red-500' : 
-                            result.plagiarism_score > 25 ? 'bg-yellow-500' : 
-                            'bg-green-500'
-                          }" style="width: ${result.plagiarism_score || 0}%"></div>
-                        </div>
+                    <div class="mb-3">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-600">Similarity Score</span>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
+                          result.plagiarism_score > 50 ? 'bg-red-100 text-red-800' : 
+                          result.plagiarism_score > 25 ? 'bg-yellow-100 text-yellow-800' : 
+                          'bg-green-100 text-green-800'
+                        }">
+                          ${result.plagiarism_score != null ? result.plagiarism_score + "%" : "N/A"}
+                        </span>
                       </div>
-                      ${result.plagiarism_result ? `
-                        <div class="prose prose-xs max-w-none text-gray-600">
-                          ${window.marked ? window.marked.parse(result.plagiarism_result) : result.plagiarism_result}
-                        </div>
-                      ` : ''}
+                      <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="h-2 rounded-full ${
+                          result.plagiarism_score > 50 ? 'bg-red-500' : 
+                          result.plagiarism_score > 25 ? 'bg-yellow-500' : 
+                          'bg-green-500'
+                        }" style="width: ${result.plagiarism_score || 0}%"></div>
+                      </div>
                     </div>
+                    ${result.plagiarism_result ? `
+                      <div class="prose prose-xs max-w-none text-gray-600 max-h-48 overflow-y-auto">
+                        ${window.marked ? window.marked.parse(result.plagiarism_result) : result.plagiarism_result}
+                      </div>
+                    ` : ''}
                   </div>
                   
                   ${result.improvements && result.improvements.trim() && result.improvements.trim().toLowerCase() !== "n/a" ? `
                   <!-- Improvements -->
-                  <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border border-purple-100 h-80 flex flex-col">
+                  <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border border-purple-100">
                     <div class="flex items-center mb-3">
                       <div class="p-2 bg-purple-100 rounded-lg mr-3">
                         <i class="fas fa-lightbulb text-purple-600"></i>
                       </div>
                       <h4 class="text-lg font-semibold text-gray-800">Suggested Improvements</h4>
                     </div>
-                    <div class="prose prose-sm max-w-none text-gray-700 overflow-y-auto flex-1">
+                    <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
                       ${window.marked ? window.marked.parse(result.improvements) : result.improvements}
                     </div>
                   </div>
                   ` : ''}
                   
                   <!-- Code Quality Summary -->
-                  <div class="bg-gradient-to-br from-green-50 to-teal-50 rounded-xl p-5 border border-green-100 h-80 flex flex-col ${result.improvements && result.improvements.trim() && result.improvements.trim().toLowerCase() !== "n/a" ? '' : 'lg:col-span-1'}">
+                  <div class="bg-gradient-to-br from-green-50 to-teal-50 rounded-xl p-5 border border-green-100">
                     <div class="flex items-center mb-3">
                       <div class="p-2 bg-green-100 rounded-lg mr-3">
                         <i class="fas fa-code text-green-600"></i>
                       </div>
                       <h4 class="text-lg font-semibold text-gray-800">Quality Summary</h4>
                     </div>
-                    <div class="prose prose-sm max-w-none text-gray-700 overflow-y-auto flex-1">
+                    <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
                       ${window.marked && result.code_quality ? window.marked.parse(result.code_quality) : (result.code_quality || "No quality summary available")}
                     </div>
                   </div>
