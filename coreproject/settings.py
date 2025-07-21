@@ -35,17 +35,6 @@ SECRET_KEY = 'django-insecure-v2-3mp*@_tl99u3prftl(n-#_#2ycozh!v$hasfq&6(7&9)&g+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# OpenAI Configuration
-# All API keys should be fetched from the database or a secure config service.
-# Example: from eval.models import Config; OPENAI_API_KEY = Config.get("OPENAI_API_KEY")
-OPENAI_API_KEY = "FETCH_FROM_DB('OPENAI_API_KEY')"  # Replace with actual DB fetch
-
-# Anthropic Configuration
-ANTHROPIC_API_KEY = "FETCH_FROM_DB('ANTHROPIC_API_KEY')"  # Replace with actual DB fetch
-
-# Gemini Configuration
-GEMINI_API_KEY = "FETCH_FROM_DB('GEMINI_API_KEY')"  # Replace with actual DB fetch
-
 # Google Cloud Project ID
 GOOGLE_CLOUD_PROJECT_ID = "FETCH_FROM_DB('GOOGLE_CLOUD_PROJECT_ID')"  # Replace with actual DB fetch
 
@@ -54,7 +43,8 @@ SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, 'service_account.json')
 if not os.path.exists(SERVICE_ACCOUNT_FILE):
     print(f"Warning: service_account.json not found at {SERVICE_ACCOUNT_FILE}")
 
-ALLOWED_HOSTS = ["*"]
+if DEBUG:
+    ALLOWED_HOSTS = ["*"]
 
 
 # Application definition

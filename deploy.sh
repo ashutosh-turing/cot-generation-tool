@@ -15,8 +15,8 @@ BACKUP_DIR="$PROJECT_DIR/db_backups_v2"
 COMMIT_FILE="$PROJECT_DIR/last_deploy_commit_v2.txt"
 LOG_FILE="$PROJECT_DIR/logs/deploy_v2.log"
 VENV_DIR="$PROJECT_DIR/venv"
-GUNICORN_SOCK="/run/gunicorn_v2.sock"
-GUNICORN_PID="/run/gunicorn_v2.pid"
+GUNICORN_SOCK="$PROJECT_DIR/gunicorn_v2.sock"
+GUNICORN_PID="$PROJECT_DIR/gunicorn_v2.pid"
 
 log() {
     mkdir -p "$PROJECT_DIR/logs"
