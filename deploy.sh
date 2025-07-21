@@ -198,3 +198,4 @@ else
     echo "  rollback - Rollback V2 to previous version"
     echo "  local    - Run V2 in local development mode"
     exit 1
+fi
