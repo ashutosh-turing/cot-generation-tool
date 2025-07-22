@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from eval.utils.pubsub import publish_notification
 from django.utils import timezone
+from concurrent.futures import ThreadPoolExecutor
 
 def process_trainer_question_analysis(data):
     """Processes a trainer question analysis job."""
@@ -530,8 +531,13 @@ class Command(BaseCommand):
                 print(f"Error processing message: {e}")
                 message.nack()
 
-        streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
-        self.stdout.write(f"Listening for messages on {subscription_path}...")
+        # Enable concurrent processing with a thread pool
+        max_workers = 16  # Adjust based on server resources
+        executor = ThreadPoolExecutor(max_workers=max_workers)
+        streaming_pull_future = subscriber.subscribe(
+            subscription_path, callback=callback, executor=executor
+        )
+        self.stdout.write(f"Listening for messages on {subscription_path} with {max_workers} concurrent workers...")
 
         try:
             streaming_pull_future.result()
