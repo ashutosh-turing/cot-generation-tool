@@ -60,6 +60,7 @@ urlpatterns = [
     path('api/llm/jobs/<uuid:job_id>/status/', api_llm.poll_job_status, name='api_poll_job_status'),
     path('api/llm/jobs/<uuid:job_id>/result/', api_llm.get_job_result, name='api_get_job_result'),
     path('api/llm/jobs/', api_llm.list_user_jobs, name='api_list_user_jobs'),
+    path('api/llm/jobs/stats/', views.get_llm_job_stats, name='api_get_llm_job_stats'),
     path('api/llm/trainer-analysis/', api_llm.submit_trainer_question_analysis, name='api_submit_trainer_analysis'),
     
     # path('api/ground-truth-validate/', api_views.run_ground_truth_validation, name='api_ground_truth_validate'),

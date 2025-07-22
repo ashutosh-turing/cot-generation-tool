@@ -91,18 +91,102 @@ admin.site.register(UserPreference, UserPreferenceAdmin)
 
 @admin.register(LLMJob)
 class LLMJobAdmin(admin.ModelAdmin):
-    list_display = ('job_id', 'job_type', 'status', 'user', 'model', 'question_id', 'created_at', 'processing_time')
-    list_filter = ('job_type', 'status', 'model__provider', 'created_at')
-    search_fields = ('job_id', 'question_id', 'user__username', 'model__name')
-    readonly_fields = ('job_id', 'created_at', 'started_at', 'completed_at', 'processing_time')
+    list_display = ('job_id_short', 'job_type', 'status_colored', 'user', 'model', 'question_id', 'created_at', 'processing_time_formatted', 'actions_column')
+    list_filter = ('job_type', 'status', 'model__provider', 'model', 'created_at', 'user')
+    search_fields = ('job_id', 'question_id', 'user__username', 'model__name', 'error_message')
+    readonly_fields = ('job_id', 'created_at', 'started_at', 'completed_at', 'processing_time_formatted', 'job_age')
+    list_per_page = 50
+    date_hierarchy = 'created_at'
+    actions = ['retry_failed_jobs', 'cancel_stuck_jobs', 'mark_as_failed']
     
-    def processing_time(self, obj):
-        return f"{obj.processing_time:.2f}s" if obj.processing_time else "-"
-    processing_time.short_description = 'Processing Time'
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('user', 'model')
+    
+    def job_id_short(self, obj):
+        return str(obj.job_id)[:8] + "..."
+    job_id_short.short_description = 'Job ID'
+    
+    def status_colored(self, obj):
+        from django.utils.safestring import mark_safe
+        colors = {
+            'pending': '#fbbf24',  # yellow
+            'processing': '#3b82f6',  # blue
+            'completed': '#10b981',  # green
+            'failed': '#ef4444',  # red
+        }
+        color = colors.get(obj.status, '#6b7280')
+        return mark_safe(f'<span style="color: {color}; font-weight: bold;">●</span> {obj.get_status_display()}')
+    status_colored.short_description = 'Status'
+    
+    def processing_time_formatted(self, obj):
+        if obj.processing_time:
+            return f"{obj.processing_time:.2f}s"
+        elif obj.status == 'processing' and obj.started_at:
+            from django.utils import timezone
+            current_time = (timezone.now() - obj.started_at).total_seconds()
+            return f"{current_time:.2f}s (ongoing)"
+        return "-"
+    processing_time_formatted.short_description = 'Processing Time'
+    
+    def job_age(self, obj):
+        from django.utils import timezone
+        age = timezone.now() - obj.created_at
+        if age.days > 0:
+            return f"{age.days}d {age.seconds//3600}h"
+        elif age.seconds > 3600:
+            return f"{age.seconds//3600}h {(age.seconds%3600)//60}m"
+        else:
+            return f"{age.seconds//60}m {age.seconds%60}s"
+    job_age.short_description = 'Age'
+    
+    def actions_column(self, obj):
+        from django.utils.safestring import mark_safe
+        actions = []
+        if obj.status == 'failed':
+            actions.append(f'<a href="/admin/eval/llmjob/{obj.job_id}/retry/" style="color: #3b82f6;">Retry</a>')
+        if obj.status == 'processing':
+            actions.append(f'<a href="/admin/eval/llmjob/{obj.job_id}/cancel/" style="color: #ef4444;">Cancel</a>')
+        return mark_safe(' | '.join(actions)) if actions else '-'
+    actions_column.short_description = 'Actions'
+    
+    def retry_failed_jobs(self, request, queryset):
+        failed_jobs = queryset.filter(status='failed')
+        count = 0
+        for job in failed_jobs:
+            # Reset job status to pending for retry
+            job.status = 'pending'
+            job.started_at = None
+            job.completed_at = None
+            job.error_message = None
+            job.save()
+            count += 1
+        self.message_user(request, f"Successfully queued {count} jobs for retry.")
+    retry_failed_jobs.short_description = "Retry selected failed jobs"
+    
+    def cancel_stuck_jobs(self, request, queryset):
+        stuck_jobs = queryset.filter(status='processing')
+        count = 0
+        for job in stuck_jobs:
+            job.mark_failed("Job cancelled by admin")
+            count += 1
+        self.message_user(request, f"Successfully cancelled {count} stuck jobs.")
+    cancel_stuck_jobs.short_description = "Cancel selected processing jobs"
+    
+    def mark_as_failed(self, request, queryset):
+        pending_jobs = queryset.filter(status='pending')
+        count = 0
+        for job in pending_jobs:
+            job.mark_failed("Marked as failed by admin")
+            count += 1
+        self.message_user(request, f"Successfully marked {count} jobs as failed.")
+    mark_as_failed.short_description = "Mark selected pending jobs as failed"
     
     fieldsets = (
         ('Job Information', {
             'fields': ('job_id', 'job_type', 'status', 'user', 'model', 'question_id')
+        }),
+        ('Timing Information', {
+            'fields': ('created_at', 'started_at', 'completed_at', 'processing_time_formatted', 'job_age')
         }),
         ('Input Data', {
             'fields': ('input_data',),
@@ -112,7 +196,83 @@ class LLMJobAdmin(admin.ModelAdmin):
             'fields': ('result_data', 'error_message'),
             'classes': ('collapse',)
         }),
-        ('Timestamps', {
-            'fields': ('created_at', 'started_at', 'completed_at', 'processing_time')
-        }),
     )
+    
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('dashboard/', self.admin_site.admin_view(self.job_dashboard_view), name='eval_llmjob_dashboard'),
+            path('<uuid:job_id>/retry/', self.admin_site.admin_view(self.retry_job_view), name='eval_llmjob_retry'),
+            path('<uuid:job_id>/cancel/', self.admin_site.admin_view(self.cancel_job_view), name='eval_llmjob_cancel'),
+        ]
+        return custom_urls + urls
+    
+    def job_dashboard_view(self, request):
+        from django.shortcuts import render
+        from django.db.models import Count, Q
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Get statistics
+        total_jobs = LLMJob.objects.count()
+        status_counts = LLMJob.objects.values('status').annotate(count=Count('status'))
+        
+        # Recent jobs (last 24 hours)
+        recent_jobs = LLMJob.objects.filter(
+            created_at__gte=timezone.now() - timedelta(hours=24)
+        ).count()
+        
+        # Jobs by type
+        type_counts = LLMJob.objects.values('job_type').annotate(count=Count('job_type'))
+        
+        # Failed jobs with errors
+        failed_jobs = LLMJob.objects.filter(status='failed').order_by('-created_at')[:10]
+        
+        # Long running jobs (processing for more than 10 minutes)
+        long_running = LLMJob.objects.filter(
+            status='processing',
+            started_at__lt=timezone.now() - timedelta(minutes=10)
+        ).order_by('started_at')
+        
+        context = {
+            'title': 'LLM Job Dashboard',
+            'total_jobs': total_jobs,
+            'status_counts': {item['status']: item['count'] for item in status_counts},
+            'recent_jobs': recent_jobs,
+            'type_counts': {item['job_type']: item['count'] for item in type_counts},
+            'failed_jobs': failed_jobs,
+            'long_running_jobs': long_running,
+        }
+        
+        return render(request, 'admin/eval/llmjob/dashboard.html', context)
+    
+    def retry_job_view(self, request, job_id):
+        from django.shortcuts import get_object_or_404, redirect
+        from django.contrib import messages
+        
+        job = get_object_or_404(LLMJob, job_id=job_id)
+        if job.status == 'failed':
+            job.status = 'pending'
+            job.started_at = None
+            job.completed_at = None
+            job.error_message = None
+            job.save()
+            messages.success(request, f"Job {job_id} has been queued for retry.")
+        else:
+            messages.error(request, f"Job {job_id} cannot be retried (current status: {job.status}).")
+        
+        return redirect('admin:eval_llmjob_changelist')
+    
+    def cancel_job_view(self, request, job_id):
+        from django.shortcuts import get_object_or_404, redirect
+        from django.contrib import messages
+        
+        job = get_object_or_404(LLMJob, job_id=job_id)
+        if job.status == 'processing':
+            job.mark_failed("Job cancelled by admin")
+            messages.success(request, f"Job {job_id} has been cancelled.")
+        else:
+            messages.error(request, f"Job {job_id} cannot be cancelled (current status: {job.status}).")
+        
+        return redirect('admin:eval_llmjob_changelist')

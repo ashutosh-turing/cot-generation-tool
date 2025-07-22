@@ -1,0 +1,375 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | Django Admin{% endblock %}
+
+{% block extrahead %}
+<style>
+    .dashboard-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #3b82f6;
+    }
+    
+    .stat-card.pending { border-left-color: #fbbf24; }
+    .stat-card.processing { border-left-color: #3b82f6; }
+    .stat-card.completed { border-left-color: #10b981; }
+    .stat-card.failed { border-left-color: #ef4444; }
+    
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        color: #6b7280;
+        font-size: 0.9rem;
+    }
+    
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .status-pending { background-color: #fbbf24; }
+    .status-processing { background-color: #3b82f6; }
+    .status-completed { background-color: #10b981; }
+    .status-failed { background-color: #ef4444; }
+    
+    .job-table {
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+    
+    .job-table h3 {
+        background: #f8fafc;
+        margin: 0;
+        padding: 15px 20px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 1.1rem;
+    }
+    
+    .job-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .job-table th,
+    .job-table td {
+        padding: 12px 20px;
+        text-align: left;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .job-table th {
+        background: #f8fafc;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    .job-table tr:hover {
+        background: #f9fafb;
+    }
+    
+    .error-message {
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .refresh-btn {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-bottom: 20px;
+    }
+    
+    .refresh-btn:hover {
+        background: #2563eb;
+    }
+    
+    .alert {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    
+    .alert-warning {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        color: #92400e;
+    }
+    
+    .alert-info {
+        background: #dbeafe;
+        border: 1px solid #3b82f6;
+        color: #1e40af;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+<button class="refresh-btn" onclick="location.reload()">
+    <i class="fas fa-sync-alt"></i> Refresh Dashboard
+</button>
+
+<!-- Status Overview -->
+<div class="dashboard-stats">
+    <div class="stat-card">
+        <div class="stat-number">{{ total_jobs }}</div>
+        <div class="stat-label">Total Jobs</div>
+    </div>
+    
+    <div class="stat-card pending">
+        <div class="stat-number">{{ status_counts.pending|default:0 }}</div>
+        <div class="stat-label">
+            <span class="status-indicator status-pending"></span>
+            Pending Jobs
+        </div>
+    </div>
+    
+    <div class="stat-card processing">
+        <div class="stat-number">{{ status_counts.processing|default:0 }}</div>
+        <div class="stat-label">
+            <span class="status-indicator status-processing"></span>
+            Processing Jobs
+        </div>
+    </div>
+    
+    <div class="stat-card completed">
+        <div class="stat-number">{{ status_counts.completed|default:0 }}</div>
+        <div class="stat-label">
+            <span class="status-indicator status-completed"></span>
+            Completed Jobs
+        </div>
+    </div>
+    
+    <div class="stat-card failed">
+        <div class="stat-number">{{ status_counts.failed|default:0 }}</div>
+        <div class="stat-label">
+            <span class="status-indicator status-failed"></span>
+            Failed Jobs
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-number">{{ recent_jobs }}</div>
+        <div class="stat-label">Jobs (Last 24h)</div>
+    </div>
+</div>
+
+<!-- Alerts -->
+{% if long_running_jobs %}
+<div class="alert alert-warning">
+    <strong>Warning:</strong> {{ long_running_jobs.count }} job(s) have been processing for more than 10 minutes. 
+    <a href="#long-running">View details below</a>
+</div>
+{% endif %}
+
+{% if status_counts.pending > 50 %}
+<div class="alert alert-info">
+    <strong>Info:</strong> High number of pending jobs ({{ status_counts.pending }}). 
+    Check if the job processor is running.
+</div>
+{% endif %}
+
+<!-- Job Types Breakdown -->
+<div class="job-table">
+    <h3>Jobs by Type</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Job Type</th>
+                <th>Count</th>
+                <th>Percentage</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for type_data in type_counts.items %}
+            <tr>
+                <td>{{ type_data.0|title }}</td>
+                <td>{{ type_data.1 }}</td>
+                <td>
+                    {% if total_jobs > 0 %}
+                        {{ type_data.1|floatformat:0 }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="3">No jobs found</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Recent Failed Jobs -->
+{% if failed_jobs %}
+<div class="job-table">
+    <h3>Recent Failed Jobs</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Job ID</th>
+                <th>Type</th>
+                <th>User</th>
+                <th>Model</th>
+                <th>Failed At</th>
+                <th>Error</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in failed_jobs %}
+            <tr>
+                <td>
+                    <a href="/admin/eval/llmjob/{{ job.job_id }}/change/">
+                        {{ job.job_id|truncatechars:12 }}
+                    </a>
+                </td>
+                <td>{{ job.get_job_type_display }}</td>
+                <td>{{ job.user.username|default:"-" }}</td>
+                <td>{{ job.model.name|default:"-" }}</td>
+                <td>{{ job.completed_at|date:"M d, H:i" }}</td>
+                <td class="error-message" title="{{ job.error_message }}">
+                    {{ job.error_message|truncatechars:50 }}
+                </td>
+                <td>
+                    <a href="/admin/eval/llmjob/{{ job.job_id }}/retry/" 
+                       style="color: #3b82f6; text-decoration: none;">
+                        Retry
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Long Running Jobs -->
+{% if long_running_jobs %}
+<div class="job-table" id="long-running">
+    <h3>Long Running Jobs (>10 minutes)</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Job ID</th>
+                <th>Type</th>
+                <th>User</th>
+                <th>Model</th>
+                <th>Started At</th>
+                <th>Duration</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in long_running_jobs %}
+            <tr>
+                <td>
+                    <a href="/admin/eval/llmjob/{{ job.job_id }}/change/">
+                        {{ job.job_id|truncatechars:12 }}
+                    </a>
+                </td>
+                <td>{{ job.get_job_type_display }}</td>
+                <td>{{ job.user.username|default:"-" }}</td>
+                <td>{{ job.model.name|default:"-" }}</td>
+                <td>{{ job.started_at|date:"M d, H:i" }}</td>
+                <td>
+                    {% now "U" as current_timestamp %}
+                    {% with duration=current_timestamp|add:job.started_at.timestamp|floatformat:0 %}
+                        {{ duration|floatformat:0 }}m
+                    {% endwith %}
+                </td>
+                <td>
+                    <a href="/admin/eval/llmjob/{{ job.job_id }}/cancel/" 
+                       style="color: #ef4444; text-decoration: none;"
+                       onclick="return confirm('Are you sure you want to cancel this job?')">
+                        Cancel
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="job-table">
+    <h3>Quick Actions</h3>
+    <div style="padding: 20px;">
+        <p>
+            <a href="/admin/eval/llmjob/" class="button default">View All Jobs</a>
+            <a href="/admin/eval/llmjob/?status__exact=failed" class="button">View Failed Jobs</a>
+            <a href="/admin/eval/llmjob/?status__exact=pending" class="button">View Pending Jobs</a>
+            <a href="/admin/eval/llmmodel/" class="button">Manage Models</a>
+        </p>
+        
+        <h4>System Health</h4>
+        <ul>
+            <li>
+                <strong>Job Processor Status:</strong> 
+                {% if status_counts.processing > 0 %}
+                    <span style="color: #10b981;">● Running</span>
+                {% else %}
+                    <span style="color: #ef4444;">● Unknown</span>
+                    (No jobs currently processing)
+                {% endif %}
+            </li>
+            <li>
+                <strong>Queue Health:</strong>
+                {% if status_counts.pending < 10 %}
+                    <span style="color: #10b981;">● Good</span>
+                {% elif status_counts.pending < 50 %}
+                    <span style="color: #fbbf24;">● Moderate</span>
+                {% else %}
+                    <span style="color: #ef4444;">● High Load</span>
+                {% endif %}
+                ({{ status_counts.pending|default:0 }} pending)
+            </li>
+        </ul>
+    </div>
+</div>
+
+<script>
+// Auto-refresh every 30 seconds
+setTimeout(function() {
+    location.reload();
+}, 30000);
+
+// Add timestamp to show when page was last updated
+document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    const timestamp = now.toLocaleTimeString();
+    const refreshBtn = document.querySelector('.refresh-btn');
+    refreshBtn.innerHTML += ` (Last updated: ${timestamp})`;
+});
+</script>
+
+{% endblock %}

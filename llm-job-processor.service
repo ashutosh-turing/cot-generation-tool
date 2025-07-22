@@ -1,0 +1,23 @@
+[Unit]
+Description=LLM Job Auto Processor
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/home/cot-generation-tool
+Environment=PATH=/home/cot-generation-tool/bin
+ExecStart=/home/cot-generation-tool/bin/python manage.py auto_job_processor --auto-fix-stuck --auto-retry-failed
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=DJANGO_SETTINGS_MODULE=coreproject.settings
+Environment=GOOGLE_APPLICATION_CREDENTIALS=/home/cot-generation-tool/service_account.json
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,192 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .dashboard-link {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 6px;
+        text-decoration: none;
+        display: inline-block;
+        margin-bottom: 15px;
+        font-weight: 500;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .dashboard-link:hover {
+        color: white;
+        text-decoration: none;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .dashboard-link i {
+        margin-right: 8px;
+    }
+    
+    .job-status-summary {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .status-badge {
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-processing { background: #dbeafe; color: #1e40af; }
+    .status-completed { background: #d1fae5; color: #065f46; }
+    .status-failed { background: #fee2e2; color: #991b1b; }
+    
+    .quick-actions {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .quick-actions h3 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        color: #374151;
+        font-weight: 600;
+    }
+    
+    .quick-actions a {
+        display: inline-block;
+        margin-right: 10px;
+        margin-bottom: 5px;
+        padding: 6px 12px;
+        background: white;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        text-decoration: none;
+        color: #374151;
+        font-size: 12px;
+        transition: all 0.2s ease;
+    }
+    
+    .quick-actions a:hover {
+        background: #f3f4f6;
+        border-color: #9ca3af;
+        text-decoration: none;
+    }
+</style>
+{% endblock %}
+
+{% block content_title %}
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+    <h1>{{ title }}</h1>
+    <a href="{% url 'admin:eval_llmjob_dashboard' %}" class="dashboard-link">
+        <i class="fas fa-chart-line"></i>
+        LLM Job Dashboard
+    </a>
+</div>
+{% endblock %}
+
+{% block result_list %}
+<!-- Job Status Summary -->
+<div class="job-status-summary">
+    <div class="status-badge status-pending">
+        <i class="fas fa-clock"></i> 
+        {{ cl.result_count|default:0 }} Total Jobs
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="quick-actions">
+    <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+    <a href="?status__exact=pending">
+        <i class="fas fa-hourglass-half"></i> View Pending
+    </a>
+    <a href="?status__exact=processing">
+        <i class="fas fa-spinner"></i> View Processing
+    </a>
+    <a href="?status__exact=failed">
+        <i class="fas fa-exclamation-triangle"></i> View Failed
+    </a>
+    <a href="?status__exact=completed">
+        <i class="fas fa-check-circle"></i> View Completed
+    </a>
+    <a href="?created_at__gte={{ today|date:'Y-m-d' }}">
+        <i class="fas fa-calendar-day"></i> Today's Jobs
+    </a>
+    <a href="/admin/eval/llmmodel/">
+        <i class="fas fa-robot"></i> Manage Models
+    </a>
+</div>
+
+{{ block.super }}
+{% endblock %}
+
+{% block extrajs %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add auto-refresh functionality
+    const refreshInterval = 30000; // 30 seconds
+    let autoRefresh = false;
+    
+    // Add refresh toggle button
+    const toolbar = document.querySelector('.actions');
+    if (toolbar) {
+        const refreshToggle = document.createElement('button');
+        refreshToggle.type = 'button';
+        refreshToggle.className = 'button';
+        refreshToggle.innerHTML = '<i class="fas fa-sync-alt"></i> Auto Refresh: OFF';
+        refreshToggle.style.marginLeft = '10px';
+        
+        refreshToggle.addEventListener('click', function() {
+            autoRefresh = !autoRefresh;
+            this.innerHTML = autoRefresh ? 
+                '<i class="fas fa-sync-alt"></i> Auto Refresh: ON' : 
+                '<i class="fas fa-sync-alt"></i> Auto Refresh: OFF';
+            
+            if (autoRefresh) {
+                startAutoRefresh();
+            }
+        });
+        
+        toolbar.appendChild(refreshToggle);
+    }
+    
+    function startAutoRefresh() {
+        if (autoRefresh) {
+            setTimeout(function() {
+                if (autoRefresh) {
+                    location.reload();
+                }
+            }, refreshInterval);
+        }
+    }
+    
+    // Highlight rows based on status
+    const rows = document.querySelectorAll('#result_list tbody tr');
+    rows.forEach(function(row) {
+        const statusCell = row.querySelector('td:nth-child(3)'); // Assuming status is 3rd column
+        if (statusCell) {
+            const statusText = statusCell.textContent.toLowerCase();
+            if (statusText.includes('failed')) {
+                row.style.backgroundColor = '#fef2f2';
+            } else if (statusText.includes('processing')) {
+                row.style.backgroundColor = '#eff6ff';
+            } else if (statusText.includes('pending')) {
+                row.style.backgroundColor = '#fffbeb';
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

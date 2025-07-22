@@ -2168,3 +2168,29 @@ def modal_playground(request):
         "llm_models": llm_models,  # Only active models are passed
     }
     return render(request, "modal_playground.html", context)
+
+@login_required
+def get_llm_job_stats(request):
+    """Get LLM job statistics for the dashboard."""
+    try:
+        from .models import LLMJob
+        from django.db.models import Count
+        
+        # Get job counts by status
+        status_counts = dict(
+            LLMJob.objects.values('status').annotate(count=Count('status')).values_list('status', 'count')
+        )
+        
+        # Get total job count
+        total_jobs = LLMJob.objects.count()
+        
+        return JsonResponse({
+            'success': True,
+            'total_jobs': total_jobs,
+            'status_counts': status_counts
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
