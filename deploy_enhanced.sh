@@ -89,39 +89,49 @@ backup_critical_data() {
 
 restore_critical_data() {
     log "Restoring critical data from backup..."
-    
+
+    # Check if DB already has data (e.g., any users)
+    source "$VENV_DIR/bin/activate"
+    export DJANGO_SETTINGS_MODULE=coreproject.settings
+    USER_COUNT=$(python3 manage.py dbshell <<EOF
+SELECT COUNT(*) FROM auth_user;
+EOF
+    2>/dev/null | grep -E '^[0-9]+$' | head -n 1)
+
+    if [ -n "$USER_COUNT" ] && [ "$USER_COUNT" -gt 0 ]; then
+        log "Database already contains data (auth_user count: $USER_COUNT), skipping data restore."
+        return
+    fi
+
     if [ ! -f "$BACKUP_DIR/latest_backup_path.txt" ]; then
         log "⚠ No backup path found, skipping data restore"
         return
     fi
-    
+
     RESTORE_DIR=$(cat "$BACKUP_DIR/latest_backup_path.txt")
     if [ ! -d "$RESTORE_DIR" ]; then
         log "⚠ Backup directory $RESTORE_DIR not found, skipping data restore"
         return
     fi
-    
-    source "$VENV_DIR/bin/activate"
-    export DJANGO_SETTINGS_MODULE=coreproject.settings
-    
+
     # Restore users and groups first (most critical)
     if [ -f "$RESTORE_DIR/users_and_groups.json" ]; then
         python3 manage.py loaddata "$RESTORE_DIR/users_and_groups.json" || log "⚠ Could not restore users and groups"
         log "✓ Users and groups restored"
     fi
-    
+
     # Restore system configuration
     if [ -f "$RESTORE_DIR/system_config.json" ]; then
         python3 manage.py loaddata "$RESTORE_DIR/system_config.json" || log "⚠ Could not restore system config"
         log "✓ System configuration restored"
     fi
-    
+
     # Restore LLM data
     if [ -f "$RESTORE_DIR/llm_data.json" ]; then
         python3 manage.py loaddata "$RESTORE_DIR/llm_data.json" || log "⚠ Could not restore LLM data"
         log "✓ LLM data restored"
     fi
-    
+
     # Restore projects and tasks
     if [ -f "$RESTORE_DIR/projects_and_tasks.json" ]; then
         python3 manage.py loaddata "$RESTORE_DIR/projects_and_tasks.json" || log "⚠ Could not restore projects and tasks"
