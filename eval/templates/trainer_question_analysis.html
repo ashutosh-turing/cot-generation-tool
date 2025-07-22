@@ -427,6 +427,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('DOMContentLoaded', function() {
         const llmResultContainer = document.getElementById('llm-result-container');
         let selectedModelIds = [];
+        
+        // Store raw response data for each model
+        let rawResponseData = {};
 
         // Handle model checkbox changes
         document.addEventListener('change', function(e) {
@@ -585,11 +588,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                             `;
                             
-                            // Render the result content
+                            // Store raw response data for transfer to Colab
                             let content = statusData.result_data?.result || 'No result available';
                             if (typeof content === "object" && content !== null && "result" in content) {
                                 content = content.result;
                             }
+                            
+                            // Store the raw content for Colab transfer
+                            rawResponseData[modelId] = content;
                             
                             const markdownDiv = placeholder.querySelector(`#llm-markdown-${modelId}`);
                             if (window.marked) {
@@ -686,7 +692,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 file_id = match[1];
             }
             const modelId = document.getElementById('colab-modal').getAttribute('data-model-id');
-            const llmContent = document.getElementById(`llm-markdown-${modelId}`) ? document.getElementById(`llm-markdown-${modelId}`).innerText : "";
+            // Use raw response data instead of processed content from DOM
+            const llmContent = rawResponseData[modelId] || "";
             const messageDiv = document.getElementById('colab-transfer-message');
             messageDiv.innerHTML = '<div class="text-gray-500">Transferring to Colab...</div>';
             try {
