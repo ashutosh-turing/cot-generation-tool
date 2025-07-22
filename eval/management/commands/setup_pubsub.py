@@ -16,7 +16,7 @@ class Command(BaseCommand):
         publisher = pubsub_v1.PublisherClient()
 
         # Create topics
-        topics = ["llm-requests", "llm-notifications"]
+        topics = ["v2-cot-llm-requests", "v2-cot-llm-notifications"]
         for topic_id in topics:
             topic_path = publisher.topic_path(project_id, topic_id)
             try:
@@ -33,8 +33,8 @@ class Command(BaseCommand):
 
         # Create subscriptions
         subscriptions = {
-            "llm-requests-subscription": "llm-requests",
-            "llm-notifications-subscription": "llm-notifications"
+            "v2-cot-llm-requests-subscription": "v2-cot-llm-requests",
+            "v2-cot-llm-notifications-subscription": "v2-cot-llm-notifications"
         }
         for sub_id, topic_id in subscriptions.items():
             subscription_path = subscriber.subscription_path(project_id, sub_id)
