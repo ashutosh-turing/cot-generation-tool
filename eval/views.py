@@ -189,29 +189,32 @@ def trainer_question_analysis(request, question_id):
                         references = [str(links).strip()]
                 except Exception:
                     references = [link.strip().strip("'").strip('"') for link in task.response_links.split(",") if link.strip()]
-            # Scrape the problem statement from the problem_link
-            problem_title = ""
+            # Use raw_prompt if available, else scrape the problem statement from the problem_link
+            problem_title = task.title or ""
             problem_statement = ""
             problem_html = ""
             error = None
-            try:
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
-                }
-                resp = requests.get(problem_link, headers=headers)
-                if resp.status_code == 200:
-                    soup = BeautifulSoup(resp.text, "html.parser")
-                    title_tag = soup.find("div", class_="title")
-                    if title_tag:
-                        problem_title = title_tag.text.strip()
-                    statement_tag = soup.find("div", class_="problem-statement")
-                    if statement_tag:
-                        problem_statement = statement_tag.text.strip()
-                        problem_html = str(statement_tag)
-                else:
-                    error = f"Failed to fetch problem from link (status {resp.status_code})"
-            except Exception as e:
-                error = f"Error scraping problem link: {str(e)}"
+            if task.raw_prompt:
+                problem_statement = task.raw_prompt.strip()
+            else:
+                try:
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+                    }
+                    resp = requests.get(problem_link, headers=headers)
+                    if resp.status_code == 200:
+                        soup = BeautifulSoup(resp.text, "html.parser")
+                        title_tag = soup.find("div", class_="title")
+                        if title_tag:
+                            problem_title = title_tag.text.strip()
+                        statement_tag = soup.find("div", class_="problem-statement")
+                        if statement_tag:
+                            problem_statement = statement_tag.text.strip()
+                            problem_html = str(statement_tag)
+                    else:
+                        error = f"Failed to fetch problem from link (status {resp.status_code})"
+                except Exception as e:
+                    error = f"Error scraping problem link: {str(e)}"
             # Always define reference_data
             if references:
                 for ref in references:
