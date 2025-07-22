@@ -272,6 +272,15 @@ deploy() {
     log "Installing Python dependencies..."
     pip install -r requirements.txt
 
+    # 4b. Restore latest DB backup before migrations
+    LATEST_BACKUP_DIR=$(ls -td "$BACKUP_DIR"/backup_* 2>/dev/null | head -n 1)
+    if [ -d "$LATEST_BACKUP_DIR" ] && [ -f "$LATEST_BACKUP_DIR/db_v2_full_backup.sqlite3" ]; then
+        log "Restoring latest DB backup from $LATEST_BACKUP_DIR"
+        cp "$LATEST_BACKUP_DIR/db_v2_full_backup.sqlite3" "$DB_PATH"
+    else
+        log "No valid DB backup found to restore before migrations."
+    fi
+
     # 5. Run safe migrations
     safe_migrate
 
@@ -383,6 +392,15 @@ rollback() {
     # 4. Install dependencies
     log "Installing Python dependencies..."
     pip install -r requirements.txt
+
+    # 4b. Restore latest DB backup before migrations
+    LATEST_BACKUP_DIR=$(ls -td "$BACKUP_DIR"/backup_* 2>/dev/null | head -n 1)
+    if [ -d "$LATEST_BACKUP_DIR" ] && [ -f "$LATEST_BACKUP_DIR/db_v2_full_backup.sqlite3" ]; then
+        log "Restoring latest DB backup from $LATEST_BACKUP_DIR"
+        cp "$LATEST_BACKUP_DIR/db_v2_full_backup.sqlite3" "$DB_PATH"
+    else
+        log "No valid DB backup found to restore before migrations."
+    fi
 
     # 5. Run migrations
     safe_migrate
