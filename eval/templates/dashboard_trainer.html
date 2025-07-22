@@ -56,9 +56,9 @@
                                 <!-- Question Id as link -->
                                 <td class="px-6 py-4">
                                     {% if task.question_id %}
-                                        <a href="{% url 'trainer_question_analysis' task.question_id %}" class="text-blue-700 font-semibold hover:underline">
-                                            {{ task.question_id }}
-                                        </a>
+<a href="{% url 'trainer_question_analysis' selected_project task.question_id %}" class="text-blue-700 font-semibold hover:underline">
+    {{ task.question_id }}
+</a>
                                     {% else %}
                                         <span class="text-gray-400">-</span>
                                     {% endif %}

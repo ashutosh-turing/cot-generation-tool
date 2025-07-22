@@ -72,42 +72,56 @@
         <!-- Task Sync Configuration Section -->
     </div>
      <div class="max-w-full mx-auto bg-white rounded-2xl shadow p-8 mt-8">
-            <div class="mb-10">
-                <h1 class="text-2xl font-bold mb-4 text-blue-700">Task Sync Configuration</h1>
-                <form method="post" class="space-y-6 w-full">
-                    {% csrf_token %}
-                    <div>
-                        <label for="project_id" class="block font-semibold mb-1">Project</label>
-                        <select name="project_id" id="project_id" class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-400" required>
-                            <option value="">-- Choose Project --</option>
-                            {% for project in projects %}
-                                {% if project.is_active %}
-                                <option value="{{ project.id }}" {% if project.id|stringformat:"s" == selected_project_id %}selected{% endif %}>{{ project.code }} - {{ project.name }}</option>
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="sheet_url" class="block font-semibold mb-1">Sheet/Data Source URL</label>
-                        <input type="url" id="sheet_url" name="sheet_url" value="{{ config.sheet_url|default:'' }}" required class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-400">
-                    </div>
-                    <div>
-                        <label for="sync_interval_minutes" class="block font-semibold mb-1">Sync Interval (minutes)</label>
-                        <input type="number" id="sync_interval_minutes" name="sync_interval_minutes" min="1" value="{{ config.sync_interval_minutes|default:60 }}" required class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-400">
-                    </div>
-                    <div>
-                        <label class="block font-semibold mb-1">Last Synced</label>
-                        <div class="text-gray-600">{{ config.last_synced|default:"Never" }}</div>
-                    </div>
-                    <div class="flex justify-end">
-                        <button type="submit" name="save_config" value="1" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold shadow">Save Configuration</button>
-                    </div>
-                </form>
-                {% if message %}
-                    <div class="mt-4 p-3 rounded bg-green-100 text-green-800 text-center">{{ message }}</div>
-                {% endif %}
+    <div class="mb-10">
+        <h1 class="text-2xl font-bold mb-4 text-blue-700">Task Sync Configuration</h1>
+        <!-- Config JSON Upload Section -->
+        <form method="post" enctype="multipart/form-data" class="mb-6 flex flex-col md:flex-row items-center gap-4">
+            {% csrf_token %}
+            <input type="file" name="config_json" accept=".json,application/json" class="border rounded p-2" required>
+            <button type="submit" name="upload_config_json" value="1" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 font-semibold shadow">Upload config.json</button>
+        </form>
+        <!-- Config JSON Format Info -->
+        <div class="mb-8">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h2 class="text-lg font-bold text-blue-700 mb-2">Configuration Format</h2>
+                <p class="text-gray-700 mb-2">
+                    Please upload a <span class="font-mono bg-gray-100 px-1 rounded">config.json</span> file with the following structure:
+                </p>
+                <pre class="bg-gray-900 text-green-200 rounded-lg p-4 text-sm overflow-x-auto mb-2">
+{
+  "project_code": "Code-Data-Repack-SFT",
+  "sheet_url": "https://docs.google.com/spreadsheets/d/...",
+  "sync_interval_minutes": 60,
+  "primary_key_column": "question_id",
+  "scraping_needed": false,
+  "link_column": "problem_link",
+  "column_mapping": {
+    "prompt": "Task Prompt",
+    "reference_links": "Links"
+  },
+  "sync_mode": "prompt_in_sheet",
+  "sheet_tab": "Sheet1",
+  "is_active": true
+}
+                </pre>
+                <ul class="list-disc pl-6 text-gray-600 text-sm">
+                    <li><span class="font-mono">project_code</span>: The code of the project to apply this config to.</li>
+                    <li><span class="font-mono">sheet_url</span>: Google Sheet or data source URL.</li>
+                    <li><span class="font-mono">sync_interval_minutes</span>: How often to sync (in minutes).</li>
+                    <li><span class="font-mono">primary_key_column</span>: Unique identifier column for tasks.</li>
+                    <li><span class="font-mono">scraping_needed</span>: Set to true if scraping is required.</li>
+                    <li><span class="font-mono">link_column</span>: Column containing links for scraping (if needed).</li>
+                    <li><span class="font-mono">column_mapping</span>: Map logical fields to sheet columns.</li>
+                    <li><span class="font-mono">sync_mode</span>: One of "prompt_in_sheet", "scraping", or "custom".</li>
+                    <li><span class="font-mono">sheet_tab</span>: Sheet tab/range name (optional).</li>
+                    <li><span class="font-mono">is_active</span>: Set to true to activate this config.</li>
+                </ul>
             </div>
-            <!-- Sync History Table at the bottom -->
+        </div>
+        {% if message %}
+            <div class="mt-4 p-3 rounded bg-green-100 text-green-800 text-center">{{ message }}</div>
+        {% endif %}
+        <!-- Sync History Table at the bottom -->
             <div class="mt-10">
                 <h2 class="text-lg font-semibold mb-2 text-gray-800">Sync History</h2>
                 {% if history %}

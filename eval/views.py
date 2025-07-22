@@ -84,19 +84,19 @@ def is_not_trainer(user):
 # (removed duplicate import of LLMModel)
 
 @login_required
-def trainer_question_analysis(request, question_id):
+def trainer_question_analysis(request, project_id, question_id):
     """
-    View for trainer to analyze a specific question.
-    - GET: Scrapes Codeforces for the problem statement and references, displays UI.
+    View for trainer to analyze a specific question, project-aware and config-driven.
+    - GET: Uses config to fetch and map fields, falls back to scraping if needed.
     - POST: Runs analysis and returns chain of thought as JSON.
     """
     import json as pyjson
     from django.utils.html import escape
     from django.http import JsonResponse
+    from .models import TaskSyncConfig, TrainerTask, Project
 
     # Helper to scrape Codeforces
     def scrape_codeforces(qid):
-        print(qid)
         codeforces_url = f"https://codeforces.com/problemset/problem/{qid}"
         problem_title = ""
         problem_statement = ""
@@ -122,6 +122,13 @@ def trainer_question_analysis(request, question_id):
             error = f"Error scraping Codeforces: {str(e)}"
         return problem_title, problem_statement, references, error
 
+    # Fetch config for this project
+    config = TaskSyncConfig.objects.filter(project__id=project_id, is_active=True).first()
+    mapping = config.column_mapping if config else {}
+    primary_key = config.primary_key_column if config else "question_id"
+    scraping_needed = config.scraping_needed if config else False
+    link_column = config.link_column if config else None
+
     if request.method == "POST":
         # Handle AJAX analysis request for LLM analysis
         system_message = request.POST.get("system_message", "")
@@ -129,12 +136,12 @@ def trainer_question_analysis(request, question_id):
         llm_model_ids = request.POST.getlist("llm_models")
         # Compose the prompt
         prompt = request.POST.get("prompt", "")
-        # If prompt is not provided, use problem_statement from GET
-        if not prompt:
-            from .models import TrainerTask
-            task = TrainerTask.objects.filter(question_id=question_id).first()
-            if task:
-                prompt = task.title or ""
+        # If prompt is not provided, use mapped field from TrainerTask
+        filter_kwargs = {primary_key: question_id, "project__id": project_id}
+        task = TrainerTask.objects.filter(**filter_kwargs).first()
+        if not prompt and task:
+            prompt_field = mapping.get("prompt", "raw_prompt")
+            prompt = getattr(task, prompt_field, "") or getattr(task, "raw_prompt", "")
         # Compose the full input for LLM
         full_input = f"{prompt}\n\nAdditional context:\n{additional_context}" if additional_context else prompt
         # Use the first selected LLM model, or a default
@@ -156,6 +163,7 @@ def trainer_question_analysis(request, question_id):
                     "type": "trainer_question_analysis",
                     "job_id": job_id,
                     "question_id": str(question_id),
+                    "project_id": str(project_id),
                     "user_id": request.user.id,
                     "system_message": system_message,
                     "full_input": full_input,
@@ -172,60 +180,55 @@ def trainer_question_analysis(request, question_id):
             return JsonResponse({"success": False, "error": f"Failed to publish request: {str(e)}"})
     else:
         # GET: Render the analysis page
-        from .models import TrainerTask
-        task = TrainerTask.objects.filter(question_id=question_id).first()
+        filter_kwargs = {primary_key: question_id, "project__id": project_id}
+        task = TrainerTask.objects.filter(**filter_kwargs).first()
         reference_data = []
+        extra_fields = {}
+        problem_title = ""
+        problem_statement = ""
+        problem_html = ""
+        error = None
+        references = []
         if task:
-            problem_link = task.problem_link
-            references = []
-            if task.response_links:
-                # Try to parse as a Python list, fallback to comma split
+            # Map fields using config
+            problem_title = getattr(task, mapping.get("title", "title"), "") or ""
+            prompt_field = mapping.get("prompt", "raw_prompt")
+            problem_statement = getattr(task, prompt_field, "") or getattr(task, "raw_prompt", "")
+            problem_html = ""  # Could be extended for HTML if needed
+            # Reference links
+            ref_field = mapping.get("reference_links", "response_links")
+            ref_val = getattr(task, ref_field, "")
+            if ref_val:
                 import ast
                 try:
-                    links = ast.literal_eval(task.response_links)
+                    links = ast.literal_eval(ref_val)
                     if isinstance(links, list):
                         references = [str(link).strip().strip("'").strip('"') for link in links if str(link).strip()]
                     else:
                         references = [str(links).strip()]
                 except Exception:
-                    references = [link.strip().strip("'").strip('"') for link in task.response_links.split(",") if link.strip()]
-            # Use raw_prompt if available, else scrape the problem statement from the problem_link
-            problem_title = task.title or ""
-            problem_statement = ""
-            problem_html = ""
-            error = None
-            if task.raw_prompt:
-                problem_statement = task.raw_prompt.strip()
-            else:
-                try:
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
-                    }
-                    resp = requests.get(problem_link, headers=headers)
-                    if resp.status_code == 200:
-                        soup = BeautifulSoup(resp.text, "html.parser")
-                        title_tag = soup.find("div", class_="title")
-                        if title_tag:
-                            problem_title = title_tag.text.strip()
-                        statement_tag = soup.find("div", class_="problem-statement")
-                        if statement_tag:
-                            problem_statement = statement_tag.text.strip()
-                            problem_html = str(statement_tag)
-                    else:
-                        error = f"Failed to fetch problem from link (status {resp.status_code})"
-                except Exception as e:
-                    error = f"Error scraping problem link: {str(e)}"
+                    references = [link.strip().strip("'").strip('"') for link in ref_val.split(",") if link.strip()]
+            # Scraping fallback if needed
+            if scraping_needed and link_column and getattr(task, link_column, None):
+                problem_statement = f"[TO SCRAPE] {getattr(task, link_column)}"
+            # Collect all mapped extra fields
+            for logical, sheet_col in mapping.items():
+                if logical not in ("prompt", "title", "reference_links"):
+                    extra_fields[logical] = getattr(task, sheet_col, "")
             # Always define reference_data
             if references:
                 for ref in references:
                     reference_data.append({"url": ref, "text": ""})
         else:
-            # Fallback to old logic if not found in DB
-            problem_title, problem_statement, references, error = scrape_codeforces(question_id)
-            problem_html = ""
-            if references:
-                for ref in references:
-                    reference_data.append({"url": ref, "text": ""})
+            # Fallback to scraping if config allows, else show error
+            if scraping_needed:
+                problem_title, problem_statement, references, error = scrape_codeforces(question_id)
+                problem_html = ""
+                if references:
+                    for ref in references:
+                        reference_data.append({"url": ref, "text": ""})
+            else:
+                error = "Task not found for this project and question ID."
         # Fetch system messages based on user preference (stream/subject)
         preferred_streams = []
         try:
@@ -247,18 +250,20 @@ def trainer_question_analysis(request, question_id):
         
         context = {
             "question_id": question_id,
+            "project_id": project_id,
             "problem_title": problem_title,
             "problem_statement": problem_statement,
             "problem_html": problem_html,
             "references": references,
             "reference_data": reference_data,
+            "extra_fields": extra_fields,
             "system_messages": system_messages,
             "llm_models": llm_models,
             "error": error,
             "WEBSOCKET_URL": websocket_url,
             "debug_message": "DEBUG: trainer_question_analysis view is being called correctly!",
         }
-        print(f"DEBUG: trainer_question_analysis view called for question_id: {question_id}")
+        print(f"DEBUG: trainer_question_analysis view called for project_id: {project_id}, question_id: {question_id}")
         print(f"DEBUG: Using template: trainer_question_analysis.html")
         print(f"DEBUG: WebSocket URL: {websocket_url}")
         return render(request, "trainer_question_analysis.html", context)
@@ -319,8 +324,26 @@ def trainer_dashboard(request):
     end = start + page_size
     paginated_tasks = filtered_tasks[start:end]
 
-    # Extract headers from model fields (excluding id, created_at, updated_at)
-    headers = [f.name for f in TrainerTask._meta.fields if f.name not in ("id", "created_at", "updated_at")]
+    # Dynamic headers based on TaskSyncConfig.column_mapping if available
+    config_headers = []
+    if selected_project_id:
+        config = TaskSyncConfig.objects.filter(project__id=selected_project_id, is_active=True).first()
+        if config and config.column_mapping:
+            # Always include these fields at the start
+            config_headers = ["question_id", "problem_link", "response_links"]
+            # Add all logical fields from column_mapping (excluding duplicates)
+            for logical_field in config.column_mapping.keys():
+                if logical_field not in config_headers:
+                    config_headers.append(logical_field)
+            # Optionally add "completed" if not present
+            if "completed" not in config_headers:
+                config_headers.append("completed")
+        else:
+            # Fallback to model fields if no config
+            config_headers = [f.name for f in TrainerTask._meta.fields if f.name not in ("id", "created_at", "updated_at")]
+    else:
+        config_headers = [f.name for f in TrainerTask._meta.fields if f.name not in ("id", "created_at", "updated_at")]
+    headers = config_headers
 
     # Compute visible page numbers for pagination (show first, last, current, neighbors, with ellipsis)
     visible_page_numbers = []
@@ -457,6 +480,32 @@ def reviewer_dashboard(request):
     if trainer_name:
         tasks_for_table = tasks_for_table.filter(developer__iexact=trainer_name)
 
+    # Dynamic headers based on TaskSyncConfig.column_mapping if available
+    config_headers = []
+    if project_id:
+        config = TaskSyncConfig.objects.filter(project__id=project_id, is_active=True).first()
+        if config and config.column_mapping:
+            # Always include these fields at the start
+            config_headers = ["developer", "question_id", "problem_link"]
+            for logical_field in config.column_mapping.keys():
+                if logical_field not in config_headers:
+                    config_headers.append(logical_field)
+            # Optionally add common reviewer fields if not present
+            for extra in ["labelling_tool_id_link", "screenshot_drive_link", "codeforces_submission_id", "completed"]:
+                if extra not in config_headers:
+                    config_headers.append(extra)
+        else:
+            config_headers = [
+                "developer", "question_id", "problem_link",
+                "labelling_tool_id_link", "screenshot_drive_link", "codeforces_submission_id", "completed"
+            ]
+    else:
+        config_headers = [
+            "developer", "question_id", "problem_link",
+            "labelling_tool_id_link", "screenshot_drive_link", "codeforces_submission_id", "completed"
+        ]
+    headers = config_headers
+
     # Pagination for table
     page_size = 10
     try:
@@ -520,6 +569,72 @@ def task_sync_config_view(request):
     from .models import TaskSyncHistory, Project
     config = TaskSyncConfig.objects.first()
     message = ""
+
+    # Handle config.json upload
+    if request.method == "POST" and "upload_config_json" in request.POST and request.FILES.get("config_json"):
+        try:
+            import json
+            config_file = request.FILES["config_json"]
+            config_data = json.load(config_file)
+
+            # Accept either project_code or project_id
+            project_code = config_data.get("project_code")
+            project_id = config_data.get("project_id")
+            project = None
+            if project_id:
+                project = Project.objects.filter(id=project_id).first()
+            elif project_code:
+                project = Project.objects.filter(code=project_code).first()
+            if not project:
+                message = "Project not found for the given project_code or project_id."
+            else:
+                # Map config fields
+                sheet_url = config_data.get("sheet_url", "").strip()
+                sync_interval = int(config_data.get("sync_interval_minutes", 60))
+                primary_key_column = config_data.get("primary_key_column", "question_id")
+                scraping_needed = bool(config_data.get("scraping_needed", False))
+                link_column = config_data.get("link_column", "")
+                column_mapping = config_data.get("column_mapping", {})
+                sync_mode = config_data.get("sync_mode", "prompt_in_sheet")
+                sheet_tab = config_data.get("sheet_tab", "")
+                is_active = config_data.get("is_active", True)
+
+                # Validate required fields
+                if not sheet_url:
+                    message = "sheet_url is required in config.json."
+                else:
+                    # Find or create config for this project
+                    config = TaskSyncConfig.objects.filter(project=project).first()
+                    if config:
+                        config.sheet_url = sheet_url
+                        config.sync_interval_minutes = sync_interval
+                        config.project = project
+                        config.primary_key_column = primary_key_column
+                        config.scraping_needed = scraping_needed
+                        config.link_column = link_column
+                        config.column_mapping = column_mapping
+                        config.sync_mode = sync_mode
+                        config.sheet_tab = sheet_tab
+                        config.is_active = is_active
+                        config.save()
+                        message = "Configuration updated from config.json."
+                    else:
+                        config = TaskSyncConfig.objects.create(
+                            sheet_url=sheet_url,
+                            sync_interval_minutes=sync_interval,
+                            project=project,
+                            primary_key_column=primary_key_column,
+                            scraping_needed=scraping_needed,
+                            link_column=link_column,
+                            column_mapping=column_mapping,
+                            sync_mode=sync_mode,
+                            sheet_tab=sheet_tab,
+                            is_active=is_active
+                        )
+                        message = "Configuration created from config.json."
+        except Exception as e:
+            message = f"Failed to process config.json: {str(e)}"
+
     # Handle project creation and toggle
     if request.method == "POST" and "create_project" in request.POST:
         code = request.POST.get("project_code", "").strip()
@@ -542,17 +657,42 @@ def task_sync_config_view(request):
         sync_interval = int(request.POST.get("sync_interval_minutes", 60))
         selected_project_id = request.POST.get("project_id", "").strip()
         selected_project = Project.objects.filter(id=selected_project_id).first() if selected_project_id else None
+
+        # New config fields
+        primary_key_column = request.POST.get("primary_key_column", "").strip() or "question_id"
+        scraping_needed = request.POST.get("scraping_needed", "") == "on"
+        link_column = request.POST.get("link_column", "").strip()
+        column_mapping_raw = request.POST.get("column_mapping", "").strip()
+        try:
+            column_mapping = json.loads(column_mapping_raw) if column_mapping_raw else {}
+        except Exception:
+            column_mapping = {}
+        sync_mode = request.POST.get("sync_mode", "prompt_in_sheet")
+        sheet_tab = request.POST.get("sheet_tab", "").strip()
+
         if config:
             config.sheet_url = sheet_url
             config.sync_interval_minutes = sync_interval
             config.project = selected_project
+            config.primary_key_column = primary_key_column
+            config.scraping_needed = scraping_needed
+            config.link_column = link_column
+            config.column_mapping = column_mapping
+            config.sync_mode = sync_mode
+            config.sheet_tab = sheet_tab
             config.save()
             message = "Configuration updated successfully."
         else:
             config = TaskSyncConfig.objects.create(
                 sheet_url=sheet_url,
                 sync_interval_minutes=sync_interval,
-                project=selected_project
+                project=selected_project,
+                primary_key_column=primary_key_column,
+                scraping_needed=scraping_needed,
+                link_column=link_column,
+                column_mapping=column_mapping,
+                sync_mode=sync_mode,
+                sheet_tab=sheet_tab
             )
             message = "Configuration saved successfully."
         # Perform immediate sync after saving config

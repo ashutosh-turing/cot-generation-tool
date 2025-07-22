@@ -186,110 +186,107 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                <i class="fas fa-user mr-1"></i>
-                                Trainer
-                            </th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                <i class="fas fa-hashtag mr-1"></i>
-                                Question ID
-                            </th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                <i class="fas fa-link mr-1"></i>
-                                Problem
-                            </th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                <i class="fas fa-tag mr-1"></i>
-                                Tool ID
-                            </th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                <i class="fas fa-image mr-1"></i>
-                                Screenshot
-                            </th>
-                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                <i class="fas fa-code mr-1"></i>
-                                Submission
-                            </th>
+                            {% for header in headers %}
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                    {{ header|replace:"_":" "|title }}
+                                </th>
+                            {% endfor %}
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for task in tasks %}
                         <tr class="hover:bg-blue-50 transition-all duration-200">
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-8 w-8">
-                                        <div class="h-8 w-8 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-medium">
-                                            {{ task.developer.0|upper }}
+                            {% for header in headers %}
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {# Special rendering for certain fields #}
+                                    {% if header == "developer" %}
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 h-8 w-8">
+                                                <div class="h-8 w-8 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-medium">
+                                                    {{ task.developer.0|upper }}
+                                                </div>
+                                            </div>
+                                            <div class="ml-3">
+                                                <div class="text-sm font-medium text-gray-900">{{ task.developer }}</div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="ml-3">
-                                        <div class="text-sm font-medium text-gray-900">{{ task.developer }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <a href="/review/{{ task.question_id }}{% if selected_project %}?project={{ selected_project }}{% endif %}" 
-                                   class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-all duration-200">
-                                    <i class="fas fa-external-link-alt mr-1"></i>
-                                    {{ task.question_id }}
-                                </a>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {% if task.problem_link %}
-                                    <a href="{{ task.problem_link }}" target="_blank" 
-                                       class="inline-flex items-center text-indigo-600 hover:text-indigo-900 transition-colors duration-200">
-                                        <i class="fas fa-external-link-alt mr-1"></i>
-                                        View Problem
-                                    </a>
-                                {% else %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        <i class="fas fa-minus mr-1"></i>
-                                        N/A
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {% if task.labelling_tool_id_link and task.labelling_tool_id_link != "-" %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        {{ task.labelling_tool_id_link }}
-                                    </span>
-                                {% else %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        <i class="fas fa-minus mr-1"></i>
-                                        N/A
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {% if task.screenshot_drive_link %}
-                                    <a href="{{ task.screenshot_drive_link }}" target="_blank" 
-                                       class="inline-flex items-center text-green-600 hover:text-green-900 transition-colors duration-200">
-                                        <i class="fas fa-cloud mr-1"></i>
-                                        Drive Link
-                                    </a>
-                                {% else %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        <i class="fas fa-minus mr-1"></i>
-                                        N/A
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {% if task.codeforces_submission_id and task.codeforces_submission_id != "-" %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                        {{ task.codeforces_submission_id }}
-                                    </span>
-                                {% else %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        <i class="fas fa-minus mr-1"></i>
-                                        N/A
-                                    </span>
-                                {% endif %}
-                            </td>
+                                    {% elif header == "question_id" %}
+                                        <a href="/review/{{ task.question_id }}{% if selected_project %}?project={{ selected_project }}{% endif %}" 
+                                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-all duration-200">
+                                            <i class="fas fa-external-link-alt mr-1"></i>
+                                            {{ task.question_id }}
+                                        </a>
+                                    {% elif header == "problem_link" %}
+                                        {% if task.problem_link %}
+                                            <a href="{{ task.problem_link }}" target="_blank" 
+                                               class="inline-flex items-center text-indigo-600 hover:text-indigo-900 transition-colors duration-200">
+                                                <i class="fas fa-external-link-alt mr-1"></i>
+                                                View Problem
+                                            </a>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                <i class="fas fa-minus mr-1"></i>
+                                                N/A
+                                            </span>
+                                        {% endif %}
+                                    {% elif header == "labelling_tool_id_link" %}
+                                        {% if task.labelling_tool_id_link and task.labelling_tool_id_link != "-" %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                {{ task.labelling_tool_id_link }}
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                <i class="fas fa-minus mr-1"></i>
+                                                N/A
+                                            </span>
+                                        {% endif %}
+                                    {% elif header == "screenshot_drive_link" %}
+                                        {% if task.screenshot_drive_link %}
+                                            <a href="{{ task.screenshot_drive_link }}" target="_blank" 
+                                               class="inline-flex items-center text-green-600 hover:text-green-900 transition-colors duration-200">
+                                                <i class="fas fa-cloud mr-1"></i>
+                                                Drive Link
+                                            </a>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                <i class="fas fa-minus mr-1"></i>
+                                                N/A
+                                            </span>
+                                        {% endif %}
+                                    {% elif header == "codeforces_submission_id" %}
+                                        {% if task.codeforces_submission_id and task.codeforces_submission_id != "-" %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                {{ task.codeforces_submission_id }}
+                                            </span>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                <i class="fas fa-minus mr-1"></i>
+                                                N/A
+                                            </span>
+                                        {% endif %}
+                                    {% elif header == "completed" %}
+                                        <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold
+                                            {% if task.completed == "Completed" %}
+                                                bg-green-100 text-green-800
+                                            {% elif task.completed == "In Progress" %}
+                                                bg-yellow-100 text-yellow-800
+                                            {% elif task.completed == "Review Required" %}
+                                                bg-orange-100 text-orange-800
+                                            {% else %}
+                                                bg-gray-100 text-gray-700
+                                            {% endif %}
+                                        ">
+                                            {{ task.completed|default:"-" }}
+                                        </span>
+                                    {% else %}
+                                        {{ task|attr:header|default:"-" }}
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="px-6 py-12 text-center">
+                            <td colspan="{{ headers|length }}" class="px-6 py-12 text-center">
                                 <div class="flex flex-col items-center">
                                     <i class="fas fa-inbox text-4xl text-gray-300 mb-4"></i>
                                     <h3 class="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>

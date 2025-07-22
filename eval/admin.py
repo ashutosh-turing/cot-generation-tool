@@ -3,9 +3,41 @@ from .models import TrainerTask, TaskSyncConfig, TaskSyncHistory
 
 @admin.register(TaskSyncConfig)
 class TaskSyncConfigAdmin(admin.ModelAdmin):
-    list_display = ("sheet_url", "sync_interval_minutes", "last_synced", "created_at", "updated_at")
-    search_fields = ("sheet_url",)
+    list_display = (
+        "project",
+        "sheet_url",
+        "sync_interval_minutes",
+        "primary_key_column",
+        "scraping_needed",
+        "link_column",
+        "sync_mode",
+        "sheet_tab",
+        "last_synced",
+        "is_active",
+        "created_at",
+        "updated_at"
+    )
+    search_fields = ("sheet_url", "project__code", "primary_key_column")
     readonly_fields = ("last_synced", "created_at", "updated_at")
+    fieldsets = (
+        (None, {
+            "fields": (
+                "project",
+                "sheet_url",
+                "sync_interval_minutes",
+                "primary_key_column",
+                "scraping_needed",
+                "link_column",
+                "sync_mode",
+                "sheet_tab",
+                "column_mapping",
+                "is_active",
+                "last_synced",
+                "created_at",
+                "updated_at"
+            )
+        }),
+    )
 
 @admin.register(TaskSyncHistory)
 class TaskSyncHistoryAdmin(admin.ModelAdmin):

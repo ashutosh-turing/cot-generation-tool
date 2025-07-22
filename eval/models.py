@@ -191,6 +191,21 @@ class TaskSyncConfig(models.Model):
     project = models.ForeignKey('Project', on_delete=models.SET_NULL, null=True, blank=True, related_name="sync_configs", help_text="Project this sync config belongs to")
     sheet_url = models.URLField("Sheet/Data Source URL")
     sync_interval_minutes = models.PositiveIntegerField(default=60, help_text="How often to sync (in minutes)")
+    primary_key_column = models.CharField(max_length=100, default="question_id", help_text="Column name to use as the unique identifier for tasks")
+    scraping_needed = models.BooleanField(default=False, help_text="Whether scraping is needed for this project")
+    link_column = models.CharField(max_length=100, blank=True, null=True, help_text="Column name containing the link to scrape (if scraping is needed)")
+    column_mapping = models.JSONField(default=dict, blank=True, help_text="Map logical fields to sheet columns, e.g. {'prompt': 'Task Prompt'}")
+    sync_mode = models.CharField(
+        max_length=50,
+        choices=[
+            ("prompt_in_sheet", "Prompt in Sheet"),
+            ("scraping", "Scraping"),
+            ("custom", "Custom")
+        ],
+        default="prompt_in_sheet",
+        help_text="How to sync tasks for this project"
+    )
+    sheet_tab = models.CharField(max_length=100, blank=True, null=True, help_text="Sheet tab/range name (optional)")
     last_synced = models.DateTimeField(blank=True, null=True)
     is_active = models.BooleanField(default=True, help_text="Whether this sync configuration is active")
     created_at = models.DateTimeField(auto_now_add=True)

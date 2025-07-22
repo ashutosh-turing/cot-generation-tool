@@ -40,6 +40,7 @@ def fetch_trainer_tasks():
 def sync_trainer_tasks(config, selected_project=None, sync_type="auto", synced_by="system"):
     """
     Syncs TrainerTask objects from the Google Sheet specified in config.
+    Uses config-driven mapping for primary key, columns, and scraping.
     Logs the sync in TaskSyncHistory and updates config.last_synced.
     Returns (status, summary, details, created_count, updated_count, deleted_count)
     """
@@ -64,24 +65,57 @@ def sync_trainer_tasks(config, selected_project=None, sync_type="auto", synced_b
         rows = worksheet.get_all_values()
         headers = rows[0]
         data_rows = rows[1:]
-        # Build a set of question_ids from the sheet
-        sheet_qids = set()
+
+        # Config-driven fields
+        primary_key = config.primary_key_column or "question_id"
+        mapping = config.column_mapping or {}
+        sync_mode = config.sync_mode or "prompt_in_sheet"
+        scraping_needed = config.scraping_needed
+        link_column = config.link_column
+
+        # Build a set of primary keys from the sheet
+        sheet_keys = set()
         for row in data_rows:
             row_dict = dict(zip(headers, row))
-            qid = row_dict.get("question_id") or row_dict.get("Question Id") or row_dict.get("Question ID")
-            if qid:
-                sheet_qids.add(qid)
-                obj, created = TrainerTask.objects.update_or_create(
-                    question_id=qid,
-                    defaults={**{k.lower().replace(" ", "_"): v for k, v in row_dict.items()}, "project": selected_project}
-                )
-                if created:
-                    created_count += 1
-                else:
-                    updated_count += 1
+            pk_value = row_dict.get(primary_key) or row_dict.get(primary_key.replace("_", " ")) or row_dict.get(primary_key.replace("_", " ").title())
+            if not pk_value:
+                continue
+            sheet_keys.add(pk_value)
+
+            # Build defaults using mapping
+            defaults = {}
+            for logical_field, sheet_col in mapping.items():
+                value = row_dict.get(sheet_col)
+                if value is not None:
+                    defaults[logical_field] = value
+
+            # Always set project
+            defaults["project"] = selected_project
+
+            # Scraping logic (if needed)
+            if scraping_needed and link_column and row_dict.get(link_column):
+                # Place-holder: you can add scraping logic here if needed
+                defaults["raw_prompt"] = f"[TO SCRAPE] {row_dict.get(link_column)}"
+            # If not scraping, use mapped prompt if available
+            elif "prompt" in defaults:
+                defaults["raw_prompt"] = defaults["prompt"]
+
+            # Always set the primary key field
+            filter_kwargs = {primary_key: pk_value}
+            obj, created = TrainerTask.objects.update_or_create(
+                **filter_kwargs,
+                defaults=defaults
+            )
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
+
         # Delete tasks not in the sheet for this project
         if selected_project:
-            to_delete = TrainerTask.objects.filter(project=selected_project).exclude(question_id__in=sheet_qids)
+            filter_kwargs = {"project": selected_project}
+            filter_kwargs[primary_key + "__isnull"] = False
+            to_delete = TrainerTask.objects.filter(**filter_kwargs).exclude(**{primary_key + "__in": list(sheet_keys)})
             deleted_count = to_delete.count()
             to_delete.delete()
         sync_summary = f"{created_count} created, {updated_count} updated, {deleted_count} deleted"
