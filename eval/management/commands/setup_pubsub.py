@@ -15,8 +15,11 @@ class Command(BaseCommand):
         # Create a publisher client
         publisher = pubsub_v1.PublisherClient()
 
-        # Create topics
-        topics = ["v2-cot-llm-requests", "v2-cot-llm-notifications"]
+        # Create topics from settings
+        topics = [
+            settings.PUBSUB_TOPIC_LLM_REQUESTS,
+            settings.PUBSUB_TOPIC_LLM_NOTIFICATIONS,
+        ]
         for topic_id in topics:
             topic_path = publisher.topic_path(project_id, topic_id)
             try:
@@ -31,10 +34,10 @@ class Command(BaseCommand):
         # Create a subscriber client
         subscriber = pubsub_v1.SubscriberClient()
 
-        # Create subscriptions
+        # Create subscriptions from settings
         subscriptions = {
-            "v2-cot-llm-requests-subscription": "v2-cot-llm-requests",
-            "v2-cot-llm-notifications-subscription": "v2-cot-llm-notifications"
+            settings.PUBSUB_SUB_LLM_REQUESTS: settings.PUBSUB_TOPIC_LLM_REQUESTS,
+            settings.PUBSUB_SUB_LLM_NOTIFICATIONS: settings.PUBSUB_TOPIC_LLM_NOTIFICATIONS,
         }
         for sub_id, topic_id in subscriptions.items():
             subscription_path = subscriber.subscription_path(project_id, sub_id)

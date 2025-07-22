@@ -16,3 +16,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Pub/Sub topic and subscription names (configurable via environment variables)
+PUBSUB_TOPIC_LLM_REQUESTS = os.environ.get("PUBSUB_TOPIC_LLM_REQUESTS", "v2-cot-llm-requests")
+PUBSUB_TOPIC_LLM_NOTIFICATIONS = os.environ.get("PUBSUB_TOPIC_LLM_NOTIFICATIONS", "v2-cot-llm-notifications")
+PUBSUB_SUB_LLM_REQUESTS = os.environ.get("PUBSUB_SUB_LLM_REQUESTS", "v2-cot-llm-requests-subscription")
+PUBSUB_SUB_LLM_NOTIFICATIONS = os.environ.get("PUBSUB_SUB_LLM_NOTIFICATIONS", "v2-cot-llm-notifications-subscription")

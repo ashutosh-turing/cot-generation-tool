@@ -265,7 +265,11 @@ deploy() {
     # 5. Run safe migrations
     safe_migrate
 
-    # 6. Restore critical data if needed
+    # 6. Setup Pub/Sub topics and subscriptions
+    log "Setting up Pub/Sub topics and subscriptions..."
+    python3 manage.py setup_pubsub
+
+    # 7. Restore critical data if needed
     restore_critical_data
 
     # 7. Collect static files
