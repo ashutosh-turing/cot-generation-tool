@@ -437,6 +437,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Store active polling intervals
         let activePollingIntervals = [];
+        let sessionId = null; // Declare sessionId in the proper scope
 
         document.getElementById('analysis-form').onsubmit = async function(e) {
             e.preventDefault();
@@ -453,12 +454,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            const runAnalysisBtn = document.getElementById('run-analysis');
-            runAnalysisBtn.disabled = true;
+        const runAnalysisBtn = document.getElementById('run-analysis');
+        runAnalysisBtn.disabled = true;
 
-            // Clear any existing polling intervals
-            activePollingIntervals.forEach(interval => clearInterval(interval));
-            activePollingIntervals = [];
+        // Clear any existing polling intervals
+        activePollingIntervals.forEach(interval => clearInterval(interval));
+        activePollingIntervals = [];
+
+        // Register this analysis session with the global process manager
+        sessionId = Date.now().toString();
+        window.GlobalProcessManager.addRunningProcess(
+            window.GlobalProcessManager.PROCESS_TYPES.TRAINER_ANALYSIS, 
+            sessionId
+        );
 
             // Prepare full input with additional context
             let fullInput = `{{ problem_statement|escapejs }}`;
@@ -654,6 +662,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!stillProcessing) {
                 document.getElementById('run-analysis').disabled = false;
+                
+                // Unregister this analysis session from the global process manager
+                window.GlobalProcessManager.removeRunningProcess(
+                    window.GlobalProcessManager.PROCESS_TYPES.TRAINER_ANALYSIS, 
+                    sessionId
+                );
             }
         }
 

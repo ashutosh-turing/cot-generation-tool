@@ -247,6 +247,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('run-analysis').disabled = true;
 
+    // Register this analysis session with the global process manager
+    const sessionId = Date.now().toString();
+    window.GlobalProcessManager.addRunningProcess(
+      window.GlobalProcessManager.PROCESS_TYPES.MODAL_ANALYSIS, 
+      sessionId
+    );
+
     // Prepare full input with additional context
     let fullInput = prompt || '';
     if (additionalContext.trim()) {
@@ -438,6 +445,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (!stillProcessing) {
         document.getElementById('run-analysis').disabled = false;
+        
+        // Unregister this analysis session from the global process manager
+        window.GlobalProcessManager.removeRunningProcess(
+          window.GlobalProcessManager.PROCESS_TYPES.MODAL_ANALYSIS, 
+          sessionId
+        );
       }
     }
   };

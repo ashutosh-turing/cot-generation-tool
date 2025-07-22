@@ -233,6 +233,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Store active polling intervals
   let activePollingIntervals = [];
+  let sessionId = null; // Track the current session
 
   // Run Review
   runReviewBtn.addEventListener("click", async function () {
@@ -257,6 +258,13 @@ document.addEventListener("DOMContentLoaded", function () {
     // Clear any existing polling intervals
     activePollingIntervals.forEach(interval => clearInterval(interval));
     activePollingIntervals = [];
+
+    // Register this analysis session with the global process manager
+    const sessionId = Date.now().toString();
+    window.GlobalProcessManager.addRunningProcess(
+      window.GlobalProcessManager.PROCESS_TYPES.REVIEW_ANALYSIS, 
+      sessionId
+    );
 
     try {
       // Submit jobs for each selected model
@@ -602,6 +610,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (stillProcessing.length === 0) {
       runReviewBtn.disabled = false;
       runReviewBtn.textContent = "Run Review";
+      
+      // Unregister this analysis session from the global process manager
+      if (sessionId) {
+        window.GlobalProcessManager.removeRunningProcess(
+          window.GlobalProcessManager.PROCESS_TYPES.REVIEW_ANALYSIS, 
+          sessionId
+        );
+      }
     } else {
       // Update the count to show remaining jobs
       runReviewBtn.textContent = `Processing ${stillProcessing.length} job(s)...`;
