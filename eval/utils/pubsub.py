@@ -25,8 +25,10 @@ def publish_message(data):
         data = json.dumps(data).encode("utf-8")
         future = llm_publisher.publish(llm_topic_path, data)
         print(f"Published message ID: {future.result()}")
+        return True
     except Exception as e:
         print(f"Error publishing message: {e}")
+        return False
 
 def publish_notification(data):
     """Publishes a notification to the v2-cot-llm-notifications topic."""
