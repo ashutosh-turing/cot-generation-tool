@@ -233,6 +233,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Store active polling intervals
   let activePollingIntervals = [];
+  let sessionId = null; // Track the current session
 
   // Run Review
   runReviewBtn.addEventListener("click", async function () {
@@ -257,6 +258,13 @@ document.addEventListener("DOMContentLoaded", function () {
     // Clear any existing polling intervals
     activePollingIntervals.forEach(interval => clearInterval(interval));
     activePollingIntervals = [];
+
+    // Register this analysis session with the global process manager
+    const sessionId = Date.now().toString();
+    window.GlobalProcessManager.addRunningProcess(
+      window.GlobalProcessManager.PROCESS_TYPES.REVIEW_ANALYSIS, 
+      sessionId
+    );
 
     try {
       // Submit jobs for each selected model
@@ -449,26 +457,31 @@ document.addEventListener("DOMContentLoaded", function () {
                       <div class="flex items-center justify-between mb-2">
                         <span class="text-sm font-medium text-gray-600">Similarity Score</span>
                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
-                          result.plagiarism_score > 50 ? 'bg-red-100 text-red-800' : 
-                          result.plagiarism_score > 25 ? 'bg-yellow-100 text-yellow-800' : 
+                          (result.plagiarism_score != null && result.plagiarism_score > 50) ? 'bg-red-100 text-red-800' : 
+                          (result.plagiarism_score != null && result.plagiarism_score > 25) ? 'bg-yellow-100 text-yellow-800' : 
                           'bg-green-100 text-green-800'
                         }">
-                          ${result.plagiarism_score != null ? result.plagiarism_score + "%" : "N/A"}
+                          ${result.plagiarism_score != null && result.plagiarism_score !== undefined ? result.plagiarism_score + "%" : "N/A"}
                         </span>
                       </div>
                       <div class="w-full bg-gray-200 rounded-full h-2">
                         <div class="h-2 rounded-full ${
-                          result.plagiarism_score > 50 ? 'bg-red-500' : 
-                          result.plagiarism_score > 25 ? 'bg-yellow-500' : 
+                          (result.plagiarism_score != null && result.plagiarism_score > 50) ? 'bg-red-500' : 
+                          (result.plagiarism_score != null && result.plagiarism_score > 25) ? 'bg-yellow-500' : 
                           'bg-green-500'
-                        }" style="width: ${result.plagiarism_score || 0}%"></div>
+                        }" style="width: ${result.plagiarism_score != null ? result.plagiarism_score : 0}%"></div>
                       </div>
                     </div>
-                    ${result.plagiarism_result ? `
+                    ${result.plagiarism_result && result.plagiarism_result.trim() ? `
                       <div class="prose prose-xs max-w-none text-gray-600 max-h-48 overflow-y-auto">
                         ${window.marked ? window.marked.parse(result.plagiarism_result) : result.plagiarism_result}
                       </div>
-                    ` : ''}
+                    ` : `
+                      <div class="text-sm text-gray-500 italic">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        No plagiarism analysis available
+                      </div>
+                    `}
                   </div>
                   
                   ${result.improvements && result.improvements.trim() && result.improvements.trim().toLowerCase() !== "n/a" ? `
@@ -597,6 +610,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (stillProcessing.length === 0) {
       runReviewBtn.disabled = false;
       runReviewBtn.textContent = "Run Review";
+      
+      // Unregister this analysis session from the global process manager
+      if (sessionId) {
+        window.GlobalProcessManager.removeRunningProcess(
+          window.GlobalProcessManager.PROCESS_TYPES.REVIEW_ANALYSIS, 
+          sessionId
+        );
+      }
     } else {
       // Update the count to show remaining jobs
       runReviewBtn.textContent = `Processing ${stillProcessing.length} job(s)...`;

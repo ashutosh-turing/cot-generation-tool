@@ -365,6 +365,9 @@ def reviewer_dashboard(request):
     Supports filtering by project and trainer, and paginates results.
     """
     from django.db.models import Q
+    from django.db import transaction
+    import time
+    
     user = request.user
     print(str(user))
     reviewer_names = [
@@ -377,11 +380,51 @@ def reviewer_dashboard(request):
     project_id = request.GET.get('project', '').strip()
     trainer_name = request.GET.get('trainer', '').strip()
 
-    print(str(TrainerTask.objects.all()))
-    # Filter tasks where reviewer matches the logged-in user's username (case-insensitive)
-    base_tasks = TrainerTask.objects.filter(
-        reviewer__iexact=user.username
-    )
+    # Add retry logic for database operations
+    max_retries = 3
+    retry_delay = 0.1  # 100ms
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"Database query attempt {attempt + 1}")
+            
+            # Filter tasks where reviewer matches the logged-in user's username (case-insensitive)
+            with transaction.atomic():
+                base_tasks = TrainerTask.objects.filter(
+                    reviewer__iexact=user.username
+                )
+                # Force evaluation of the queryset to catch database errors early
+                _ = base_tasks.count()
+            break
+            
+        except Exception as e:
+            print(f"Database error on attempt {attempt + 1}: {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                # If all retries failed, return an error page
+                messages.error(request, f"Database error: {str(e)}. Please try again later.")
+                return render(request, 'dashboard_reviewer.html', {
+                    'tasks': [],
+                    'projects': [],
+                    'selected_project': '',
+                    'trainers': [],
+                    'selected_trainer': '',
+                    'stats': {'total': 0, 'in_progress': 0, 'completed': 0},
+                    'pagination': {
+                        'current_page': 1,
+                        'total_pages': 0,
+                        'has_previous': False,
+                        'has_next': False,
+                        'previous_page': 1,
+                        'next_page': 1,
+                        'total_records': 0,
+                    },
+                    'visible_page_numbers': [],
+                    'database_error': True,
+                })
     # Filter by project for stats/trainers/table
     if project_id:
         base_tasks = base_tasks.filter(project__id=project_id)

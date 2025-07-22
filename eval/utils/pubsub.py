@@ -5,7 +5,7 @@ import json
 
 # Configure the project and topic
 project_id = settings.GOOGLE_CLOUD_PROJECT_ID
-topic_id = "v2-cot-llm-requests"
+topic_id = settings.PUBSUB_TOPIC_LLM_REQUESTS
 
 # Create a publisher client for v2-cot-llm-requests
 credentials_path = os.path.join(settings.BASE_DIR, 'service_account.json')
@@ -13,7 +13,7 @@ llm_publisher = pubsub_v1.PublisherClient.from_service_account_file(credentials_
 llm_topic_path = llm_publisher.topic_path(project_id, topic_id)
 
 # Create a publisher client for v2-cot-llm-notifications
-notification_topic_id = "v2-cot-llm-notifications"
+notification_topic_id = settings.PUBSUB_TOPIC_LLM_NOTIFICATIONS
 notification_publisher = pubsub_v1.PublisherClient.from_service_account_file(credentials_path)
 notification_topic_path = notification_publisher.topic_path(project_id, notification_topic_id)
 

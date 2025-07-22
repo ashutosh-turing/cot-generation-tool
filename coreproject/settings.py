@@ -122,6 +122,17 @@ DATABASES = {
         'ENGINE': 'django.db.backends.sqlite3',
         # 'NAME': BASE_DIR / 'db.sqlite3',
         'NAME': os.path.join(BASE_DIR, 'db_v2.sqlite3'),
+        'OPTIONS': {
+            'timeout': 30,  # 30 second timeout for database operations
+            'init_command': '''
+                PRAGMA journal_mode=WAL;
+                PRAGMA synchronous=NORMAL;
+                PRAGMA temp_store=memory;
+                PRAGMA mmap_size=268435456;
+                PRAGMA cache_size=10000;
+                PRAGMA busy_timeout=30000;
+            ''',
+        },
     }
 }
 

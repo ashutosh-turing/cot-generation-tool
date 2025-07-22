@@ -35,6 +35,43 @@ stop_auto_processor() {
     fi
 }
 
+# Function to validate service startup
+validate_services() {
+    log "=== Validating service startup ==="
+    
+    # Wait a moment for services to initialize
+    sleep 2
+    
+    # Check auto processor
+    if [ -f "$AUTO_PROCESSOR_PID" ] && kill -0 "$(cat $AUTO_PROCESSOR_PID)" 2>/dev/null; then
+        log "✓ Auto processor is running (PID: $(cat $AUTO_PROCESSOR_PID))"
+    else
+        log "❌ ERROR: Auto processor not running after startup"
+        return 1
+    fi
+    
+    # Check process_llm_jobs worker
+    if pgrep -f "process_llm_jobs" > /dev/null; then
+        WORKER_PID=$(pgrep -f "process_llm_jobs")
+        log "✓ process_llm_jobs worker is running (PID: $WORKER_PID)"
+    else
+        log "❌ ERROR: process_llm_jobs worker not running after startup"
+        return 1
+    fi
+    
+    # Check sync daemon
+    if pgrep -f "run_sync_daemon" > /dev/null; then
+        DAEMON_PID=$(pgrep -f "run_sync_daemon")
+        log "✓ Sync daemon is running (PID: $DAEMON_PID)"
+    else
+        log "❌ ERROR: Sync daemon not running after startup"
+        return 1
+    fi
+    
+    log "✓ All critical services validated successfully"
+    return 0
+}
+
 # Enhanced health check function
 health_check() {
     log "=== Running comprehensive system health check ==="
@@ -67,7 +104,16 @@ health_check() {
         log "❌ process_llm_jobs worker is not running"
     fi
     
-    # 4. Validate Pub/Sub configuration
+    # 4. Check sync daemon status
+    log "Checking Sync Daemon status..."
+    if pgrep -f "run_sync_daemon" > /dev/null; then
+        DAEMON_PID=$(pgrep -f "run_sync_daemon")
+        log "✓ Sync daemon is running (PID: $DAEMON_PID)"
+    else
+        log "❌ Sync daemon is not running"
+    fi
+    
+    # 5. Validate Pub/Sub configuration
     log "Validating Pub/Sub configuration..."
     python -c "
 import os
@@ -91,7 +137,7 @@ except Exception as e:
     print(f'⚠ Error checking settings: {e}')
 " || log "⚠ Could not validate Pub/Sub configuration"
     
-    # 5. Check recent logs for errors
+    # 6. Check recent logs for errors
     log "Checking recent logs for errors..."
     if [ -f "logs/auto_processor.log" ]; then
         ERROR_COUNT=$(tail -50 logs/auto_processor.log 2>/dev/null | grep -i error | wc -l)
@@ -113,6 +159,16 @@ except Exception as e:
         fi
     fi
     
+    if [ -f "logs/sync_daemon.log" ]; then
+        ERROR_COUNT=$(tail -50 logs/sync_daemon.log 2>/dev/null | grep -i error | wc -l)
+        if [ "$ERROR_COUNT" -gt 0 ]; then
+            log "⚠ Found $ERROR_COUNT recent errors in sync daemon log"
+            tail -10 logs/sync_daemon.log | grep -i error || true
+        else
+            log "✓ No recent errors in sync daemon log"
+        fi
+    fi
+    
     log "=== Health check completed ==="
 }
 
@@ -129,6 +185,7 @@ local_dev() {
     # Stop any existing processes
     stop_auto_processor
     pkill -f "process_llm_jobs" || true
+    pkill -f "run_sync_daemon" || true
 
     # Start auto processor in background for local development
     log "Starting auto processor for local development..."
@@ -141,14 +198,20 @@ local_dev() {
     nohup python manage.py process_llm_jobs > logs/process_llm_jobs.log 2>&1 &
     log "✓ process_llm_jobs worker started in background"
 
-    log "Starting Django development server with auto processor running..."
+    # Start sync daemon for local development
+    log "Starting sync daemon for local development..."
+    nohup python run_sync_daemon.py > logs/sync_daemon.log 2>&1 &
+    log "✓ Sync daemon started in background"
+
+    log "Starting Django development server with all background services running..."
     log "🔍 To monitor the system:"
     log "   ./deploy_local.sh health    # Run health check"
     log "   tail -f logs/auto_processor.log    # Monitor auto processor"
     log "   tail -f logs/process_llm_jobs.log  # Monitor job processor"
+    log "   tail -f logs/sync_daemon.log       # Monitor sync daemon"
     log ""
     
-    python manage.py runserver 0.0.0.0:8000
+    python manage.py runserver 127.0.0.1:8000
 }
 
 deploy() {
@@ -177,6 +240,7 @@ deploy() {
     log "Stopping existing processes..."
     stop_auto_processor
     pkill -f "process_llm_jobs" || true
+    pkill -f "run_sync_daemon" || true
 
     # 5. Start auto processor
     log "Starting auto processor..."
@@ -189,10 +253,24 @@ deploy() {
     nohup python manage.py process_llm_jobs > logs/process_llm_jobs.log 2>&1 &
     log "✓ process_llm_jobs worker started in background"
 
-    # 7. Wait a moment and validate services
+    # 7. Start sync daemon service
+    log "Starting sync daemon service..."
+    nohup python run_sync_daemon.py > logs/sync_daemon.log 2>&1 &
+    log "✓ Sync daemon started in background"
+
+    # 8. Wait a moment and validate services
     sleep 3
     
-    # 8. Run health check
+    # 9. Validate all services started correctly
+    log "Validating service startup..."
+    if validate_services; then
+        log "✓ All services validated successfully"
+    else
+        log "❌ Service validation failed - check logs for details"
+        exit 1
+    fi
+
+    # 10. Run health check
     log "Running system health check..."
     health_check
 
@@ -206,6 +284,7 @@ deploy() {
     log "   ./deploy_local.sh health    # Run health check"
     log "   tail -f logs/auto_processor.log    # Monitor auto processor"
     log "   tail -f logs/process_llm_jobs.log  # Monitor job processor"
+    log "   tail -f logs/sync_daemon.log       # Monitor sync daemon"
     log ""
     log "To start the development server:"
     log "   ./deploy_local.sh local"
