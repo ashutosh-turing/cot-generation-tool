@@ -535,9 +535,9 @@ class Command(BaseCommand):
         max_workers = 16  # Adjust based on server resources
         executor = ThreadPoolExecutor(max_workers=max_workers)
         streaming_pull_future = subscriber.subscribe(
-            subscription_path, callback=callback, executor=executor
+            subscription_path, callback=callback
         )
-        self.stdout.write(f"Listening for messages on {subscription_path} with {max_workers} concurrent workers...")
+        self.stdout.write(f"Listening for messages on {subscription_path} (no custom executor, using default threading)...")
 
         try:
             streaming_pull_future.result()

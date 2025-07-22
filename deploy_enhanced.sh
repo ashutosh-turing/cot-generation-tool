@@ -316,6 +316,11 @@ deploy() {
     # 10. Setup and start Auto Job Processor
     setup_auto_processor_service
 
+    # 10b. Start LLM Job Pub/Sub Worker
+    log "Starting LLM Job Pub/Sub Worker (process_llm_jobs)..."
+    nohup python3 manage.py process_llm_jobs > logs/process_llm_jobs_v2.log 2>&1 &
+    log "✓ process_llm_jobs worker started in background"
+
     # 11. Start other background services for V2
     log "Starting other background services for V2..."
     nohup python3 run_sync_daemon.py > logs/sync_daemon_v2.log 2>&1 &
@@ -407,6 +412,11 @@ rollback() {
     # 8. Restart auto processor
     setup_auto_processor_service
 
+    # 8b. Start LLM Job Pub/Sub Worker
+    log "Starting LLM Job Pub/Sub Worker (process_llm_jobs)..."
+    nohup python3 manage.py process_llm_jobs > logs/process_llm_jobs_v2.log 2>&1 &
+    log "✓ process_llm_jobs worker started in background"
+
     log "=== Enhanced V2 rollback completed successfully ==="
 }
 
@@ -424,6 +434,11 @@ local_dev() {
     nohup python3 manage.py auto_job_processor --auto-fix-stuck --auto-retry-failed > logs/auto_processor_local.log 2>&1 &
     echo $! > "$AUTO_PROCESSOR_PID"
     log "✓ Auto processor started (PID: $(cat $AUTO_PROCESSOR_PID))"
+
+    # Start LLM Job Pub/Sub Worker for local development
+    log "Starting LLM Job Pub/Sub Worker (process_llm_jobs) for local development..."
+    nohup python3 manage.py process_llm_jobs > logs/process_llm_jobs_local.log 2>&1 &
+    log "✓ process_llm_jobs worker started in background"
 
     log "Starting Django development server with auto processor running..."
     python3 manage.py runserver 0.0.0.0:8001
