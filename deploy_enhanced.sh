@@ -603,6 +603,258 @@ validate_services() {
     return 0
 }
 
+# =============================================================================
+# MODULAR SERVICE MANAGEMENT FUNCTIONS
+# =============================================================================
+
+start_app_server() {
+    log "Starting Gunicorn V2 app server..."
+    source "$VENV_DIR/bin/activate"
+    export DJANGO_SETTINGS_MODULE=coreproject.settings
+    
+    cleanup_gunicorn_socket
+    
+    gunicorn coreproject.wsgi:application \
+        --workers 3 \
+        --bind unix:"$GUNICORN_SOCK" \
+        --timeout 300 \
+        --daemon \
+        --pid "$GUNICORN_PID" \
+        --access-logfile "$PROJECT_DIR/logs/v2_access.log" \
+        --error-logfile "$PROJECT_DIR/logs/v2_error.log"
+
+    sleep 2
+    if [ -S "$GUNICORN_SOCK" ]; then
+        log "✓ Gunicorn app server started successfully"
+        return 0
+    else
+        log "❌ ERROR: Gunicorn socket $GUNICORN_SOCK was not created!"
+        return 1
+    fi
+}
+
+start_auto_processor_service() {
+    log "Starting LLM Job Auto Processor..."
+    
+    # Check if we're running as root or with sudo
+    if [ "$EUID" -eq 0 ] || [ -n "$SUDO_USER" ]; then
+        log "Starting systemd service for auto processor..."
+        systemctl restart llm-job-processor.service
+        
+        sleep 2
+        if systemctl is-active --quiet llm-job-processor.service; then
+            log "✓ Auto processor systemd service started successfully"
+            return 0
+        else
+            log "❌ Auto processor systemd service failed to start"
+            systemctl status llm-job-processor.service --no-pager -l || true
+            return 1
+        fi
+    else
+        log "Starting auto processor as background process..."
+        source "$VENV_DIR/bin/activate"
+        export DJANGO_SETTINGS_MODULE=coreproject.settings
+        
+        nohup python3 manage.py auto_job_processor --auto-fix-stuck --auto-retry-failed > logs/auto_processor_v2.log 2>&1 &
+        echo $! > "$AUTO_PROCESSOR_PID"
+        
+        sleep 2
+        if [ -f "$AUTO_PROCESSOR_PID" ] && kill -0 "$(cat $AUTO_PROCESSOR_PID)" 2>/dev/null; then
+            log "✓ Auto processor started successfully (PID: $(cat $AUTO_PROCESSOR_PID))"
+            return 0
+        else
+            log "❌ Auto processor failed to start"
+            return 1
+        fi
+    fi
+}
+
+start_pubsub_worker() {
+    log "Starting LLM Job Pub/Sub Worker (process_llm_jobs)..."
+    source "$VENV_DIR/bin/activate"
+    export DJANGO_SETTINGS_MODULE=coreproject.settings
+    
+    nohup python3 manage.py process_llm_jobs > logs/process_llm_jobs_v2.log 2>&1 &
+    
+    sleep 2
+    if pgrep -f "process_llm_jobs" > /dev/null; then
+        WORKER_PID=$(pgrep -f "process_llm_jobs")
+        log "✓ Pub/Sub worker started successfully (PID: $WORKER_PID)"
+        return 0
+    else
+        log "❌ Pub/Sub worker failed to start"
+        return 1
+    fi
+}
+
+start_sync_daemon() {
+    log "Starting sync daemon service..."
+    source "$VENV_DIR/bin/activate"
+    
+    nohup python3 run_sync_daemon.py > logs/sync_daemon_v2.log 2>&1 &
+    
+    sleep 2
+    if pgrep -f "run_sync_daemon" > /dev/null; then
+        DAEMON_PID=$(pgrep -f "run_sync_daemon")
+        log "✓ Sync daemon started successfully (PID: $DAEMON_PID)"
+        return 0
+    else
+        log "❌ Sync daemon failed to start"
+        return 1
+    fi
+}
+
+stop_pubsub_worker() {
+    log "Stopping LLM Job Pub/Sub Worker..."
+    pkill -f "process_llm_jobs" || true
+    sleep 1
+    if ! pgrep -f "process_llm_jobs" > /dev/null; then
+        log "✓ Pub/Sub worker stopped successfully"
+    else
+        log "⚠ Pub/Sub worker may still be running"
+    fi
+}
+
+stop_sync_daemon() {
+    log "Stopping sync daemon..."
+    pkill -f "run_sync_daemon" || true
+    sleep 1
+    if ! pgrep -f "run_sync_daemon" > /dev/null; then
+        log "✓ Sync daemon stopped successfully"
+    else
+        log "⚠ Sync daemon may still be running"
+    fi
+}
+
+# =============================================================================
+# MODULAR SERVICE COMMANDS
+# =============================================================================
+
+restart_app_server() {
+    log "=== Restarting App Server (Gunicorn) ==="
+    stop_gunicorn
+    if start_app_server; then
+        log "✓ App server restarted successfully"
+    else
+        log "❌ App server restart failed"
+        exit 1
+    fi
+}
+
+restart_auto_processor() {
+    log "=== Restarting Auto Processor ==="
+    stop_auto_processor
+    if start_auto_processor_service; then
+        log "✓ Auto processor restarted successfully"
+    else
+        log "❌ Auto processor restart failed"
+        exit 1
+    fi
+}
+
+restart_pubsub_worker() {
+    log "=== Restarting Pub/Sub Worker ==="
+    stop_pubsub_worker
+    if start_pubsub_worker; then
+        log "✓ Pub/Sub worker restarted successfully"
+    else
+        log "❌ Pub/Sub worker restart failed"
+        exit 1
+    fi
+}
+
+restart_sync_daemon() {
+    log "=== Restarting Sync Daemon ==="
+    stop_sync_daemon
+    if start_sync_daemon; then
+        log "✓ Sync daemon restarted successfully"
+    else
+        log "❌ Sync daemon restart failed"
+        exit 1
+    fi
+}
+
+stop_all_services() {
+    log "=== Stopping All Services ==="
+    stop_gunicorn
+    stop_auto_processor
+    stop_pubsub_worker
+    stop_sync_daemon
+    log "✓ All services stopped"
+}
+
+start_all_services() {
+    log "=== Starting All Services ==="
+    
+    # Start services in order
+    if ! start_app_server; then
+        log "❌ Failed to start app server"
+        exit 1
+    fi
+    
+    if ! start_auto_processor_service; then
+        log "❌ Failed to start auto processor"
+        exit 1
+    fi
+    
+    if ! start_pubsub_worker; then
+        log "❌ Failed to start Pub/Sub worker"
+        exit 1
+    fi
+    
+    if ! start_sync_daemon; then
+        log "❌ Failed to start sync daemon"
+        exit 1
+    fi
+    
+    log "✓ All services started successfully"
+}
+
+status_services() {
+    log "=== Service Status Check ==="
+    
+    # Check Gunicorn
+    if [ -f "$GUNICORN_PID" ] && kill -0 "$(cat $GUNICORN_PID)" 2>/dev/null; then
+        log "✓ Gunicorn: RUNNING (PID: $(cat $GUNICORN_PID))"
+    else
+        log "❌ Gunicorn: NOT RUNNING"
+    fi
+    
+    # Check socket
+    if [ -S "$GUNICORN_SOCK" ]; then
+        log "✓ Gunicorn Socket: EXISTS"
+    else
+        log "❌ Gunicorn Socket: MISSING"
+    fi
+    
+    # Check auto processor
+    if systemctl is-active --quiet llm-job-processor.service 2>/dev/null; then
+        log "✓ Auto Processor: RUNNING (systemd service)"
+    elif [ -f "$AUTO_PROCESSOR_PID" ] && kill -0 "$(cat $AUTO_PROCESSOR_PID)" 2>/dev/null; then
+        log "✓ Auto Processor: RUNNING (PID: $(cat $AUTO_PROCESSOR_PID))"
+    else
+        log "❌ Auto Processor: NOT RUNNING"
+    fi
+    
+    # Check Pub/Sub worker
+    if pgrep -f "process_llm_jobs" > /dev/null; then
+        WORKER_PID=$(pgrep -f "process_llm_jobs")
+        log "✓ Pub/Sub Worker: RUNNING (PID: $WORKER_PID)"
+    else
+        log "❌ Pub/Sub Worker: NOT RUNNING"
+    fi
+    
+    # Check sync daemon
+    if pgrep -f "run_sync_daemon" > /dev/null; then
+        DAEMON_PID=$(pgrep -f "run_sync_daemon")
+        log "✓ Sync Daemon: RUNNING (PID: $DAEMON_PID)"
+    else
+        log "❌ Sync Daemon: NOT RUNNING"
+    fi
+    
+    log "=== Status check completed ==="
+}
+
 if [ "$1" == "deploy" ]; then
     deploy
 elif [ "$1" == "rollback" ]; then
@@ -611,11 +863,41 @@ elif [ "$1" == "local" ]; then
     local_dev
 elif [ "$1" == "health" ]; then
     health_check
+elif [ "$1" == "restart_app_server" ]; then
+    restart_app_server
+elif [ "$1" == "restart_auto_processor" ]; then
+    restart_auto_processor
+elif [ "$1" == "restart_pubsub_worker" ]; then
+    restart_pubsub_worker
+elif [ "$1" == "restart_sync_daemon" ]; then
+    restart_sync_daemon
+elif [ "$1" == "stop_all_services" ]; then
+    stop_all_services
+elif [ "$1" == "start_all_services" ]; then
+    start_all_services
+elif [ "$1" == "status_services" ] || [ "$1" == "status" ]; then
+    status_services
 else
-    echo "Usage: $0 {deploy|rollback|local|health}"
-    echo "  deploy   - Deploy V2 to production with auto processor"
-    echo "  rollback - Rollback V2 to previous version"
-    echo "  local    - Run V2 in local development mode with auto processor"
-    echo "  health   - Run system health check"
+    echo "Usage: $0 {deploy|rollback|local|health|restart_app_server|restart_auto_processor|restart_pubsub_worker|restart_sync_daemon|stop_all_services|start_all_services|status}"
+    echo ""
+    echo "DEPLOYMENT COMMANDS:"
+    echo "  deploy                - Deploy V2 to production with auto processor"
+    echo "  rollback              - Rollback V2 to previous version"
+    echo "  local                 - Run V2 in local development mode with auto processor"
+    echo "  health                - Run comprehensive system health check"
+    echo ""
+    echo "SERVICE MANAGEMENT COMMANDS:"
+    echo "  restart_app_server    - Restart only Gunicorn app server"
+    echo "  restart_auto_processor - Restart only LLM job auto processor"
+    echo "  restart_pubsub_worker - Restart only Pub/Sub worker (process_llm_jobs)"
+    echo "  restart_sync_daemon   - Restart only sync daemon"
+    echo "  stop_all_services     - Stop all services without redeployment"
+    echo "  start_all_services    - Start all services without redeployment"
+    echo "  status                - Show status of all services"
+    echo ""
+    echo "EXAMPLES:"
+    echo "  ./deploy_enhanced.sh restart_app_server    # Quick Gunicorn restart"
+    echo "  ./deploy_enhanced.sh status                # Check service status"
+    echo "  ./deploy_enhanced.sh stop_all_services     # Stop everything"
     exit 1
 fi
