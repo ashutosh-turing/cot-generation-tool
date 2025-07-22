@@ -53,3 +53,4 @@ nohup.out
 # But NOT in .github/
 !.github/
 !.github/**
+*.sqlite3
