@@ -342,9 +342,18 @@ deploy() {
         log "⚠ WARNING: Sync daemon service may not be running"
     fi
 
-    # 12. Run system health check
-    log "Running system health check..."
-    python3 manage.py llm_job_diagnostics || log "⚠ Health check completed with warnings"
+    # 12. Validate all services started correctly
+    log "Validating service startup..."
+    if validate_services; then
+        log "✓ All services validated successfully"
+    else
+        log "❌ Service validation failed - check logs for details"
+        exit 1
+    fi
+
+    # 13. Run comprehensive system health check
+    log "Running comprehensive system health check..."
+    health_check
 
     log "=== Enhanced V2 deployment completed successfully ==="
     log "🤖 Auto Job Processor is now running and will:"
@@ -352,6 +361,11 @@ deploy() {
     log "   ✓ Fix stuck jobs automatically"
     log "   ✓ Retry failed jobs (up to 3 attempts)"
     log "   ✓ Start automatically on system boot"
+    log ""
+    log "🔍 To monitor the system:"
+    log "   ./deploy_enhanced.sh health    # Run health check"
+    log "   tail -f logs/auto_processor_v2.log    # Monitor auto processor"
+    log "   tail -f logs/process_llm_jobs_v2.log  # Monitor job processor"
 }
 
 rollback() {
@@ -462,22 +476,131 @@ local_dev() {
     python3 manage.py runserver 0.0.0.0:8001
 }
 
-# Health check function
+# Enhanced health check function
 health_check() {
-    log "=== Running system health check ==="
+    log "=== Running comprehensive system health check ==="
     source "$VENV_DIR/bin/activate"
     export DJANGO_SETTINGS_MODULE=coreproject.settings
     
+    # 1. Run LLM job diagnostics
+    log "Running LLM job diagnostics..."
     python3 manage.py llm_job_diagnostics
     
-    # Check if auto processor is running
+    # 2. Check auto processor status
+    log "Checking Auto Job Processor status..."
     if systemctl is-active --quiet llm-job-processor.service 2>/dev/null; then
         log "✓ Auto processor systemd service is running"
+        systemctl status llm-job-processor.service --no-pager -l | head -10
     elif [ -f "$AUTO_PROCESSOR_PID" ] && kill -0 "$(cat $AUTO_PROCESSOR_PID)" 2>/dev/null; then
-        log "✓ Auto processor background process is running"
+        log "✓ Auto processor background process is running (PID: $(cat $AUTO_PROCESSOR_PID))"
     else
-        log "⚠ Auto processor is not running"
+        log "❌ Auto processor is not running"
     fi
+    
+    # 3. Check process_llm_jobs worker status
+    log "Checking LLM Job Pub/Sub Worker status..."
+    if pgrep -f "process_llm_jobs" > /dev/null; then
+        WORKER_PID=$(pgrep -f "process_llm_jobs")
+        log "✓ process_llm_jobs worker is running (PID: $WORKER_PID)"
+    else
+        log "❌ process_llm_jobs worker is not running"
+    fi
+    
+    # 4. Check Gunicorn status
+    log "Checking Gunicorn status..."
+    if [ -f "$GUNICORN_PID" ] && kill -0 "$(cat $GUNICORN_PID)" 2>/dev/null; then
+        log "✓ Gunicorn is running (PID: $(cat $GUNICORN_PID))"
+    else
+        log "❌ Gunicorn is not running"
+    fi
+    
+    # 5. Check socket file
+    if [ -S "$GUNICORN_SOCK" ]; then
+        log "✓ Gunicorn socket exists: $GUNICORN_SOCK"
+    else
+        log "❌ Gunicorn socket missing: $GUNICORN_SOCK"
+    fi
+    
+    # 6. Validate Pub/Sub configuration
+    log "Validating Pub/Sub configuration..."
+    python3 -c "
+from django.conf import settings
+import os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'coreproject.settings')
+import django
+django.setup()
+
+print(f'✓ Project ID: {settings.GOOGLE_CLOUD_PROJECT_ID}')
+print(f'✓ LLM Requests Topic: {settings.PUBSUB_TOPIC_LLM_REQUESTS}')
+print(f'✓ LLM Requests Subscription: {settings.PUBSUB_SUB_LLM_REQUESTS}')
+print(f'✓ Service Account File: {settings.SERVICE_ACCOUNT_FILE}')
+
+# Check if service account file exists
+if os.path.exists(settings.SERVICE_ACCOUNT_FILE):
+    print(f'✓ Service account file exists')
+else:
+    print(f'❌ Service account file missing: {settings.SERVICE_ACCOUNT_FILE}')
+"
+    
+    # 7. Check recent logs for errors
+    log "Checking recent logs for errors..."
+    if [ -f "logs/auto_processor_v2.log" ]; then
+        ERROR_COUNT=$(tail -50 logs/auto_processor_v2.log | grep -i error | wc -l)
+        if [ "$ERROR_COUNT" -gt 0 ]; then
+            log "⚠ Found $ERROR_COUNT recent errors in auto processor log"
+            tail -10 logs/auto_processor_v2.log | grep -i error || true
+        else
+            log "✓ No recent errors in auto processor log"
+        fi
+    fi
+    
+    if [ -f "logs/process_llm_jobs_v2.log" ]; then
+        ERROR_COUNT=$(tail -50 logs/process_llm_jobs_v2.log | grep -i error | wc -l)
+        if [ "$ERROR_COUNT" -gt 0 ]; then
+            log "⚠ Found $ERROR_COUNT recent errors in process_llm_jobs log"
+            tail -10 logs/process_llm_jobs_v2.log | grep -i error || true
+        else
+            log "✓ No recent errors in process_llm_jobs log"
+        fi
+    fi
+    
+    log "=== Health check completed ==="
+}
+
+# Function to validate service startup
+validate_services() {
+    log "=== Validating service startup ==="
+    
+    # Wait a moment for services to initialize
+    sleep 5
+    
+    # Check Gunicorn
+    if [ ! -S "$GUNICORN_SOCK" ]; then
+        log "❌ ERROR: Gunicorn socket not created after startup"
+        return 1
+    fi
+    
+    # Check auto processor
+    AUTO_PROCESSOR_RUNNING=false
+    if systemctl is-active --quiet llm-job-processor.service 2>/dev/null; then
+        AUTO_PROCESSOR_RUNNING=true
+    elif [ -f "$AUTO_PROCESSOR_PID" ] && kill -0 "$(cat $AUTO_PROCESSOR_PID)" 2>/dev/null; then
+        AUTO_PROCESSOR_RUNNING=true
+    fi
+    
+    if [ "$AUTO_PROCESSOR_RUNNING" = false ]; then
+        log "❌ ERROR: Auto processor not running after startup"
+        return 1
+    fi
+    
+    # Check process_llm_jobs worker
+    if ! pgrep -f "process_llm_jobs" > /dev/null; then
+        log "❌ ERROR: process_llm_jobs worker not running after startup"
+        return 1
+    fi
+    
+    log "✓ All critical services validated successfully"
+    return 0
 }
 
 if [ "$1" == "deploy" ]; then

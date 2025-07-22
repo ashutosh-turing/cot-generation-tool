@@ -508,7 +508,7 @@ class Command(BaseCommand):
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.SERVICE_ACCOUNT_FILE
         
         project_id = settings.GOOGLE_CLOUD_PROJECT_ID
-        subscription_id = "llm-requests-subscription"
+        subscription_id = settings.PUBSUB_SUB_LLM_REQUESTS
 
         subscriber = pubsub_v1.SubscriberClient()
         subscription_path = subscriber.subscription_path(project_id, subscription_id)
