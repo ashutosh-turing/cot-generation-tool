@@ -169,10 +169,259 @@
     </div>
 </div>
 
-<!-- Admin: Projects Table -->
+<!-- Admin Statistics Overview -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Total Projects -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Projects</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ admin_stats.total_projects|default:"0" }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ admin_stats.active_projects|default:"0" }} active</p>
+            </div>
+            <div class="p-3 bg-blue-100 rounded-full">
+                <i class="fas fa-project-diagram text-2xl text-blue-600"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Users -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Users</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ admin_stats.total_users|default:"0" }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ admin_stats.active_users|default:"0" }} active</p>
+            </div>
+            <div class="p-3 bg-green-100 rounded-full">
+                <i class="fas fa-users text-2xl text-green-600"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Tasks -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Tasks</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ admin_stats.total_tasks|default:"0" }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ admin_stats.completion_rate|floatformat:1 }}% completed</p>
+            </div>
+            <div class="p-3 bg-purple-100 rounded-full">
+                <i class="fas fa-tasks text-2xl text-purple-600"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Activity -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Focus Time This Week</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ admin_stats.focus_time_this_week|default:"0m" }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ admin_stats.unique_active_users|default:"0" }} active users</p>
+            </div>
+            <div class="p-3 bg-orange-100 rounded-full">
+                <i class="fas fa-chart-line text-2xl text-orange-600"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Role Distribution -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+    <!-- Admin Users -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Admin Users</p>
+                <p class="text-2xl font-bold text-gray-900 mt-2">{{ admin_stats.admin_users|default:"0" }}</p>
+                <p class="text-xs text-gray-500 mt-1">System administrators</p>
+            </div>
+            <div class="p-3 bg-red-100 rounded-full">
+                <i class="fas fa-user-shield text-xl text-red-600"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pod Lead Users -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Pod Leads</p>
+                <p class="text-2xl font-bold text-gray-900 mt-2">{{ admin_stats.pod_lead_users|default:"0" }}</p>
+                <p class="text-xs text-gray-500 mt-1">Team reviewers</p>
+            </div>
+            <div class="p-3 bg-indigo-100 rounded-full">
+                <i class="fas fa-user-tie text-xl text-indigo-600"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trainer Users -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Trainers</p>
+                <p class="text-2xl font-bold text-gray-900 mt-2">{{ admin_stats.trainer_users|default:"0" }}</p>
+                <p class="text-xs text-gray-500 mt-1">Content developers</p>
+            </div>
+            <div class="p-3 bg-teal-100 rounded-full">
+                <i class="fas fa-graduation-cap text-xl text-teal-600"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Per-Project Statistics -->
+<div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8">
+    <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+            <i class="fas fa-chart-bar mr-3 text-blue-600"></i>
+            Project Analytics
+        </h2>
+        <p class="text-sm text-gray-600 mt-1">Comprehensive statistics for all projects</p>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="min-w-full">
+            <thead>
+                <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div class="flex items-center space-x-1">
+                            <i class="fas fa-user-tie text-blue-500"></i>
+                            <span>Developer</span>
+                        </div>
+                    </th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Project</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Total Tasks</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Completed</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">In Progress</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Pending</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Completion Rate</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Team Size</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-100">
+                {% for project_stat in project_stats %}
+                <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 group">
+                    <td class="px-6 py-4 border-r border-gray-100 group-hover:border-blue-200">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10">
+                                <div class="h-10 w-10 rounded-full bg-gradient-to-r from-green-400 to-teal-500 flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">{{ project_stat.lead_developer.first_name|slice:":1"|upper|default:"D" }}{{ project_stat.lead_developer.last_name|slice:":1"|upper|default:"V" }}</span>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">{{ project_stat.lead_developer.get_full_name|default:"Developer" }}</div>
+                                <div class="text-sm text-gray-500">{{ project_stat.lead_developer.username|default:"developer" }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 border-r border-gray-100 group-hover:border-blue-200">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10">
+                                <div class="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-center">
+                                    <span class="text-white font-bold text-sm">{{ project_stat.project.code|slice:":2"|upper }}</span>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">{{ project_stat.project.name }}</div>
+                                <div class="text-sm text-gray-500">{{ project_stat.project.code }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 border-r border-gray-100 group-hover:border-blue-200">
+                        <div class="text-sm font-bold text-gray-900">{{ project_stat.total_tasks }}</div>
+                    </td>
+                    <td class="px-6 py-4 border-r border-gray-100 group-hover:border-blue-200">
+                        <div class="flex items-center">
+                            <div class="text-sm font-bold text-green-600">{{ project_stat.completed }}</div>
+                            <div class="ml-2">
+                                <i class="fas fa-check-circle text-green-500"></i>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 border-r border-gray-100 group-hover:border-blue-200">
+                        <div class="flex items-center">
+                            <div class="text-sm font-bold text-yellow-600">{{ project_stat.in_progress }}</div>
+                            <div class="ml-2">
+                                <i class="fas fa-clock text-yellow-500"></i>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 border-r border-gray-100 group-hover:border-blue-200">
+                        <div class="flex items-center">
+                            <div class="text-sm font-bold text-gray-600">{{ project_stat.pending }}</div>
+                            <div class="ml-2">
+                                <i class="fas fa-hourglass-half text-gray-500"></i>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 border-r border-gray-100 group-hover:border-blue-200">
+                        <div class="flex items-center">
+                            <div class="flex-1 bg-gray-200 rounded-full h-2 mr-2">
+                                <div class="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full" 
+                                     style="width: {{ project_stat.completion_rate|default:0 }}%"></div>
+                            </div>
+                            <span class="text-sm font-bold text-gray-900">{{ project_stat.completion_rate|default:0|floatformat:1 }}%</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 border-r border-gray-100 group-hover:border-blue-200">
+                        <div class="flex items-center space-x-2">
+                            <div class="flex items-center">
+                                <i class="fas fa-user-tie text-blue-500 mr-1"></i>
+                                <span class="text-sm text-gray-600">{{ project_stat.trainers }}</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-user-check text-green-500 mr-1"></i>
+                                <span class="text-sm text-gray-600">{{ project_stat.reviewers }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if project_stat.project.is_active %}
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-green-100 text-green-800 border border-green-200">
+                                <i class="fas fa-check-circle mr-1"></i>
+                                Active
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-red-100 text-red-800 border border-red-200">
+                                <i class="fas fa-times-circle mr-1"></i>
+                                Inactive
+                            </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="px-6 py-16 text-center">
+                        <div class="flex flex-col items-center">
+                            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                <i class="fas fa-project-diagram text-2xl text-gray-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">No projects found</h3>
+                            <p class="text-gray-500 max-w-sm">Create your first project to start tracking tasks and team progress.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Admin: Projects Management Table -->
 <div class="container mx-auto px-4 py-8">
-    <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-xl font-semibold mb-4">All Projects</h2>
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8">
+        <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+            <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                <i class="fas fa-cog mr-3 text-gray-600"></i>
+                Project Management
+            </h2>
+            <p class="text-sm text-gray-600 mt-1">Manage project status and settings</p>
+        </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">

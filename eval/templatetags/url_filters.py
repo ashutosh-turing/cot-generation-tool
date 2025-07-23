@@ -21,3 +21,18 @@ def trim(value):
 @register.filter
 def attr(obj, name):
     return getattr(obj, name, "")
+
+@register.filter
+def get_index(lst, idx):
+    """Return the item at index idx from the list lst."""
+    try:
+        return lst[idx]
+    except (IndexError, TypeError):
+        return ""
+
+@register.filter
+def get_field_value(obj, field_name):
+    """Get field value using the TrainerTask's get_field_value method"""
+    if hasattr(obj, 'get_field_value'):
+        return obj.get_field_value(field_name)
+    return getattr(obj, field_name, '')

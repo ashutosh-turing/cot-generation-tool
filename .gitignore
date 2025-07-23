@@ -54,3 +54,6 @@ nohup.out
 !.github/
 !.github/**
 *.sqlite3
+db_v2.sqlite3
+.gitignore
+db_v2.sqlite3

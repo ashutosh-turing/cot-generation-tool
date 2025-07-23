@@ -195,6 +195,8 @@ class TaskSyncConfig(models.Model):
     scraping_needed = models.BooleanField(default=False, help_text="Whether scraping is needed for this project")
     link_column = models.CharField(max_length=100, blank=True, null=True, help_text="Column name containing the link to scrape (if scraping is needed)")
     column_mapping = models.JSONField(default=dict, blank=True, help_text="Map logical fields to sheet columns, e.g. {'prompt': 'Task Prompt'}")
+    field_types = models.JSONField(default=dict, blank=True, help_text="Define field types for display, e.g. {'status': 'badge', 'link': 'url', 'date': 'datetime'}")
+    display_config = models.JSONField(default=dict, blank=True, help_text="Display configuration for fields, e.g. column order, visibility, labels")
     sync_mode = models.CharField(
         max_length=50,
         choices=[
@@ -214,6 +216,31 @@ class TaskSyncConfig(models.Model):
     def __str__(self):
         project_str = f"{self.project.code} - " if self.project else ""
         return f"{project_str}Sync: {self.sheet_url} every {self.sync_interval_minutes} min"
+    
+    def get_display_fields(self):
+        """Get ordered list of fields to display based on display_config"""
+        if self.display_config and 'field_order' in self.display_config:
+            return self.display_config['field_order']
+        elif self.column_mapping:
+            # Default order: primary key first, then mapped fields
+            fields = [self.primary_key_column]
+            for logical_field in self.column_mapping.keys():
+                if logical_field != self.primary_key_column and logical_field not in fields:
+                    fields.append(logical_field)
+            return fields
+        else:
+            # Fallback to model fields
+            return ['question_id', 'problem_link', 'response_links', 'completed']
+    
+    def get_field_type(self, field_name):
+        """Get the display type for a field"""
+        return self.field_types.get(field_name, 'text')
+    
+    def get_field_label(self, field_name):
+        """Get the display label for a field"""
+        if self.display_config and 'field_labels' in self.display_config:
+            return self.display_config['field_labels'].get(field_name, field_name.replace('_', ' ').title())
+        return field_name.replace('_', ' ').title()
 
 class TaskSyncHistory(models.Model):
     config = models.ForeignKey(TaskSyncConfig, on_delete=models.CASCADE, related_name="history")
@@ -261,11 +288,36 @@ class TrainerTask(models.Model):
     codeforces_submission_id = models.CharField(max_length=255, blank=True, null=True)
     plagiarism = models.CharField(max_length=255, blank=True, null=True)
     review_doc = models.CharField(max_length=255, blank=True, null=True)
+    dynamic_fields = models.JSONField(default=dict, blank=True, help_text="Store additional fields from sheets that don't map to model fields")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.question_id} - {self.title}"
+    
+    def get_field_value(self, field_name):
+        """Get value for a field, checking both model fields and dynamic fields"""
+        # First check if it's a model field
+        if hasattr(self, field_name):
+            return getattr(self, field_name)
+        # Then check dynamic fields
+        return self.dynamic_fields.get(field_name, '')
+    
+    def set_field_value(self, field_name, value):
+        """Set value for a field, using model field if exists, otherwise dynamic field"""
+        if hasattr(self, field_name) and field_name != 'dynamic_fields':
+            # Special handling for foreign key fields
+            if field_name == 'project' and isinstance(value, str):
+                # Don't set project field from string, it should be set separately
+                if not self.dynamic_fields:
+                    self.dynamic_fields = {}
+                self.dynamic_fields[field_name] = value
+            else:
+                setattr(self, field_name, value)
+        else:
+            if not self.dynamic_fields:
+                self.dynamic_fields = {}
+            self.dynamic_fields[field_name] = value
 
 class UserPreference(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preference')
@@ -354,4 +406,176 @@ class LLMJob(models.Model):
             models.Index(fields=['job_id']),
             models.Index(fields=['status']),
             models.Index(fields=['user', 'created_at']),
+        ]
+
+
+class UserActivitySession(models.Model):
+    """
+    Privacy-first activity tracking for personal productivity insights.
+    Tracks user engagement time on task-related pages for statistics only.
+    """
+    
+    ACTIVITY_TYPE_CHOICES = [
+        ('trainer_analysis', 'Trainer Question Analysis'),
+        ('review_task', 'Task Review'),
+        ('modal_playground', 'Modal Playground'),
+        ('dashboard_view', 'Dashboard View'),
+    ]
+    
+    session_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activity_sessions')
+    task = models.ForeignKey(TrainerTask, on_delete=models.CASCADE, null=True, blank=True, related_name='activity_sessions')
+    activity_type = models.CharField(max_length=50, choices=ACTIVITY_TYPE_CHOICES)
+    
+    # Time tracking
+    session_start = models.DateTimeField(auto_now_add=True)
+    session_end = models.DateTimeField(null=True, blank=True)
+    focus_time_minutes = models.PositiveIntegerField(default=0, help_text="Actual engaged time in minutes")
+    total_time_minutes = models.PositiveIntegerField(default=0, help_text="Total session time in minutes")
+    
+    # Engagement metrics (for quality scoring)
+    page_interactions = models.PositiveIntegerField(default=0, help_text="Number of clicks, scrolls, etc.")
+    llm_queries_count = models.PositiveIntegerField(default=0, help_text="Number of LLM queries in this session")
+    
+    # Privacy-friendly metadata
+    activity_data = models.JSONField(default=dict, blank=True, help_text="Aggregated activity metrics (no detailed tracking)")
+    
+    # Session management
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.activity_type} - {self.focus_time_minutes}min"
+    
+    def end_session(self):
+        """End the current session and calculate total time"""
+        if not self.session_end:
+            self.session_end = timezone.now()
+            self.total_time_minutes = int((self.session_end - self.session_start).total_seconds() / 60)
+            self.is_active = False
+            self.save()
+    
+    def add_interaction(self, interaction_type='general'):
+        """Record a user interaction (click, scroll, etc.)"""
+        self.page_interactions += 1
+        if interaction_type == 'llm_query':
+            self.llm_queries_count += 1
+        self.save()
+    
+    @property
+    def engagement_score(self):
+        """Calculate engagement score based on interactions and time"""
+        if self.total_time_minutes == 0:
+            return 0
+        # Simple engagement score: interactions per minute
+        return min(self.page_interactions / max(self.total_time_minutes, 1), 10)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'created_at']),
+            models.Index(fields=['activity_type', 'created_at']),
+            models.Index(fields=['user', 'activity_type']),
+        ]
+
+
+class UserProductivityInsight(models.Model):
+    """
+    Aggregated productivity insights for users - privacy-first approach.
+    Stores weekly/monthly summaries rather than detailed session data.
+    """
+    
+    PERIOD_CHOICES = [
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+    ]
+    
+    insight_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='productivity_insights')
+    period_type = models.CharField(max_length=10, choices=PERIOD_CHOICES)
+    period_start = models.DateField()
+    period_end = models.DateField()
+    
+    # Aggregated metrics
+    total_focus_time_minutes = models.PositiveIntegerField(default=0)
+    total_sessions = models.PositiveIntegerField(default=0)
+    tasks_analyzed = models.PositiveIntegerField(default=0)
+    llm_queries_total = models.PositiveIntegerField(default=0)
+    modal_playground_sessions = models.PositiveIntegerField(default=0)
+    
+    # Quality metrics
+    average_session_length = models.FloatField(default=0.0)
+    average_engagement_score = models.FloatField(default=0.0)
+    
+    # Activity breakdown
+    activity_breakdown = models.JSONField(default=dict, help_text="Time spent by activity type")
+    
+    # Personal insights (generated, not tracked)
+    insights_data = models.JSONField(default=dict, help_text="Personal productivity patterns and insights")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.period_type} - {self.period_start}"
+    
+    @classmethod
+    def generate_weekly_insight(cls, user, week_start):
+        """Generate weekly productivity insight for a user"""
+        from datetime import timedelta
+        
+        week_end = week_start + timedelta(days=6)
+        
+        # Get all sessions for this week
+        sessions = UserActivitySession.objects.filter(
+            user=user,
+            session_start__date__range=[week_start, week_end],
+            session_end__isnull=False
+        )
+        
+        # Calculate aggregated metrics
+        total_focus_time = sum(s.focus_time_minutes for s in sessions)
+        total_sessions = sessions.count()
+        tasks_analyzed = sessions.filter(activity_type='trainer_analysis').count()
+        llm_queries = sum(s.llm_queries_count for s in sessions)
+        modal_sessions = sessions.filter(activity_type='modal_playground').count()
+        
+        avg_session_length = total_focus_time / max(total_sessions, 1)
+        avg_engagement = sum(s.engagement_score for s in sessions) / max(total_sessions, 1)
+        
+        # Activity breakdown
+        breakdown = {}
+        for activity_type, _ in UserActivitySession.ACTIVITY_TYPE_CHOICES:
+            activity_time = sum(
+                s.focus_time_minutes for s in sessions.filter(activity_type=activity_type)
+            )
+            if activity_time > 0:
+                breakdown[activity_type] = activity_time
+        
+        # Create or update insight
+        insight, created = cls.objects.update_or_create(
+            user=user,
+            period_type='weekly',
+            period_start=week_start,
+            defaults={
+                'period_end': week_end,
+                'total_focus_time_minutes': total_focus_time,
+                'total_sessions': total_sessions,
+                'tasks_analyzed': tasks_analyzed,
+                'llm_queries_total': llm_queries,
+                'modal_playground_sessions': modal_sessions,
+                'average_session_length': avg_session_length,
+                'average_engagement_score': avg_engagement,
+                'activity_breakdown': breakdown,
+            }
+        )
+        
+        return insight
+    
+    class Meta:
+        ordering = ['-period_start']
+        unique_together = ['user', 'period_type', 'period_start']
+        indexes = [
+            models.Index(fields=['user', 'period_type', 'period_start']),
         ]

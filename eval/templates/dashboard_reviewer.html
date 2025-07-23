@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load url_filters %}
 {% block title %}Reviewer Dashboard{% endblock %}
 
 {% block content %}
@@ -61,7 +62,7 @@
             </form>
 
             <!-- Trainer Filter -->
-            <form method="get" class="border-t pt-4">
+            <form method="get" class="border-t pt-4" id="trainerFilterForm">
                 <input type="hidden" name="project" value="{{ selected_project }}">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
@@ -71,7 +72,7 @@
                         </label>
                         <select name="trainer" id="trainer"
                             class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 bg-white"
-                            onchange="this.form.submit()">
+                            onchange="refreshDashboard()">
                             <option value="">All Trainers</option>
                             {% for trainer in trainers %}
                                 <option value="{{ trainer }}" {% if trainer == selected_trainer %}selected{% endif %}>
@@ -93,204 +94,265 @@
             </form>
         </div>
 
-        <!-- Active Filters Display -->
-        {% if selected_project or selected_trainer %}
-            <div class="mb-6">
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-sm font-medium text-gray-600">Active filters:</span>
-                    {% if selected_project %}
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            <i class="fas fa-project-diagram mr-1"></i>
-                            Project: 
-                            {% for project in projects %}
-                                {% if project.id|stringformat:"s" == selected_project %}
-                                    {{ project.name }}
-                                {% endif %}
-                            {% endfor %}
-                        </span>
-                    {% endif %}
-                    {% if selected_trainer %}
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <i class="fas fa-user-tie mr-1"></i>
-                            Trainer: {{ selected_trainer }}
-                        </span>
-                    {% endif %}
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Statistics Section -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Reviewer Productivity Insights Section -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Review Focus Time This Week -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Tasks</p>
-                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.total|default:"0" }}</p>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Review Focus Time</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ productivity_stats.review_focus_time|default:"0m" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">This week</p>
                     </div>
                     <div class="p-3 bg-blue-100 rounded-full">
-                        <i class="fas fa-tasks text-2xl text-blue-600"></i>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-center">
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-blue-600 h-2 rounded-full" style="width: 100%"></div>
+                        <i class="fas fa-eye text-2xl text-blue-600"></i>
                     </div>
                 </div>
             </div>
-            
+
+            <!-- Review Sessions -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">In Progress</p>
-                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.in_progress|default:"0" }}</p>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Review Sessions</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ productivity_stats.review_sessions|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Quality assurance work</p>
                     </div>
-                    <div class="p-3 bg-yellow-100 rounded-full">
-                        <i class="fas fa-clock text-2xl text-yellow-600"></i>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-center">
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-yellow-500 h-2 rounded-full" style="width: 70%"></div>
+                    <div class="p-3 bg-indigo-100 rounded-full">
+                        <i class="fas fa-clipboard-check text-2xl text-indigo-600"></i>
                     </div>
                 </div>
             </div>
-            
+
+            <!-- Tasks Reviewed -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Completed</p>
-                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.completed|default:"0" }}</p>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Tasks Reviewed</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ productivity_stats.tasks_reviewed|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Completed reviews</p>
                     </div>
                     <div class="p-3 bg-green-100 rounded-full">
-                        <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                        <i class="fas fa-check-double text-2xl text-green-600"></i>
                     </div>
                 </div>
-                <div class="mt-4 flex items-center">
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
+            </div>
+
+            <!-- Quality Assurance Time -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Avg Review Time</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ productivity_stats.quality_assurance_time|default:"0m" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Per review session</p>
+                    </div>
+                    <div class="p-3 bg-purple-100 rounded-full">
+                        <i class="fas fa-stopwatch text-2xl text-purple-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Additional Reviewer Insights Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+            <!-- Analysis Sessions -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Analysis Sessions</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">{{ productivity_stats.analysis_sessions|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Deep dive analysis</p>
+                    </div>
+                    <div class="p-3 bg-orange-100 rounded-full">
+                        <i class="fas fa-search text-xl text-orange-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LLM Experiments -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">LLM Experiments</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">{{ productivity_stats.llm_experiments|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Model interactions</p>
+                    </div>
+                    <div class="p-3 bg-teal-100 rounded-full">
+                        <i class="fas fa-robot text-xl text-teal-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Sessions -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Sessions</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">{{ productivity_stats.total_sessions|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">This week</p>
+                    </div>
+                    <div class="p-3 bg-gray-100 rounded-full">
+                        <i class="fas fa-chart-line text-xl text-gray-600"></i>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Tasks Table -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                    <i class="fas fa-list mr-2 text-indigo-500"></i>
-                    Tasks Overview
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-blue-50">
+                <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                    <i class="fas fa-list-alt mr-3 text-indigo-600"></i>
+                    My Review Tasks
                 </h2>
+                <p class="text-sm text-gray-600 mt-1">Tasks assigned to you for review</p>
             </div>
             
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                                <div class="flex items-center space-x-1">
+                                    <i class="fas fa-user-tie text-green-500"></i>
+                                    <span>Developer</span>
+                                </div>
+                            </th>
                             {% for header in headers %}
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                    {{ header|replace:"_":" "|title }}
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
+                                    <div class="flex items-center space-x-1">
+                                        {% if header == "question_id" %}
+                                            <i class="fas fa-hashtag text-indigo-500"></i>
+                                        {% elif header == "title" %}
+                                            <i class="fas fa-file-alt text-blue-500"></i>
+                                        {% elif header == "status" %}
+                                            <i class="fas fa-flag text-green-500"></i>
+                                        {% elif header == "difficulty" %}
+                                            <i class="fas fa-chart-bar text-orange-500"></i>
+                                        {% else %}
+                                            <i class="fas fa-info-circle text-gray-400"></i>
+                                        {% endif %}
+                                        <span>{{ field_labels|get_item:header|default:header|cut:"_"|title }}</span>
+                                    </div>
                                 </th>
                             {% endfor %}
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-gray-100">
                         {% for task in tasks %}
-                        <tr class="hover:bg-blue-50 transition-all duration-200">
-                            {% for header in headers %}
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {# Special rendering for certain fields #}
-                                    {% if header == "developer" %}
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 h-8 w-8">
-                                                <div class="h-8 w-8 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-medium">
-                                                    {{ task.developer.0|upper }}
-                                                </div>
-                                            </div>
-                                            <div class="ml-3">
-                                                <div class="text-sm font-medium text-gray-900">{{ task.developer }}</div>
-                                            </div>
+                        <tr class="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 group">
+                            <td class="px-6 py-4 border-r border-gray-100 group-hover:border-blue-200">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10">
+                                        <div class="h-10 w-10 rounded-full bg-gradient-to-r from-green-400 to-teal-500 flex items-center justify-center">
+                                            {% with developer_name=task.developer|default:"Unknown" %}
+                                                <span class="text-white font-bold text-sm">{{ developer_name|slice:":1"|upper|default:"U" }}{{ developer_name|slice:"1:2"|upper|default:"N" }}</span>
+                                            {% endwith %}
                                         </div>
-                                    {% elif header == "question_id" %}
-                                        <a href="/review/{{ task.question_id }}{% if selected_project %}?project={{ selected_project }}{% endif %}" 
-                                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-all duration-200">
-                                            <i class="fas fa-external-link-alt mr-1"></i>
-                                            {{ task.question_id }}
-                                        </a>
-                                    {% elif header == "problem_link" %}
-                                        {% if task.problem_link %}
-                                            <a href="{{ task.problem_link }}" target="_blank" 
-                                               class="inline-flex items-center text-indigo-600 hover:text-indigo-900 transition-colors duration-200">
-                                                <i class="fas fa-external-link-alt mr-1"></i>
-                                                View Problem
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">{{ task.developer|default:"Unknown Developer" }}</div>
+                                        <div class="text-sm text-gray-500">@{{ task.developer|lower|slugify|default:"unknown" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            {% for header in headers %}
+                                <td class="px-6 py-4 border-r border-gray-100 last:border-r-0 group-hover:border-blue-200">
+                                    {% with field_type=field_types|get_item:header|default:"text" %}
+                                    {% with field_value=task|get_field_value:header %}
+                                        {% if field_type == "url" and field_value %}
+                                            <a href="{{ field_value }}" target="_blank" 
+                                               class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 hover:text-indigo-800 transition-all duration-200">
+                                                <i class="fas fa-external-link-alt mr-2"></i>
+                                                {% if header == "problem_link" %}View Problem{% else %}View Link{% endif %}
                                             </a>
-                                        {% else %}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                <i class="fas fa-minus mr-1"></i>
-                                                N/A
+                                        {% elif field_type == "badge" %}
+                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide
+                                                {% if field_value == "completed" or field_value == "Completed" %}
+                                                    bg-emerald-100 text-emerald-800 border border-emerald-200
+                                                {% elif field_value == "in_progress" or field_value == "In Progress" %}
+                                                    bg-amber-100 text-amber-800 border border-amber-200
+                                                {% elif field_value == "review_required" or field_value == "Review Required" %}
+                                                    bg-orange-100 text-orange-800 border border-orange-200
+                                                {% elif field_value == "pending" or field_value == "Pending" %}
+                                                    bg-blue-100 text-blue-800 border border-blue-200
+                                                {% elif field_value == "failed" or field_value == "Failed" %}
+                                                    bg-red-100 text-red-800 border border-red-200
+                                                {% else %}
+                                                    bg-gray-100 text-gray-700 border border-gray-200
+                                                {% endif %}
+                                            ">
+                                                {% if field_value == "completed" or field_value == "Completed" %}
+                                                    <i class="fas fa-check-circle mr-1"></i>
+                                                {% elif field_value == "in_progress" or field_value == "In Progress" %}
+                                                    <i class="fas fa-clock mr-1"></i>
+                                                {% elif field_value == "pending" or field_value == "Pending" %}
+                                                    <i class="fas fa-hourglass-half mr-1"></i>
+                                                {% elif field_value == "failed" or field_value == "Failed" %}
+                                                    <i class="fas fa-times-circle mr-1"></i>
+                                                {% endif %}
+                                                {{ field_value|default:"-" }}
                                             </span>
-                                        {% endif %}
-                                    {% elif header == "labelling_tool_id_link" %}
-                                        {% if task.labelling_tool_id_link and task.labelling_tool_id_link != "-" %}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                {{ task.labelling_tool_id_link }}
-                                            </span>
-                                        {% else %}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                <i class="fas fa-minus mr-1"></i>
-                                                N/A
-                                            </span>
-                                        {% endif %}
-                                    {% elif header == "screenshot_drive_link" %}
-                                        {% if task.screenshot_drive_link %}
-                                            <a href="{{ task.screenshot_drive_link }}" target="_blank" 
-                                               class="inline-flex items-center text-green-600 hover:text-green-900 transition-colors duration-200">
-                                                <i class="fas fa-cloud mr-1"></i>
-                                                Drive Link
+                                        {% elif field_type == "links" and field_value %}
+                                            <div class="flex flex-wrap gap-2">
+                                                {% for link in field_value|split:"," %}
+                                                    <a href="{{ link|trim }}" target="_blank" 
+                                                       class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors duration-200">
+                                                        <i class="fas fa-link mr-1"></i>
+                                                        Ref {{ forloop.counter }}
+                                                    </a>
+                                                {% endfor %}
+                                            </div>
+                                        {% elif header == "question_id" and field_value %}
+                                            <a href="/review/{{ field_value }}{% if selected_project %}?project={{ selected_project }}{% endif %}" 
+                                               class="inline-flex items-center font-mono text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1 rounded-md transition-all duration-200">
+                                                <i class="fas fa-eye mr-2"></i>
+                                                {{ field_value }}
                                             </a>
+                                        {% elif header == "title" %}
+                                            <div class="max-w-xs">
+                                                <p class="text-sm font-medium text-gray-900 truncate" title="{{ field_value }}">
+                                                    {{ field_value|default:"-" }}
+                                                </p>
+                                            </div>
+                                        {% elif header == "difficulty" %}
+                                            <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium
+                                                {% if field_value == "Easy" %}
+                                                    bg-green-100 text-green-800
+                                                {% elif field_value == "Medium" %}
+                                                    bg-yellow-100 text-yellow-800
+                                                {% elif field_value == "Hard" %}
+                                                    bg-red-100 text-red-800
+                                                {% else %}
+                                                    bg-gray-100 text-gray-700
+                                                {% endif %}
+                                            ">
+                                                {% if field_value == "Easy" %}
+                                                    <i class="fas fa-star mr-1"></i>
+                                                {% elif field_value == "Medium" %}
+                                                    <i class="fas fa-star mr-1"></i><i class="fas fa-star mr-1"></i>
+                                                {% elif field_value == "Hard" %}
+                                                    <i class="fas fa-star mr-1"></i><i class="fas fa-star mr-1"></i><i class="fas fa-star mr-1"></i>
+                                                {% endif %}
+                                                {{ field_value|default:"-" }}
+                                            </span>
                                         {% else %}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                <i class="fas fa-minus mr-1"></i>
-                                                N/A
-                                            </span>
+                                            <span class="text-sm text-gray-900">{{ field_value|default:"-" }}</span>
                                         {% endif %}
-                                    {% elif header == "codeforces_submission_id" %}
-                                        {% if task.codeforces_submission_id and task.codeforces_submission_id != "-" %}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                                {{ task.codeforces_submission_id }}
-                                            </span>
-                                        {% else %}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                <i class="fas fa-minus mr-1"></i>
-                                                N/A
-                                            </span>
-                                        {% endif %}
-                                    {% elif header == "completed" %}
-                                        <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold
-                                            {% if task.completed == "Completed" %}
-                                                bg-green-100 text-green-800
-                                            {% elif task.completed == "In Progress" %}
-                                                bg-yellow-100 text-yellow-800
-                                            {% elif task.completed == "Review Required" %}
-                                                bg-orange-100 text-orange-800
-                                            {% else %}
-                                                bg-gray-100 text-gray-700
-                                            {% endif %}
-                                        ">
-                                            {{ task.completed|default:"-" }}
-                                        </span>
-                                    {% else %}
-                                        {{ task|attr:header|default:"-" }}
-                                    {% endif %}
+                                    {% endwith %}
+                                    {% endwith %}
                                 </td>
                             {% endfor %}
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="{{ headers|length }}" class="px-6 py-12 text-center">
+                            <td colspan="{{ headers|length|add:1 }}" class="px-6 py-16 text-center">
                                 <div class="flex flex-col items-center">
-                                    <i class="fas fa-inbox text-4xl text-gray-300 mb-4"></i>
-                                    <h3 class="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
-                                    <p class="text-gray-500">No tasks match your current filters.</p>
+                                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                        <i class="fas fa-inbox text-2xl text-gray-400"></i>
+                                    </div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-2">No review tasks found</h3>
+                                    <p class="text-gray-500 max-w-sm">You don't have any tasks assigned for review at the moment. Check back later or contact your administrator.</p>
                                 </div>
                             </td>
                         </tr>
@@ -312,8 +374,7 @@
                 <div class="flex items-center space-x-2">
                     {% if pagination.has_previous %}
                         <a href="?{% if selected_project %}project={{ selected_project }}&{% endif %}{% if selected_trainer %}trainer={{ selected_trainer }}&{% endif %}page={{ pagination.previous_page }}" 
-                           class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
-                            <i class="fas fa-chevron-left mr-1"></i>
+                           class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                             Previous
                         </a>
                     {% endif %}
@@ -327,7 +388,7 @@
                             </span>
                         {% else %}
                             <a href="?{% if selected_project %}project={{ selected_project }}&{% endif %}{% if selected_trainer %}trainer={{ selected_trainer }}&{% endif %}page={{ p }}" 
-                               class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
+                               class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                                 {{ p }}
                             </a>
                         {% endif %}
@@ -335,9 +396,8 @@
                     
                     {% if pagination.has_next %}
                         <a href="?{% if selected_project %}project={{ selected_project }}&{% endif %}{% if selected_trainer %}trainer={{ selected_trainer }}&{% endif %}page={{ pagination.next_page }}" 
-                           class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
+                           class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                             Next
-                            <i class="fas fa-chevron-right ml-1"></i>
                         </a>
                     {% endif %}
                 </div>
@@ -346,4 +406,58 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+function refreshDashboard() {
+    // Get the current values from both dropdowns
+    const projectSelect = document.getElementById('project');
+    const trainerSelect = document.getElementById('trainer');
+    
+    const projectValue = projectSelect ? projectSelect.value : '';
+    const trainerValue = trainerSelect ? trainerSelect.value : '';
+    
+    // Build the URL with both parameters
+    let url = window.location.pathname + '?';
+    const params = [];
+    
+    if (projectValue) {
+        params.push('project=' + encodeURIComponent(projectValue));
+    }
+    
+    if (trainerValue) {
+        params.push('trainer=' + encodeURIComponent(trainerValue));
+    }
+    
+    url += params.join('&');
+    
+    // Navigate to the new URL to refresh the dashboard
+    window.location.href = url;
+}
+
+// Also update the project dropdown to work with the trainer selection
+document.addEventListener('DOMContentLoaded', function() {
+    const projectSelect = document.getElementById('project');
+    if (projectSelect) {
+        projectSelect.addEventListener('change', function() {
+            // When project changes, we want to keep the trainer selection if possible
+            const trainerSelect = document.getElementById('trainer');
+            const trainerValue = trainerSelect ? trainerSelect.value : '';
+            
+            let url = window.location.pathname + '?';
+            const params = [];
+            
+            if (this.value) {
+                params.push('project=' + encodeURIComponent(this.value));
+            }
+            
+            if (trainerValue) {
+                params.push('trainer=' + encodeURIComponent(trainerValue));
+            }
+            
+            url += params.join('&');
+            window.location.href = url;
+        });
+    }
+});
+</script>
 {% endblock %}

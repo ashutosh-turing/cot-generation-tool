@@ -271,10 +271,13 @@ def trainer_question_analysis(request, project_id, question_id):
 @login_required
 def trainer_dashboard(request):
     """
-    Trainer dashboard: fetches tasks from Google Sheets and displays them.
+    Trainer dashboard: fetches tasks from Google Sheets and displays them with productivity insights.
     """
     user = request.user
-    from .models import TrainerTask
+    from .models import TrainerTask, UserActivitySession, UserProductivityInsight, LLMJob
+    from datetime import datetime, timedelta
+    from django.utils import timezone
+    
     user_full_name = user.get_full_name().strip().lower()
     user_name = user.username.strip().lower()
     user_first_name = user.first_name.strip().lower()
@@ -283,9 +286,7 @@ def trainer_dashboard(request):
     projects = Project.objects.filter(is_active=True).order_by('name')
     print("DEBUG: projects count =", projects.count(), "projects =", list(projects.values('id', 'code', 'name', 'is_active')))
     selected_project_id = request.GET.get('project', '').strip()
-    # Strict filter: match if developer exactly matches user's full name, username, or first+last name (case-insensitive)
-    from django.db.models import Q
-    user_full = f"{user_first_name} {user_last_name}".strip()
+    
     # Get all tasks for the selected project, then filter in Python for word-based match
     if selected_project_id:
         all_tasks = TrainerTask.objects.filter(project__id=selected_project_id).order_by('-updated_at')
@@ -304,7 +305,52 @@ def trainer_dashboard(request):
     else:
         filtered_tasks = []
         all_developers = []
-    # Compute stats by status (using 'completed' field)
+    
+    # Calculate privacy-first productivity statistics
+    week_start = timezone.now().date() - timedelta(days=timezone.now().weekday())
+    week_end = week_start + timedelta(days=6)
+    
+    # Get this week's activity sessions for the user
+    this_week_sessions = UserActivitySession.objects.filter(
+        user=user,
+        session_start__date__range=[week_start, week_end],
+        session_end__isnull=False
+    )
+    
+    # Get LLM job statistics for the user (this week)
+    this_week_llm_jobs = LLMJob.objects.filter(
+        user=user,
+        created_at__date__range=[week_start, week_end]
+    )
+    
+    # Calculate trainer-focused statistics
+    total_focus_time = sum(session.focus_time_minutes for session in this_week_sessions)
+    total_sessions = this_week_sessions.count()
+    analysis_sessions = this_week_sessions.filter(activity_type='trainer_analysis').count()
+    modal_sessions = this_week_sessions.filter(activity_type='modal_playground').count()
+    llm_experiments = this_week_llm_jobs.count()
+    
+    # Calculate average session length
+    avg_session_length = total_focus_time / max(total_sessions, 1)
+    
+    # Format focus time in hours and minutes
+    focus_hours = total_focus_time // 60
+    focus_minutes = total_focus_time % 60
+    focus_time_display = f"{focus_hours}h {focus_minutes}m" if focus_hours > 0 else f"{focus_minutes}m"
+    
+    # Create productivity statistics for display
+    productivity_stats = {
+        'focus_time_this_week': focus_time_display,
+        'focus_time_minutes': total_focus_time,
+        'deep_analysis_sessions': analysis_sessions,
+        'llm_experiments': llm_experiments,
+        'learning_velocity': len([task for task in filtered_tasks if task.completed and task.completed.lower() in ['completed', 'done']]),
+        'avg_session_length': f"{int(avg_session_length)}m" if avg_session_length > 0 else "0m",
+        'modal_playground_usage': modal_sessions,
+        'total_sessions': total_sessions
+    }
+    
+    # Compute traditional task stats by status (using 'completed' field) - keep for compatibility
     status_counts = {}
     for task in filtered_tasks:
         status = (task.completed or 'Unknown').strip()
@@ -324,26 +370,33 @@ def trainer_dashboard(request):
     end = start + page_size
     paginated_tasks = filtered_tasks[start:end]
 
-    # Dynamic headers based on TaskSyncConfig.column_mapping if available
-    config_headers = []
+    # Dynamic headers based on TaskSyncConfig
+    config = None
+    headers = []
+    field_types = {}
+    field_labels = {}
+    
     if selected_project_id:
         config = TaskSyncConfig.objects.filter(project__id=selected_project_id, is_active=True).first()
-        if config and config.column_mapping:
-            # Always include these fields at the start
-            config_headers = ["question_id", "problem_link", "response_links"]
-            # Add all logical fields from column_mapping (excluding duplicates)
-            for logical_field in config.column_mapping.keys():
-                if logical_field not in config_headers:
-                    config_headers.append(logical_field)
-            # Optionally add "completed" if not present
-            if "completed" not in config_headers:
-                config_headers.append("completed")
+        if config:
+            # Use the config's display fields method
+            headers = config.get_display_fields()
+            # Get field types and labels
+            for field in headers:
+                field_types[field] = config.get_field_type(field)
+                field_labels[field] = config.get_field_label(field)
         else:
-            # Fallback to model fields if no config
-            config_headers = [f.name for f in TrainerTask._meta.fields if f.name not in ("id", "created_at", "updated_at")]
+            # Fallback to default fields
+            headers = ["question_id", "problem_link", "response_links", "completed"]
+            for field in headers:
+                field_types[field] = 'text'
+                field_labels[field] = field.replace('_', ' ').title()
     else:
-        config_headers = [f.name for f in TrainerTask._meta.fields if f.name not in ("id", "created_at", "updated_at")]
-    headers = config_headers
+        # Default headers when no project selected
+        headers = ["question_id", "problem_link", "response_links", "completed"]
+        for field in headers:
+            field_types[field] = 'text'
+            field_labels[field] = field.replace('_', ' ').title()
 
     # Compute visible page numbers for pagination (show first, last, current, neighbors, with ellipsis)
     visible_page_numbers = []
@@ -363,7 +416,10 @@ def trainer_dashboard(request):
         'tasks': paginated_tasks,
         'user': user,
         'stats': status_counts,
+        'productivity_stats': productivity_stats,  # New productivity insights
         'headers': headers,
+        'field_types': field_types,
+        'field_labels': field_labels,
         'projects': projects,
         'selected_project': selected_project_id,
         'all_developers': all_developers,  # For debugging
@@ -384,21 +440,19 @@ from .models import TaskSyncConfig, TrainerTask, Project
 @login_required
 def reviewer_dashboard(request):
     """
-    Reviewer dashboard: shows tasks where reviewer matches the logged-in user.
+    Reviewer dashboard: shows tasks where reviewer matches the logged-in user with productivity insights.
     Supports filtering by project and trainer, and paginates results.
     """
     from django.db.models import Q
     from django.db import transaction
+    from .models import UserActivitySession, LLMJob
+    from datetime import datetime, timedelta
+    from django.utils import timezone
     import time
     
     user = request.user
-    print(str(user))
-    reviewer_names = [
-        user.get_full_name().strip().lower(),
-        user.username.strip().lower(),
-        user.first_name.strip().lower(),
-        user.email.strip().lower() if user.email else ""
-    ]
+    print(f"DEBUG: Current user: {user.username}, Full name: {user.get_full_name()}, Email: {user.email}")
+    
     # Filters
     project_id = request.GET.get('project', '').strip()
     trainer_name = request.GET.get('trainer', '').strip()
@@ -411,13 +465,67 @@ def reviewer_dashboard(request):
         try:
             print(f"Database query attempt {attempt + 1}")
             
-            # Filter tasks where reviewer matches the logged-in user's username (case-insensitive)
+            # Filter tasks based on user role
+            user_role = get_user_role(user)
+            print(f"DEBUG: User {user.username} determined as role: {user_role}")
+            
             with transaction.atomic():
-                base_tasks = TrainerTask.objects.filter(
-                    reviewer__iexact=user.username
-                )
+                if user_role == 'admin':
+                    # Only admins can see all tasks
+                    base_tasks = TrainerTask.objects.all()
+                    print(f"DEBUG: User {user.username} is {user_role}, showing all tasks")
+                else:
+                    # Pod leads and regular reviewers only see tasks assigned to them
+                    # Try username first (most specific), then fall back to other identifiers
+                    base_tasks = TrainerTask.objects.none()
+                    
+                    # First, try exact username match (most reliable)
+                    if user.username.strip():
+                        base_tasks = TrainerTask.objects.filter(
+                            Q(reviewer__isnull=False) & Q(reviewer__gt='') & 
+                            Q(reviewer__iexact=user.username)
+                        ).distinct()
+                        print(f"DEBUG: Found {base_tasks.count()} tasks with exact username match")
+                    
+                    # If no exact username match, try username contains
+                    if base_tasks.count() == 0 and user.username.strip():
+                        base_tasks = TrainerTask.objects.filter(
+                            Q(reviewer__isnull=False) & Q(reviewer__gt='') & 
+                            Q(reviewer__icontains=user.username)
+                        ).distinct()
+                        print(f"DEBUG: Found {base_tasks.count()} tasks with username contains match")
+                    
+                    # If still no match and user has full name, try full name exact match
+                    if base_tasks.count() == 0 and user.get_full_name().strip():
+                        base_tasks = TrainerTask.objects.filter(
+                            Q(reviewer__isnull=False) & Q(reviewer__gt='') & 
+                            Q(reviewer__iexact=user.get_full_name())
+                        ).distinct()
+                        print(f"DEBUG: Found {base_tasks.count()} tasks with full name exact match")
+                    
+                    # If still no match and user has first name, try first name matches
+                    if base_tasks.count() == 0 and user.first_name.strip():
+                        base_tasks = TrainerTask.objects.filter(
+                            Q(reviewer__isnull=False) & Q(reviewer__gt='') & 
+                            (Q(reviewer__iexact=user.first_name) | Q(reviewer__icontains=user.first_name))
+                        ).distinct()
+                        print(f"DEBUG: Found {base_tasks.count()} tasks with first name match")
+                    
+                    print(f"DEBUG: User {user.username} is {user_role}, filtering by assignment")
+                        
+                    # Debug: Print what we're looking for and what we found
+                    task_count = base_tasks.count()
+                    print(f"DEBUG: Looking for reviewer matching: {user.username}, {user.get_full_name()}, {user.first_name}")
+                    print(f"DEBUG: Found {task_count} tasks for current user")
+                    
+                    # If no tasks found, let's see what reviewers exist
+                    if task_count == 0:
+                        all_reviewers = TrainerTask.objects.values_list('reviewer', flat=True).distinct()
+                        print(f"DEBUG: Available reviewers in database: {list(all_reviewers)}")
+                
                 # Force evaluation of the queryset to catch database errors early
-                _ = base_tasks.count()
+                task_count = base_tasks.count()
+                print(f"DEBUG: Total tasks after filtering: {task_count}")
             break
             
         except Exception as e:
@@ -436,6 +544,7 @@ def reviewer_dashboard(request):
                     'trainers': [],
                     'selected_trainer': '',
                     'stats': {'total': 0, 'in_progress': 0, 'completed': 0},
+                    'productivity_stats': {},
                     'pagination': {
                         'current_page': 1,
                         'total_pages': 0,
@@ -466,11 +575,79 @@ def reviewer_dashboard(request):
         print("screenshot_drive_link:", first_task.screenshot_drive_link)
         print("codeforces_submission_id:", first_task.codeforces_submission_id)
 
-    # Get unique trainer names from the filtered queryset (for dropdown)
-    trainers_qs = tasks_for_stats_and_trainers.values_list('developer', flat=True).distinct()
-    trainers = sorted([t for t in trainers_qs if t and t.strip()])
+    # Get all users from the 'trainer' group for the dropdown, excluding the logged-in user
+    from django.contrib.auth.models import Group
+    try:
+        trainer_group = Group.objects.get(name='trainer')
+        admin_group = Group.objects.filter(name='admin').first()
+        # Exclude logged-in user, superusers, staff, and admin group members
+        trainers_qs = User.objects.filter(groups=trainer_group)
+        if admin_group:
+            trainers_qs = trainers_qs.exclude(groups=admin_group)
+        trainers_qs = trainers_qs.exclude(id=user.id).exclude(is_superuser=True).exclude(is_staff=True)
+        trainers = sorted([t for t in trainers_qs.values_list('username', flat=True) if t and t.strip()])
+        print(f"DEBUG: Found {len(trainers)} users in trainer group (excluding logged-in user and admins): {trainers}")
+    except Group.DoesNotExist:
+        print("DEBUG: 'trainer' group does not exist, falling back to developer field")
+        # Fallback to existing logic if trainer group doesn't exist, excluding the logged-in user and admins
+        admin_usernames = set(User.objects.filter(
+            is_superuser=True
+        ).values_list('username', flat=True)) | set(User.objects.filter(
+            is_staff=True
+        ).values_list('username', flat=True)) | set(User.objects.filter(
+            groups__name='admin'
+        ).values_list('username', flat=True))
+        trainers_qs = tasks_for_stats_and_trainers.values_list('developer', flat=True).distinct()
+        trainers = sorted([
+            t for t in trainers_qs
+            if t and t.strip() and t != user.username and t not in admin_usernames
+        ])
 
-    # Stats (project filter only)
+    # Calculate privacy-first productivity statistics for reviewers
+    week_start = timezone.now().date() - timedelta(days=timezone.now().weekday())
+    week_end = week_start + timedelta(days=6)
+    
+    # Get this week's activity sessions for the user
+    this_week_sessions = UserActivitySession.objects.filter(
+        user=user,
+        session_start__date__range=[week_start, week_end],
+        session_end__isnull=False
+    )
+    
+    # Get LLM job statistics for the user (this week)
+    this_week_llm_jobs = LLMJob.objects.filter(
+        user=user,
+        created_at__date__range=[week_start, week_end]
+    )
+    
+    # Calculate reviewer-focused statistics
+    total_focus_time = sum(session.focus_time_minutes for session in this_week_sessions)
+    total_sessions = this_week_sessions.count()
+    review_sessions = this_week_sessions.filter(activity_type='review_task').count()
+    analysis_sessions = this_week_sessions.filter(activity_type='trainer_analysis').count()
+    llm_experiments = this_week_llm_jobs.count()
+    
+    # Calculate average review time
+    avg_review_time = total_focus_time / max(review_sessions, 1) if review_sessions > 0 else 0
+    
+    # Format focus time in hours and minutes
+    focus_hours = total_focus_time // 60
+    focus_minutes = total_focus_time % 60
+    focus_time_display = f"{focus_hours}h {focus_minutes}m" if focus_hours > 0 else f"{focus_minutes}m"
+    
+    # Create reviewer productivity statistics for display
+    reviewer_productivity_stats = {
+        'review_focus_time': focus_time_display,
+        'focus_time_minutes': total_focus_time,
+        'review_sessions': review_sessions,
+        'quality_assurance_time': f"{int(avg_review_time)}m" if avg_review_time > 0 else "0m",
+        'tasks_reviewed': len([task for task in tasks_for_stats_and_trainers if task.completed and task.completed.lower() in ['completed', 'done']]),
+        'analysis_sessions': analysis_sessions,
+        'llm_experiments': llm_experiments,
+        'total_sessions': total_sessions
+    }
+
+    # Traditional stats (project filter only)
     total_tasks = tasks_for_stats_and_trainers.count()
     in_progress = tasks_for_stats_and_trainers.filter(completed__iexact='In Progress').count()
     completed = tasks_for_stats_and_trainers.filter(completed__iexact='Completed').count()
@@ -481,29 +658,27 @@ def reviewer_dashboard(request):
         tasks_for_table = tasks_for_table.filter(developer__iexact=trainer_name)
 
     # Dynamic headers based on TaskSyncConfig.column_mapping if available
+    config = None
     config_headers = []
     if project_id:
         config = TaskSyncConfig.objects.filter(project__id=project_id, is_active=True).first()
         if config and config.column_mapping:
-            # Always include these fields at the start
-            config_headers = ["developer", "question_id", "problem_link"]
-            for logical_field in config.column_mapping.keys():
-                if logical_field not in config_headers:
-                    config_headers.append(logical_field)
-            # Optionally add common reviewer fields if not present
-            for extra in ["labelling_tool_id_link", "screenshot_drive_link", "codeforces_submission_id", "completed"]:
-                if extra not in config_headers:
-                    config_headers.append(extra)
+            # For reviewer dashboard, exclude developer/reviewer fields since users only see their own tasks
+            # Use the display_config field_order if available, otherwise use column_mapping keys
+            if config.display_config and 'field_order' in config.display_config:
+                config_headers = [field for field in config.display_config['field_order'] 
+                                if field not in ['developer', 'reviewer']]
+            else:
+                # Add logical fields from column_mapping (excluding developer/reviewer fields)
+                config_headers = ["question_id"]  # Always include question_id first
+                for logical_field in config.column_mapping.keys():
+                    if logical_field not in config_headers and logical_field not in ['developer', 'reviewer']:
+                        config_headers.append(logical_field)
         else:
-            config_headers = [
-                "developer", "question_id", "problem_link",
-                "labelling_tool_id_link", "screenshot_drive_link", "codeforces_submission_id", "completed"
-            ]
+            # Fallback to model fields if no config (excluding developer/reviewer)
+            config_headers = ["question_id", "problem_link"]
     else:
-        config_headers = [
-            "developer", "question_id", "problem_link",
-            "labelling_tool_id_link", "screenshot_drive_link", "codeforces_submission_id", "completed"
-        ]
+        config_headers = ["question_id", "problem_link"]
     headers = config_headers
 
     # Pagination for table
@@ -537,8 +712,26 @@ def reviewer_dashboard(request):
         elif p == total_pages - 1 and page < total_pages - 3:
             visible_page_numbers.append("...")
 
+    # Use the same flexible system as trainer dashboard
+    field_types = {}
+    field_labels = {}
+    
+    if config:
+        # Get field types and labels from config
+        for field in headers:
+            field_types[field] = config.get_field_type(field)
+            field_labels[field] = config.get_field_label(field)
+    else:
+        # Default field types and labels
+        for field in headers:
+            field_types[field] = 'text'
+            field_labels[field] = field.replace('_', ' ').title()
+
     context = {
-        'tasks': paginated_tasks,
+        'tasks': paginated_tasks,  # Use the actual task objects, not processed data
+        'headers': headers,
+        'field_types': field_types,
+        'field_labels': field_labels,
         'projects': projects,
         'selected_project': project_id,
         'trainers': trainers,
@@ -548,6 +741,7 @@ def reviewer_dashboard(request):
             'in_progress': in_progress,
             'completed': completed,
         },
+        'productivity_stats': reviewer_productivity_stats,  # New reviewer productivity insights
         'pagination': {
             'current_page': page,
             'total_pages': total_pages,
@@ -595,6 +789,8 @@ def task_sync_config_view(request):
                 scraping_needed = bool(config_data.get("scraping_needed", False))
                 link_column = config_data.get("link_column", "")
                 column_mapping = config_data.get("column_mapping", {})
+                field_types = config_data.get("field_types", {})
+                display_config = config_data.get("display_config", {})
                 sync_mode = config_data.get("sync_mode", "prompt_in_sheet")
                 sheet_tab = config_data.get("sheet_tab", "")
                 is_active = config_data.get("is_active", True)
@@ -613,6 +809,8 @@ def task_sync_config_view(request):
                         config.scraping_needed = scraping_needed
                         config.link_column = link_column
                         config.column_mapping = column_mapping
+                        config.field_types = field_types
+                        config.display_config = display_config
                         config.sync_mode = sync_mode
                         config.sheet_tab = sheet_tab
                         config.is_active = is_active
@@ -627,13 +825,27 @@ def task_sync_config_view(request):
                             scraping_needed=scraping_needed,
                             link_column=link_column,
                             column_mapping=column_mapping,
+                            field_types=field_types,
+                            display_config=display_config,
                             sync_mode=sync_mode,
                             sheet_tab=sheet_tab,
                             is_active=is_active
                         )
                         message = "Configuration created from config.json."
+                    # --- Trigger sync after config upload ---
+                    try:
+                        from .utils.sheets import sync_trainer_tasks
+                        sync_status, sync_summary, sync_details, created_count, updated_count, deleted_count = sync_trainer_tasks(
+                            config, selected_project=project, sync_type="manual", synced_by=request.user.username if request.user.is_authenticated else "system"
+                        )
+                        message += f" Sync: {sync_summary}"
+                    except Exception as sync_exc:
+                        message += f" Sync failed: {str(sync_exc)}"
         except Exception as e:
-            message = f"Failed to process config.json: {str(e)}"
+            import traceback
+            tb = traceback.format_exc()
+            print(tb)
+            message = f"Failed to process config.json: {str(e)}\nTraceback:\n{tb}"
 
     # Handle project creation and toggle
     if request.method == "POST" and "create_project" in request.POST:
@@ -739,9 +951,12 @@ def task_sync_config_view(request):
                 to_delete.delete()
             sync_summary = f"{created_count} created, {updated_count} updated, {deleted_count} deleted"
         except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            print(tb)
             sync_status = "failure"
             sync_summary = "Sync failed"
-            sync_details = str(e)
+            sync_details = f"{str(e)}\nTraceback:\n{tb}"
         # Log sync history
         TaskSyncHistory.objects.create(
             config=config,
@@ -794,12 +1009,15 @@ def task_sync_config_view(request):
     return render(request, "task_sync_config.html", context)
 
 def index(request):
-    from .models import Project
+    from .models import Project, TrainerTask, UserActivitySession, LLMJob
     from django.contrib.auth.models import User
     from django.core.paginator import Paginator
     from django.contrib import messages
     from django.urls import reverse
     from django.contrib.auth import logout
+    from django.db.models import Count, Q
+    from datetime import datetime, timedelta
+    from django.utils import timezone
 
     # Always allow superusers to access the dashboard regardless of email domain
     if request.user.is_superuser or get_user_role(request.user) == 'admin':
@@ -811,6 +1029,94 @@ def index(request):
                 project.is_active = not project.is_active
                 project.save()
                 messages.success(request, f"Project '{project.code}' is now {'active' if project.is_active else 'inactive'}.")
+
+        # Calculate comprehensive admin statistics
+        week_start = timezone.now().date() - timedelta(days=timezone.now().weekday())
+        week_end = week_start + timedelta(days=6)
+        
+        # Overall system statistics
+        total_projects = Project.objects.count()
+        active_projects = Project.objects.filter(is_active=True).count()
+        total_users = User.objects.count()
+        active_users = User.objects.filter(is_active=True).count()
+        total_tasks = TrainerTask.objects.count()
+        completed_tasks = TrainerTask.objects.filter(completed__iexact='Completed').count()
+        
+        # This week's activity
+        this_week_sessions = UserActivitySession.objects.filter(
+            session_start__date__range=[week_start, week_end],
+            session_end__isnull=False
+        )
+        this_week_llm_jobs = LLMJob.objects.filter(
+            created_at__date__range=[week_start, week_end]
+        )
+        
+        # Calculate productivity metrics
+        total_focus_time = sum(session.focus_time_minutes for session in this_week_sessions)
+        total_sessions = this_week_sessions.count()
+        unique_active_users = this_week_sessions.values('user').distinct().count()
+        
+        # Format focus time
+        focus_hours = total_focus_time // 60
+        focus_minutes = total_focus_time % 60
+        focus_time_display = f"{focus_hours}h {focus_minutes}m" if focus_hours > 0 else f"{focus_minutes}m"
+        
+        # Per-project statistics
+        project_stats = []
+        for project in Project.objects.all().order_by('name'):
+            project_tasks = TrainerTask.objects.filter(project=project)
+            project_completed = project_tasks.filter(completed__iexact='Completed').count()
+            project_in_progress = project_tasks.filter(completed__iexact='In Progress').count()
+            project_pending = project_tasks.exclude(
+                Q(completed__iexact='Completed') | Q(completed__iexact='In Progress')
+            ).count()
+            
+            # Get unique trainers and reviewers for this project
+            trainers = project_tasks.values('developer').distinct().count()
+            reviewers = project_tasks.values('reviewer').distinct().count()
+            
+            project_stats.append({
+                'project': project,
+                'total_tasks': project_tasks.count(),
+                'completed': project_completed,
+                'in_progress': project_in_progress,
+                'pending': project_pending,
+                'completion_rate': (project_completed / project_tasks.count() * 100) if project_tasks.count() > 0 else 0,
+                'trainers': trainers,
+                'reviewers': reviewers
+            })
+        
+        # User role statistics
+        admin_users = User.objects.filter(Q(is_superuser=True) | Q(groups__name='admin')).distinct().count()
+        pod_lead_users = User.objects.filter(groups__name='pod_lead').count()
+        trainer_users = User.objects.filter(groups__name='trainer').count()
+        
+        # LLM job statistics
+        llm_job_stats = {
+            'total': this_week_llm_jobs.count(),
+            'completed': this_week_llm_jobs.filter(status='completed').count(),
+            'failed': this_week_llm_jobs.filter(status='failed').count(),
+            'pending': this_week_llm_jobs.filter(status='pending').count(),
+            'processing': this_week_llm_jobs.filter(status='processing').count(),
+        }
+        
+        # Create admin statistics
+        admin_stats = {
+            'total_projects': total_projects,
+            'active_projects': active_projects,
+            'total_users': total_users,
+            'active_users': active_users,
+            'total_tasks': total_tasks,
+            'completed_tasks': completed_tasks,
+            'completion_rate': (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0,
+            'focus_time_this_week': focus_time_display,
+            'total_sessions': total_sessions,
+            'unique_active_users': unique_active_users,
+            'admin_users': admin_users,
+            'pod_lead_users': pod_lead_users,
+            'trainer_users': trainer_users,
+            'llm_jobs': llm_job_stats
+        }
 
         # Pagination for projects
         project_list = Project.objects.all().order_by('name')
@@ -827,6 +1133,8 @@ def index(request):
         return render(request, 'dashboard_variant1.html', {
             'projects_page': projects_page,
             'users_page': users_page,
+            'admin_stats': admin_stats,
+            'project_stats': project_stats,
         })
 
     # If not authenticated, redirect to login

@@ -4,143 +4,395 @@
 {% block title %}Trainer Dashboard{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <!-- Welcome Section -->
-    <div class="mb-8">
-        <h1 class="text-4xl font-extrabold text-gray-900 mb-2">Trainer Dashboard</h1>
-        <p class="text-lg text-gray-500">Track your assigned tasks, progress, and references in a beautiful, modern dashboard.</p>
-    </div>
-
-    <!-- Project Dropdown -->
-    <div class="mb-8 flex flex-col md:flex-row md:items-center md:gap-6">
-        <form method="get" class="flex items-center gap-4">
-            <label for="project" class="font-semibold text-gray-700">Project:</label>
-            <select name="project" id="project" class="border rounded p-2 min-w-[200px]" onchange="this.form.submit()">
-                <option value="">-- Choose Project --</option>
-                {% for project in projects %}
-                    <option value="{{ project.id }}" {% if project.id|stringformat:"s" == selected_project %}selected{% endif %}>{{ project.code }} - {{ project.name }}</option>
-                {% endfor %}
-            </select>
-        </form>
-    </div>
-
-    <!-- Table Card -->
-    <div class="bg-white rounded-2xl shadow-lg p-6">
-        <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 md:mb-0">Assigned Tasks</h2>
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-green-50 to-emerald-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Header Section -->
+        <div class="mb-8">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                        Trainer Dashboard
+                    </h1>
+                    <p class="mt-2 text-lg text-gray-600">Track your assigned tasks, progress, and development work</p>
+                </div>
+                <div class="mt-4 sm:mt-0">
+                    <div class="flex items-center space-x-2 text-sm text-gray-500">
+                        <i class="fas fa-clock"></i>
+                        <span>Last updated: {{ now|date:"M d, Y H:i" }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="overflow-x-auto rounded-2xl shadow-lg">
-            <table class="min-w-full border-separate border-spacing-0 bg-white rounded-2xl overflow-hidden">
-                <thead class="sticky top-0 z-10 bg-gradient-to-r from-blue-100 to-blue-50 shadow">
-                    <tr>
-                        <th class="px-6 py-4 text-left text-xs font-bold text-blue-800 uppercase tracking-wider rounded-tl-2xl">Edit</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold text-blue-800 uppercase tracking-wider">Question Id</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold text-blue-800 uppercase tracking-wider">Problem Link</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold text-blue-800 uppercase tracking-wider">Reference Links</th>
-                        {% for header in headers %}
-                            {% if header != "question_id" and header != "Problem Link" and header != "response_links" and header != "raw_prompt" %}
-                                <th class="px-6 py-4 text-left text-xs font-bold text-blue-800 uppercase tracking-wider">{{ header }}</th>
-                            {% endif %}
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if tasks and selected_project %}
-                        {% for task in tasks %}
-                            <tr class="even:bg-blue-50 odd:bg-white hover:bg-blue-100 transition-all duration-150">
-                                <td class="px-6 py-4">
-                                    <a href="{% url 'edit_trainer_task' task.id %}" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition text-sm font-semibold shadow">
-                                        Edit
-                                    </a>
-                                </td>
-                                <!-- Question Id as link -->
-                                <td class="px-6 py-4">
-                                    {% if task.question_id %}
-<a href="{% url 'trainer_question_analysis' selected_project task.question_id %}" class="text-blue-700 font-semibold hover:underline">
-    {{ task.question_id }}
-</a>
-                                    {% else %}
-                                        <span class="text-gray-400">-</span>
-                                    {% endif %}
-                                </td>
-                                <!-- Problem Link as link -->
-                                <td class="px-6 py-4">
-                                    {% if task.problem_link %}
-                                        <a href="{{ task.problem_link }}" target="_blank" class="text-blue-600 hover:underline font-medium">
-                                            View Problem
-                                        </a>
-                                    {% else %}
-                                        <span class="text-gray-400">-</span>
-                                    {% endif %}
-                                </td>
-                                <!-- Reference Links as link(s) -->
-                                <td class="px-6 py-4">
-                                    {% if task.response_links %}
-                                        <div class="flex flex-wrap gap-2">
-                                            {% for link in task.response_links|split:"," %}
-                                                <a href="{{ link|trim }}" target="_blank" class="text-blue-600 hover:underline whitespace-nowrap font-medium">
-                                                    Reference {{ forloop.counter }}
-                                                </a>
-                                            {% endfor %}
-                                        </div>
-                                    {% else %}
-                                        <span class="text-gray-400">-</span>
-                                    {% endif %}
-                                </td>
-                                <!-- Other columns except raw_prompt, question_id, Problem Link, response_links -->
+
+        <!-- Project Selection -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-project-diagram mr-2 text-green-500"></i>
+                Project Selection
+            </h2>
+            
+            <form method="get" class="mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label for="project" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-folder mr-1 text-green-500"></i>
+                            Choose Project
+                        </label>
+                        <select name="project" id="project"
+                            class="w-full rounded-xl border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 transition-all duration-200 bg-white"
+                            onchange="this.form.submit()">
+                            <option value="">-- Select a Project --</option>
+                            {% for project in projects %}
+                                <option value="{{ project.id }}" {% if project.id|stringformat:"s" == selected_project %}selected{% endif %}>
+                                    {{ project.code }} - {{ project.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% if selected_project %}
+                        <div class="flex items-end">
+                            <a href="?" class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-xl transition-all duration-200">
+                                <i class="fas fa-times mr-2"></i>
+                                Clear Selection
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <!-- Productivity Insights Section -->
+        {% if selected_project %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Focus Time This Week -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Focus Time This Week</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ productivity_stats.focus_time_this_week|default:"0m" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Deep work sessions</p>
+                    </div>
+                    <div class="p-3 bg-emerald-100 rounded-full">
+                        <i class="fas fa-brain text-2xl text-emerald-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deep Analysis Sessions -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Deep Analysis Sessions</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ productivity_stats.deep_analysis_sessions|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Question analysis work</p>
+                    </div>
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <i class="fas fa-search text-2xl text-blue-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LLM Experiments -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">LLM Experiments</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ productivity_stats.llm_experiments|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Model interactions</p>
+                    </div>
+                    <div class="p-3 bg-purple-100 rounded-full">
+                        <i class="fas fa-robot text-2xl text-purple-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Learning Velocity -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Learning Velocity</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ productivity_stats.learning_velocity|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Tasks completed</p>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <i class="fas fa-graduation-cap text-2xl text-green-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Additional Insights Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+            <!-- Average Session Length -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Avg Session Length</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">{{ productivity_stats.avg_session_length|default:"0m" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Quality over quantity</p>
+                    </div>
+                    <div class="p-3 bg-orange-100 rounded-full">
+                        <i class="fas fa-stopwatch text-xl text-orange-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Playground Usage -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Modal Playground</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">{{ productivity_stats.modal_playground_usage|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">Experimentation sessions</p>
+                    </div>
+                    <div class="p-3 bg-indigo-100 rounded-full">
+                        <i class="fas fa-flask text-xl text-indigo-600"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Sessions -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Total Sessions</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-2">{{ productivity_stats.total_sessions|default:"0" }}</p>
+                        <p class="text-xs text-gray-500 mt-1">This week</p>
+                    </div>
+                    <div class="p-3 bg-teal-100 rounded-full">
+                        <i class="fas fa-chart-line text-xl text-teal-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Tasks Table -->
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                    <i class="fas fa-code mr-3 text-green-600"></i>
+                    My Development Tasks
+                </h2>
+                <p class="text-sm text-gray-600 mt-1">Tasks assigned to you for development and training</p>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                            {% for header in headers %}
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
+                                    <div class="flex items-center space-x-1">
+                                        {% if header == "question_id" %}
+                                            <i class="fas fa-hashtag text-green-500"></i>
+                                        {% elif header == "title" %}
+                                            <i class="fas fa-file-code text-blue-500"></i>
+                                        {% elif header == "problem_link" %}
+                                            <i class="fas fa-link text-purple-500"></i>
+                                        {% elif header == "completed" %}
+                                            <i class="fas fa-flag-checkered text-red-500"></i>
+                                        {% else %}
+                                            <i class="fas fa-info-circle text-gray-400"></i>
+                                        {% endif %}
+                                        <span>{{ field_labels|get_item:header|default:header|cut:"_"|title }}</span>
+                                    </div>
+                                </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        {% if tasks and selected_project %}
+                            {% for task in tasks %}
+                            <tr class="hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 transition-all duration-300 group">
                                 {% for header in headers %}
-                                    {% if header != "question_id" and header != "problem_link" and header != "response_links" and header != "raw_prompt" %}
-                                        <td class="px-6 py-4">
-                                            {% if header == "completed" %}
-                                                <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold
-                                                    {% if task.completed == "Completed" %}
-                                                        bg-green-100 text-green-800
-                                                    {% elif task.completed == "In Progress" %}
-                                                        bg-yellow-100 text-yellow-800
-                                                    {% elif task.completed == "Review Required" %}
-                                                        bg-orange-100 text-orange-800
+                                    <td class="px-6 py-4 border-r border-gray-100 last:border-r-0 group-hover:border-green-200">
+                                        {% with field_type=field_types|get_item:header|default:"text" %}
+                                        {% with field_value=task|get_field_value:header %}
+                                            {% if field_type == "url" and field_value %}
+                                                <a href="{{ field_value }}" target="_blank" 
+                                                   class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 hover:text-purple-800 transition-all duration-200">
+                                                    <i class="fas fa-external-link-alt mr-2"></i>
+                                                    {% if header == "problem_link" %}View Problem{% else %}View Link{% endif %}
+                                                </a>
+                                            {% elif field_type == "badge" %}
+                                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide
+                                                    {% if field_value == "completed" or field_value == "Completed" %}
+                                                        bg-emerald-100 text-emerald-800 border border-emerald-200
+                                                    {% elif field_value == "in_progress" or field_value == "In Progress" %}
+                                                        bg-amber-100 text-amber-800 border border-amber-200
+                                                    {% elif field_value == "review_required" or field_value == "Review Required" %}
+                                                        bg-orange-100 text-orange-800 border border-orange-200
+                                                    {% elif field_value == "pending" or field_value == "Pending" %}
+                                                        bg-blue-100 text-blue-800 border border-blue-200
+                                                    {% elif field_value == "failed" or field_value == "Failed" %}
+                                                        bg-red-100 text-red-800 border border-red-200
                                                     {% else %}
-                                                        bg-gray-100 text-gray-700
+                                                        bg-gray-100 text-gray-700 border border-gray-200
                                                     {% endif %}
                                                 ">
-                                                    {{ task.completed|default:"-" }}
+                                                    {% if field_value == "completed" or field_value == "Completed" %}
+                                                        <i class="fas fa-check-circle mr-1"></i>
+                                                    {% elif field_value == "in_progress" or field_value == "In Progress" %}
+                                                        <i class="fas fa-clock mr-1"></i>
+                                                    {% elif field_value == "pending" or field_value == "Pending" %}
+                                                        <i class="fas fa-hourglass-half mr-1"></i>
+                                                    {% elif field_value == "failed" or field_value == "Failed" %}
+                                                        <i class="fas fa-times-circle mr-1"></i>
+                                                    {% endif %}
+                                                    {{ field_value|default:"-" }}
                                                 </span>
+                                            {% elif field_type == "links" and field_value %}
+                                                <div class="flex flex-wrap gap-2">
+                                                    {% for link in field_value|split:"," %}
+                                                        <a href="{{ link|trim }}" target="_blank" 
+                                                           class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors duration-200">
+                                                            <i class="fas fa-link mr-1"></i>
+                                                            Ref {{ forloop.counter }}
+                                                        </a>
+                                                    {% endfor %}
+                                                </div>
+                                            {% elif header == "question_id" and field_value %}
+                                                <a href="{% url 'trainer_question_analysis' selected_project field_value %}" 
+                                                   class="inline-flex items-center font-mono text-sm font-bold text-green-600 hover:text-green-800 hover:bg-green-50 px-2 py-1 rounded-md transition-all duration-200">
+                                                    <i class="fas fa-search mr-2"></i>
+                                                    {{ field_value }}
+                                                </a>
+                                            {% elif header == "title" %}
+                                                <div class="max-w-xs">
+                                                    <p class="text-sm font-medium text-gray-900 truncate" title="{{ field_value }}">
+                                                        {{ field_value|default:"-" }}
+                                                    </p>
+                                                </div>
+                                            {% elif header == "difficulty" %}
+                                                <div class="flex items-center space-x-1">
+                                                    {% if field_value == "Easy" %}
+                                                        <div class="flex items-center space-x-1">
+                                                            <i class="fas fa-star text-green-500"></i>
+                                                            <i class="far fa-star text-gray-300"></i>
+                                                            <i class="far fa-star text-gray-300"></i>
+                                                        </div>
+                                                        <span class="text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full">Easy</span>
+                                                    {% elif field_value == "Medium" %}
+                                                        <div class="flex items-center space-x-1">
+                                                            <i class="fas fa-star text-yellow-500"></i>
+                                                            <i class="fas fa-star text-yellow-500"></i>
+                                                            <i class="far fa-star text-gray-300"></i>
+                                                        </div>
+                                                        <span class="text-xs font-medium text-yellow-700 bg-yellow-100 px-2 py-1 rounded-full">Medium</span>
+                                                    {% elif field_value == "Hard" %}
+                                                        <div class="flex items-center space-x-1">
+                                                            <i class="fas fa-star text-red-500"></i>
+                                                            <i class="fas fa-star text-red-500"></i>
+                                                            <i class="fas fa-star text-red-500"></i>
+                                                        </div>
+                                                        <span class="text-xs font-medium text-red-700 bg-red-100 px-2 py-1 rounded-full">Hard</span>
+                                                    {% else %}
+                                                        <span class="text-xs font-medium text-gray-700 bg-gray-100 px-2 py-1 rounded-full">{{ field_value|default:"-" }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            {% elif header == "completed" %}
+                                                <div class="flex items-center space-x-2">
+                                                    {% if field_value and field_value != "-" %}
+                                                        <div class="flex items-center space-x-2">
+                                                            <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                                                            <span class="text-sm font-medium text-green-700 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                                                                <i class="fas fa-calendar-check mr-1"></i>
+                                                                {{ field_value }}
+                                                            </span>
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="flex items-center space-x-2">
+                                                            <div class="w-3 h-3 bg-gray-300 rounded-full"></div>
+                                                            <span class="text-sm font-medium text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-200">
+                                                                <i class="fas fa-clock mr-1"></i>
+                                                                Pending
+                                                            </span>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
                                             {% else %}
-                                                {{ task|attr:header|default:"-" }}
+                                                <span class="text-sm text-gray-900">{{ field_value|default:"-" }}</span>
                                             {% endif %}
-                                        </td>
-                                    {% endif %}
+                                        {% endwith %}
+                                        {% endwith %}
+                                    </td>
                                 {% endfor %}
                             </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="{{ headers|length }}" class="text-center text-gray-400 py-8">
-                                Choose the project to see your assigned tasks
-                            </td>
-                        </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="{{ headers|length }}" class="px-6 py-16 text-center">
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                            <i class="fas fa-folder-open text-2xl text-gray-400"></i>
+                                        </div>
+                                        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                                            {% if not selected_project %}
+                                                Select a project to view tasks
+                                            {% else %}
+                                                No development tasks found
+                                            {% endif %}
+                                        </h3>
+                                        <p class="text-gray-500 max-w-sm">
+                                            {% if not selected_project %}
+                                                Choose a project from the dropdown above to see your assigned development tasks.
+                                            {% else %}
+                                                You don't have any tasks assigned for this project. Check back later or contact your administrator.
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if pagination.total_pages > 1 %}
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 px-6 py-4 mt-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-gray-700 mb-4 sm:mb-0">
+                    Showing page <span class="font-medium">{{ pagination.current_page }}</span> of 
+                    <span class="font-medium">{{ pagination.total_pages }}</span> 
+                    (<span class="font-medium">{{ pagination.total_records }}</span> total records)
+                </div>
+                <div class="flex items-center space-x-2">
+                    {% if pagination.has_previous %}
+                        <a href="?{% if selected_project %}project={{ selected_project }}&{% endif %}page={{ pagination.previous_page }}" 
+                           class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            Previous
+                        </a>
                     {% endif %}
-                </tbody>
-            </table>
+                    
+                    {% for p in visible_page_numbers %}
+                        {% if p == "..." %}
+                            <span class="px-3 py-2 text-gray-500">...</span>
+                        {% elif p == pagination.current_page %}
+                            <span class="inline-flex items-center px-3 py-2 border border-green-500 rounded-lg text-sm font-medium text-white bg-green-600">
+                                {{ p }}
+                            </span>
+                        {% else %}
+                            <a href="?{% if selected_project %}project={{ selected_project }}&{% endif %}page={{ p }}" 
+                               class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                {{ p }}
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                        <a href="?{% if selected_project %}project={{ selected_project }}&{% endif %}page={{ pagination.next_page }}" 
+                           class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            Next
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
-        <!-- Pagination Controls -->
-        <div class="flex justify-center items-center mt-8 overflow-x-auto space-x-2">
-            {% if pagination.has_previous %}
-                <a href="?page={{ pagination.previous_page }}{% if selected_project %}&project={{ selected_project }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">&laquo; Prev</a>
-            {% endif %}
-            {% for p in visible_page_numbers %}
-                {% if p == "..." %}
-                    <span class="px-2">...</span>
-                {% elif p == pagination.current_page %}
-                    <span class="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold shadow">{{ p }}</span>
-                {% else %}
-                    <a href="?page={{ p }}{% if selected_project %}&project={{ selected_project }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">{{ p }}</a>
-                {% endif %}
-            {% endfor %}
-            {% if pagination.has_next %}
-                <a href="?page={{ pagination.next_page }}{% if selected_project %}&project={{ selected_project }}{% endif %}" class="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 transition">Next &raquo;</a>
-            {% endif %}
-        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

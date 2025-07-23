@@ -54,75 +54,147 @@ def sync_trainer_tasks(config, selected_project=None, sync_type="auto", synced_b
     sync_summary = ""
     sync_details = ""
 
+    import os
     try:
-        # Use the service account json if available
-        SERVICE_ACCOUNT_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../service_account.json'))
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_name(SERVICE_ACCOUNT_FILE, scope)
-        client = gspread.authorize(creds)
-        sheet = client.open_by_url(config.sheet_url)
-        worksheet = sheet.get_worksheet(0)
-        rows = worksheet.get_all_values()
-        headers = rows[0]
-        data_rows = rows[1:]
-
-        # Config-driven fields
-        primary_key = config.primary_key_column or "question_id"
-        mapping = config.column_mapping or {}
+        print("DEBUG: sync_trainer_tasks running as UID:", os.getuid(), "EUID:", os.geteuid())
+        print("DEBUG: Database path:", os.path.abspath(config._meta.get_field('project').model._meta.app_config.path))
         sync_mode = config.sync_mode or "prompt_in_sheet"
-        scraping_needed = config.scraping_needed
-        link_column = config.link_column
+        if sync_mode == "custom":
+            # --- Custom sync logic placeholder ---
+            # Example: Only sync rows where "Status" column is "Ready"
+            SERVICE_ACCOUNT_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../service_account.json'))
+            scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+            creds = ServiceAccountCredentials.from_json_keyfile_name(SERVICE_ACCOUNT_FILE, scope)
+            client = gspread.authorize(creds)
+            sheet = client.open_by_url(config.sheet_url)
+            worksheet = sheet.get_worksheet(0)
+            rows = worksheet.get_all_values()
+            headers = rows[0]
+            data_rows = rows[1:]
 
-        # Build a set of primary keys from the sheet
-        sheet_keys = set()
-        for row in data_rows:
-            row_dict = dict(zip(headers, row))
-            pk_value = row_dict.get(primary_key) or row_dict.get(primary_key.replace("_", " ")) or row_dict.get(primary_key.replace("_", " ").title())
-            if not pk_value:
-                continue
-            sheet_keys.add(pk_value)
+            primary_key = config.primary_key_column or "question_id"
+            mapping = config.column_mapping or {}
 
-            # Build defaults using mapping
-            defaults = {}
-            for logical_field, sheet_col in mapping.items():
-                value = row_dict.get(sheet_col)
-                if value is not None:
-                    defaults[logical_field] = value
+            sheet_keys = set()
+            for row in data_rows:
+                row_dict = dict(zip(headers, row))
+                if row_dict.get("Status") != "Ready":
+                    continue
+                pk_value = row_dict.get(primary_key) or row_dict.get(primary_key.replace("_", " ")) or row_dict.get(primary_key.replace("_", " ").title())
+                if not pk_value:
+                    continue
+                sheet_keys.add(pk_value)
+                defaults = {}
+                for logical_field, sheet_col in mapping.items():
+                    value = row_dict.get(sheet_col)
+                    if value is not None:
+                        defaults[logical_field] = value
+                defaults["project"] = selected_project
+                if "prompt" in defaults:
+                    defaults["raw_prompt"] = defaults["prompt"]
+                filter_kwargs = {primary_key: pk_value}
+                obj, created = TrainerTask.objects.update_or_create(
+                    **filter_kwargs,
+                    defaults=defaults
+                )
+                if created:
+                    created_count += 1
+                else:
+                    updated_count += 1
+            # Delete tasks not in the sheet for this project
+            if selected_project:
+                filter_kwargs = {"project": selected_project}
+                filter_kwargs[primary_key + "__isnull"] = False
+                to_delete = TrainerTask.objects.filter(**filter_kwargs).exclude(**{primary_key + "__in": list(sheet_keys)})
+                deleted_count = to_delete.count()
+                to_delete.delete()
+            sync_summary = f"{created_count} created, {updated_count} updated, {deleted_count} deleted (custom sync)"
+        else:
+            # Use the service account json if available
+            SERVICE_ACCOUNT_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../service_account.json'))
+            scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+            creds = ServiceAccountCredentials.from_json_keyfile_name(SERVICE_ACCOUNT_FILE, scope)
+            client = gspread.authorize(creds)
+            sheet = client.open_by_url(config.sheet_url)
+            worksheet = sheet.get_worksheet(0)
+            rows = worksheet.get_all_values()
+            headers = rows[0]
+            data_rows = rows[1:]
 
-            # Always set project
-            defaults["project"] = selected_project
+            # Config-driven fields
+            primary_key = config.primary_key_column or "question_id"
+            mapping = config.column_mapping or {}
+            scraping_needed = config.scraping_needed
+            link_column = config.link_column
 
-            # Scraping logic (if needed)
-            if scraping_needed and link_column and row_dict.get(link_column):
-                # Place-holder: you can add scraping logic here if needed
-                defaults["raw_prompt"] = f"[TO SCRAPE] {row_dict.get(link_column)}"
-            # If not scraping, use mapped prompt if available
-            elif "prompt" in defaults:
-                defaults["raw_prompt"] = defaults["prompt"]
+            # Build a set of primary keys from the sheet
+            sheet_keys = set()
+            for row in data_rows:
+                row_dict = dict(zip(headers, row))
+                
+                # First try to get primary key from column mapping, then fallback to direct lookup
+                mapped_pk_column = mapping.get(primary_key, primary_key)
+                pk_value = row_dict.get(mapped_pk_column)
+                if not pk_value:
+                    # Fallback to original logic
+                    pk_value = row_dict.get(primary_key) or row_dict.get(primary_key.replace("_", " ")) or row_dict.get(primary_key.replace("_", " ").title())
+                if not pk_value:
+                    continue
+                sheet_keys.add(pk_value)
 
-            # Always set the primary key field
-            filter_kwargs = {primary_key: pk_value}
-            obj, created = TrainerTask.objects.update_or_create(
-                **filter_kwargs,
-                defaults=defaults
-            )
-            if created:
-                created_count += 1
-            else:
-                updated_count += 1
+                # Get or create the task
+                filter_kwargs = {primary_key: pk_value}
+                obj, created = TrainerTask.objects.get_or_create(**filter_kwargs, defaults={"project": selected_project})
+                
+                # Update all fields using the flexible field methods
+                obj.project = selected_project
+                
+                # Handle mapped fields
+                for logical_field, sheet_col in mapping.items():
+                    value = row_dict.get(sheet_col, '')
+                    if value is not None:
+                        obj.set_field_value(logical_field, value)
+                
+                # Handle unmapped fields (store in dynamic_fields)
+                for sheet_col, value in row_dict.items():
+                    # Skip if this column is already mapped or is empty
+                    if sheet_col in mapping.values() or not value:
+                        continue
+                    # Convert sheet column name to a logical field name
+                    logical_field = sheet_col.lower().replace(' ', '_').replace('-', '_')
+                    obj.set_field_value(logical_field, value)
+                
+                # Scraping logic (if needed)
+                if scraping_needed and link_column and row_dict.get(link_column):
+                    obj.set_field_value("raw_prompt", f"[TO SCRAPE] {row_dict.get(link_column)}")
+                elif mapping.get("prompt"):
+                    # If prompt is mapped, also set raw_prompt
+                    prompt_value = obj.get_field_value("prompt")
+                    if prompt_value:
+                        obj.set_field_value("raw_prompt", prompt_value)
+                
+                obj.save()
+                if created:
+                    created_count += 1
+                else:
+                    updated_count += 1
 
-        # Delete tasks not in the sheet for this project
-        if selected_project:
-            filter_kwargs = {"project": selected_project}
-            filter_kwargs[primary_key + "__isnull"] = False
-            to_delete = TrainerTask.objects.filter(**filter_kwargs).exclude(**{primary_key + "__in": list(sheet_keys)})
-            deleted_count = to_delete.count()
-            to_delete.delete()
-        sync_summary = f"{created_count} created, {updated_count} updated, {deleted_count} deleted"
+            # Delete tasks not in the sheet for this project
+            if selected_project:
+                filter_kwargs = {"project": selected_project}
+                filter_kwargs[primary_key + "__isnull"] = False
+                to_delete = TrainerTask.objects.filter(**filter_kwargs).exclude(**{primary_key + "__in": list(sheet_keys)})
+                deleted_count = to_delete.count()
+                to_delete.delete()
+            sync_summary = f"{created_count} created, {updated_count} updated, {deleted_count} deleted"
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print("SYNC ERROR:", str(e))
+        print("TRACEBACK:", tb)
         sync_status = "failure"
         sync_summary = "Sync failed"
-        sync_details = str(e)
+        sync_details = f"{str(e)}\nTraceback:\n{tb}"
     # Log sync history
     TaskSyncHistory.objects.create(
         config=config,
