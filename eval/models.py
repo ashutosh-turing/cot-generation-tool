@@ -15,6 +15,11 @@ class LLMModel(models.Model):
     api_key = models.CharField(max_length=255, blank=True, help_text="API key for this model's provider. If blank, will use environment variable.")
     description = models.TextField(blank=True, null=True)
     temperature = models.FloatField(default=0.7)
+    max_tokens = models.PositiveIntegerField(
+        null=True, 
+        blank=True, 
+        help_text="Maximum tokens for response generation. Leave blank to use provider defaults. Anthropic models require this field."
+    )
     is_active = models.BooleanField(default=True)
 
     def __str__(self):

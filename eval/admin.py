@@ -58,9 +58,18 @@ admin.site.register(Prompt)
 
 @admin.register(LLMModel)
 class LLMModelAdmin(admin.ModelAdmin):
-    list_display = ('name', 'provider', 'is_active', 'temperature')
+    list_display = ('name', 'provider', 'is_active', 'temperature', 'max_tokens')
     list_filter = ('provider', 'is_active')
     search_fields = ('name', 'description')
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'provider', 'description', 'is_active')
+        }),
+        ('Configuration', {
+            'fields': ('api_key', 'temperature', 'max_tokens'),
+            'description': 'Model configuration settings. Leave max_tokens blank to use provider defaults. Anthropic models require this field.'
+        }),
+    )
 
 class ValidationAdmin(admin.ModelAdmin):
     list_display = ('name', 'validation_id', 'is_active', 'created_at')

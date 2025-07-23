@@ -353,11 +353,42 @@
         <!-- Sync History Section -->
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
             <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-amber-50">
-                <h2 class="text-xl font-bold text-gray-800 flex items-center">
-                    <i class="fas fa-history mr-3 text-orange-600"></i>
-                    Synchronization History
-                </h2>
-                <p class="text-sm text-gray-600 mt-1">Track all synchronization activities and their results</p>
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                            <i class="fas fa-history mr-3 text-orange-600"></i>
+                            Synchronization History
+                        </h2>
+                        <p class="text-sm text-gray-600 mt-1">Track all synchronization activities and their results</p>
+                    </div>
+                    <div class="mt-4 sm:mt-0">
+                        <form method="get" class="flex items-center space-x-3">
+                            <!-- Preserve other GET parameters -->
+                            {% for key, value in request.GET.items %}
+                                {% if key != 'project_filter' and key != 'history_page' %}
+                                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                {% endif %}
+                            {% endfor %}
+                            
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-filter text-orange-500"></i>
+                                <label for="project_filter" class="text-sm font-medium text-gray-700">Filter by Project:</label>
+                            </div>
+                            <select name="project_filter" id="project_filter" 
+                                    class="rounded-xl border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 transition-all duration-200 text-sm"
+                                    onchange="this.form.submit()">
+                                <option value="all" {% if selected_project_filter == 'all' or not selected_project_filter %}selected{% endif %}>
+                                    All Projects
+                                </option>
+                                {% for project in projects %}
+                                    <option value="{{ project.id }}" {% if selected_project_filter == project.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ project.code }} - {{ project.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </div>
+                </div>
             </div>
             
             {% if history %}
@@ -486,7 +517,7 @@
                     </div>
                     <div class="flex items-center space-x-2">
                         {% if history_pagination.has_previous %}
-                            <a href="?history_page={{ history_pagination.previous_page }}" 
+                            <a href="?history_page={{ history_pagination.previous_page }}{% if selected_project_filter and selected_project_filter != 'all' %}&project_filter={{ selected_project_filter }}{% endif %}" 
                                class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
                                 <i class="fas fa-chevron-left mr-1"></i>
                                 Previous
@@ -499,7 +530,7 @@
                                     {{ p }}
                                 </span>
                             {% else %}
-                                <a href="?history_page={{ p }}" 
+                                <a href="?history_page={{ p }}{% if selected_project_filter and selected_project_filter != 'all' %}&project_filter={{ selected_project_filter }}{% endif %}" 
                                    class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
                                     {{ p }}
                                 </a>
@@ -507,7 +538,7 @@
                         {% endfor %}
                         
                         {% if history_pagination.has_next %}
-                            <a href="?history_page={{ history_pagination.next_page }}" 
+                            <a href="?history_page={{ history_pagination.next_page }}{% if selected_project_filter and selected_project_filter != 'all' %}&project_filter={{ selected_project_filter }}{% endif %}" 
                                class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200">
                                 Next
                                 <i class="fas fa-chevron-right ml-1"></i>

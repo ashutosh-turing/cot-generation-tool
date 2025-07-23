@@ -1022,8 +1022,24 @@ def task_sync_config_view(request):
         # Redirect to avoid form resubmission on refresh
         from django.http import HttpResponseRedirect
         return HttpResponseRedirect("/task-sync/")
-    # Pagination for sync history
-    history_qs = TaskSyncHistory.objects.filter(config=config).order_by('-timestamp') if config else []
+    # Get project filter parameter
+    selected_project_filter = request.GET.get('project_filter', '')
+    
+    # Pagination for sync history with project filtering
+    if config:
+        history_qs = TaskSyncHistory.objects.filter(config=config).order_by('-timestamp')
+    else:
+        # If no specific config, get all history and allow filtering by project
+        history_qs = TaskSyncHistory.objects.all().order_by('-timestamp')
+    
+    # Apply project filter if selected
+    if selected_project_filter and selected_project_filter != 'all':
+        try:
+            filter_project = Project.objects.get(id=selected_project_filter)
+            history_qs = history_qs.filter(config__project=filter_project)
+        except Project.DoesNotExist:
+            pass  # Invalid project ID, show all results
+    
     page_size = 10
     try:
         page = int(request.GET.get('history_page', 1))
@@ -1031,11 +1047,11 @@ def task_sync_config_view(request):
             page = 1
     except ValueError:
         page = 1
-    total_history = history_qs.count() if config else 0
+    total_history = history_qs.count()
     total_history_pages = (total_history + page_size - 1) // page_size
     start = (page - 1) * page_size
     end = start + page_size
-    history = history_qs[start:end] if config else []
+    history = history_qs[start:end]
     history_page_numbers = list(range(1, total_history_pages + 1))
 
     context = {
@@ -1053,6 +1069,7 @@ def task_sync_config_view(request):
         "history_page_numbers": history_page_numbers,
         "projects": projects,
         "selected_project_id": selected_project_id,
+        "selected_project_filter": selected_project_filter,
     }
     return render(request, "task_sync_config.html", context)
 
@@ -1750,7 +1767,7 @@ def evaluate_model_async(model_id, manual_prompt, system_message, session_id, us
             from .utils.ai_client import get_ai_client
             # Fetch API key from model or DB, not from environment
             api_key = model.api_key or "FETCH_FROM_DB(f'{model.provider.upper()}_API_KEY')"
-            client = get_ai_client(model.provider, api_key, model.name)
+            client = get_ai_client(model.provider, api_key, model.name, model)
 
             result = client.get_response(messages, temperature=model.temperature)
             elapsed_time = round(time.time() - start_time, 2)
