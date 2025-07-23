@@ -584,3 +584,30 @@ class UserProductivityInsight(models.Model):
         indexes = [
             models.Index(fields=['user', 'period_type', 'period_start']),
         ]
+
+
+class ProjectCriteria(models.Model):
+    """
+    Model to manage which validation criteria are enabled/disabled for each project.
+    Allows admins to configure project-specific validation rules.
+    """
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='criteria_settings')
+    validation = models.ForeignKey(Validation, on_delete=models.CASCADE)
+    is_enabled = models.BooleanField(default=True, help_text="Whether this validation criterion is enabled for this project")
+    priority = models.IntegerField(default=1, help_text="Priority order for applying validations (lower numbers = higher priority)")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        status = "✓" if self.is_enabled else "✗"
+        return f"{self.project.code} - {self.validation.name} {status}"
+    
+    class Meta:
+        unique_together = ['project', 'validation']
+        verbose_name = "Project Criteria Setting"
+        verbose_name_plural = "Project Criteria Settings"
+        ordering = ['project__code', 'priority', 'validation__name']
+        indexes = [
+            models.Index(fields=['project', 'is_enabled']),
+            models.Index(fields=['validation', 'is_enabled']),
+        ]

@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Project Configuration - Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- Header Section -->
+    <div class="mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            Project Configuration
+          </h1>
+          <p class="mt-2 text-lg text-gray-600">Configure validation criteria for each project</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+          <div class="flex items-center space-x-4">
+            <div class="px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200">
+              <div class="flex items-center space-x-2">
+                <i class="fas fa-project-diagram text-blue-500"></i>
+                <span class="text-sm font-medium text-gray-700">Projects:</span>
+                <span class="text-sm font-bold text-blue-600">{{ stats.total_projects }}</span>
+              </div>
+            </div>
+            <div class="px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-200">
+              <div class="flex items-center space-x-2">
+                <i class="fas fa-check-circle text-green-500"></i>
+                <span class="text-sm font-medium text-gray-700">Criteria:</span>
+                <span class="text-sm font-bold text-green-600">{{ stats.total_validations }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Project Selection Section -->
+    <div class="mb-8">
+      <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <div class="flex items-center mb-4">
+          <div class="p-2 bg-blue-100 rounded-lg mr-3">
+            <i class="fas fa-folder-open text-blue-600 text-lg"></i>
+          </div>
+          <h3 class="text-lg font-semibold text-gray-800">Select Project</h3>
+        </div>
+        
+        <form method="GET" class="flex items-center space-x-4">
+          <div class="flex-1">
+            <select name="project" id="project-select" 
+                    class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200"
+                    onchange="this.form.submit()">
+              <option value="">Choose a project to configure...</option>
+              {% for project in projects %}
+                <option value="{{ project.id }}" {% if selected_project and selected_project.id == project.id %}selected{% endif %}>
+                  {{ project.code }} - {{ project.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          {% if selected_project %}
+            <button type="button" onclick="window.location.href='{% url 'project_config' %}'" 
+                    class="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">
+              <i class="fas fa-times"></i> Clear
+            </button>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+
+    {% if selected_project %}
+    <!-- Project Info Banner -->
+    <div class="mb-8">
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg text-white p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-bold">{{ selected_project.code }}</h2>
+            <p class="text-blue-100 mt-1">{{ selected_project.name }}</p>
+            {% if selected_project.description %}
+              <p class="text-blue-200 text-sm mt-2">{{ selected_project.description }}</p>
+            {% endif %}
+          </div>
+          <div class="text-right">
+            <div class="text-3xl font-bold">{{ project_criteria|length }}</div>
+            <div class="text-blue-200 text-sm">Available Criteria</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Box about Priority -->
+    <div class="mb-6">
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <div class="flex items-start">
+          <i class="fas fa-info-circle text-amber-500 mt-0.5 mr-3"></i>
+          <div>
+            <h4 class="text-sm font-semibold text-amber-800 mb-1">About Priority & Validation Order</h4>
+            <p class="text-sm text-amber-700">
+              <strong>Priority</strong> determines the order in which validation criteria are applied during review. 
+              Lower numbers = higher priority (e.g., Priority 1 runs before Priority 2). 
+              <strong>Same priority = runs simultaneously</strong> (e.g., all Priority 1 criteria run together in parallel).
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk Actions -->
+    <div class="mb-6">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i class="fas fa-magic text-purple-500"></i>
+            <span class="font-medium text-gray-700">Bulk Actions:</span>
+          </div>
+          <div class="flex items-center space-x-3">
+            <button onclick="bulkUpdateCriteria('enable_all')" 
+                    class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium">
+              <i class="fas fa-check-circle mr-1"></i> Enable All
+            </button>
+            <button onclick="bulkUpdateCriteria('disable_all')" 
+                    class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium">
+              <i class="fas fa-times-circle mr-1"></i> Disable All
+            </button>
+            <button onclick="bulkUpdateCriteria('reset_defaults')" 
+                    class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
+              <i class="fas fa-undo mr-1"></i> Reset to Defaults
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Criteria Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="criteria-grid">
+      {% for criteria in project_criteria %}
+        <div class="criteria-card bg-white rounded-2xl shadow-lg border border-gray-100 p-6 transition-all duration-200 hover:shadow-xl hover:border-blue-200"
+             data-validation-id="{{ criteria.validation.validation_id }}">
+          
+          <!-- Card Header with improved toggle -->
+          <div class="flex items-start justify-between mb-6">
+            <div class="flex-1 pr-4">
+              <h4 class="text-lg font-semibold text-gray-800 mb-2">{{ criteria.validation.name }}</h4>
+              {% if criteria.validation.description %}
+                <p class="text-sm text-gray-600 line-clamp-3 leading-relaxed">{{ criteria.validation.description }}</p>
+              {% endif %}
+            </div>
+            <div class="flex-shrink-0">
+              <!-- Improved Toggle Switch -->
+              <label class="relative inline-flex items-center cursor-pointer group">
+                <input type="checkbox" class="sr-only peer criteria-toggle" 
+                       data-validation-id="{{ criteria.validation.validation_id }}"
+                       {% if criteria.is_enabled %}checked{% endif %}>
+                <div class="relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer transition-all duration-300 peer-checked:bg-gradient-to-r peer-checked:from-green-400 peer-checked:to-green-500 shadow-inner">
+                  <div class="absolute top-0.5 left-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-all duration-300 peer-checked:translate-x-7 peer-checked:border-green-300 shadow-md flex items-center justify-center">
+                    <i class="fas fa-check text-green-500 text-xs opacity-0 peer-checked:opacity-100 transition-opacity duration-200"></i>
+                  </div>
+                </div>
+                <span class="ml-3 text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                  {% if criteria.is_enabled %}ON{% else %}OFF{% endif %}
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Status and Priority Section -->
+          <div class="space-y-3">
+            <!-- Status Badge Row -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="status-badge px-3 py-1.5 rounded-full text-xs font-semibold
+                             {% if criteria.is_enabled %}bg-green-100 text-green-800 border border-green-200{% else %}bg-gray-100 text-gray-600 border border-gray-200{% endif %}">
+                  <i class="fas {% if criteria.is_enabled %}fa-check-circle{% else %}fa-times-circle{% endif %} mr-1"></i>
+                  {% if criteria.is_enabled %}Active{% else %}Inactive{% endif %}
+                </span>
+                {% if criteria.has_setting %}
+                  <span class="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium border border-blue-200">
+                    <i class="fas fa-cog mr-1"></i> Custom
+                  </span>
+                {% else %}
+                  <span class="px-2.5 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium border border-yellow-200">
+                    <i class="fas fa-star mr-1"></i> Default
+                  </span>
+                {% endif %}
+              </div>
+            </div>
+            
+            <!-- Priority Section -->
+            <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center space-x-2">
+                  <i class="fas fa-sort-numeric-down text-gray-500"></i>
+                  <span class="text-sm font-medium text-gray-700">Execution Priority</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <input type="number" 
+                         class="priority-input w-16 px-2 py-1 text-center text-sm font-bold text-blue-600 bg-white border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                         value="{{ criteria.priority }}" 
+                         min="1" 
+                         max="10"
+                         data-validation-id="{{ criteria.validation.validation_id }}"
+                         data-original-value="{{ criteria.priority }}">
+                  <button class="priority-save-btn hidden px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+                          onclick="savePriority(this)">
+                    <i class="fas fa-check"></i>
+                  </button>
+                </div>
+              </div>
+              <p class="text-xs text-gray-600">Lower numbers run first during validation</p>
+            </div>
+          </div>
+
+          <!-- Loading Overlay -->
+          <div class="loading-overlay hidden absolute inset-0 bg-white bg-opacity-90 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+            <div class="flex flex-col items-center space-y-2">
+              <div class="animate-spin rounded-full h-6 w-6 border-2 border-blue-600 border-t-transparent"></div>
+              <span class="text-sm font-medium text-gray-700">Updating...</span>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <!-- No Project Selected State -->
+    <div class="text-center py-16">
+      <div class="max-w-md mx-auto">
+        <div class="mb-6">
+          <i class="fas fa-folder-open text-6xl text-gray-300"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-700 mb-2">Select a Project</h3>
+        <p class="text-gray-500 mb-6">Choose a project from the dropdown above to configure its validation criteria.</p>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div class="flex items-start">
+            <i class="fas fa-info-circle text-blue-500 mt-0.5 mr-2"></i>
+            <div class="text-left">
+              <p class="text-sm text-blue-700 font-medium">How it works:</p>
+              <ul class="text-sm text-blue-600 mt-1 space-y-1">
+                <li>• Select a project to see its validation criteria</li>
+                <li>• Toggle criteria on/off for that specific project</li>
+                <li>• Changes affect the review process immediately</li>
+                <li>• Priority determines the order of validation execution</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Success/Error Messages -->
+<div id="message-container" class="fixed top-20 right-4 z-50 space-y-2"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize toggle switches
+    const toggles = document.querySelectorAll('.criteria-toggle');
+    
+    toggles.forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const validationId = this.dataset.validationId;
+            const isEnabled = this.checked;
+            const card = this.closest('.criteria-card');
+            
+            updateCriteria(validationId, isEnabled, card);
+        });
+    });
+    
+    // Initialize priority inputs
+    const priorityInputs = document.querySelectorAll('.priority-input');
+    
+    priorityInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            const saveBtn = this.parentElement.querySelector('.priority-save-btn');
+            const originalValue = this.dataset.originalValue;
+            
+            if (this.value !== originalValue) {
+                saveBtn.classList.remove('hidden');
+            } else {
+                saveBtn.classList.add('hidden');
+            }
+        });
+        
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const saveBtn = this.parentElement.querySelector('.priority-save-btn');
+                if (!saveBtn.classList.contains('hidden')) {
+                    savePriority(saveBtn);
+                }
+            }
+        });
+    });
+});
+
+function updateCriteria(validationId, isEnabled, card) {
+    // Show loading state
+    const loadingOverlay = card.querySelector('.loading-overlay');
+    loadingOverlay.classList.remove('hidden');
+    
+    // Prepare data
+    const data = {
+        project_id: {% if selected_project %}{{ selected_project.id }}{% else %}null{% endif %},
+        validation_id: validationId,
+        is_enabled: isEnabled,
+        priority: 1
+    };
+    
+    // Make AJAX request
+    fetch('{% url "update_project_criteria" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update UI
+            updateCardStatus(card, isEnabled);
+            showMessage('success', data.message);
+        } else {
+            // Revert toggle
+            const toggle = card.querySelector('.criteria-toggle');
+            toggle.checked = !isEnabled;
+            showMessage('error', data.error);
+        }
+    })
+    .catch(error => {
+        // Revert toggle
+        const toggle = card.querySelector('.criteria-toggle');
+        toggle.checked = !isEnabled;
+        showMessage('error', 'Failed to update criteria: ' + error.message);
+    })
+    .finally(() => {
+        // Hide loading state
+        loadingOverlay.classList.add('hidden');
+    });
+}
+
+function updateCardStatus(card, isEnabled) {
+    const statusBadge = card.querySelector('.status-badge');
+    const toggleLabel = card.querySelector('label span');
+    
+    if (isEnabled) {
+        statusBadge.className = 'status-badge px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200';
+        statusBadge.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Active';
+        if (toggleLabel) toggleLabel.textContent = 'ON';
+    } else {
+        statusBadge.className = 'status-badge px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200';
+        statusBadge.innerHTML = '<i class="fas fa-times-circle mr-1"></i>Inactive';
+        if (toggleLabel) toggleLabel.textContent = 'OFF';
+    }
+}
+
+function bulkUpdateCriteria(action) {
+    const projectId = {% if selected_project %}{{ selected_project.id }}{% else %}null{% endif %};
+    if (!projectId) {
+        showMessage('error', 'Please select a project first');
+        return;
+    }
+    
+    // Confirm action
+    let confirmMessage = '';
+    switch(action) {
+        case 'enable_all':
+            confirmMessage = 'Enable all validation criteria for this project?';
+            break;
+        case 'disable_all':
+            confirmMessage = 'Disable all validation criteria for this project?';
+            break;
+        case 'reset_defaults':
+            confirmMessage = 'Reset all criteria to default settings? This will remove custom configurations.';
+            break;
+    }
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    // Show loading state for all cards
+    const cards = document.querySelectorAll('.criteria-card');
+    cards.forEach(card => {
+        card.querySelector('.loading-overlay').classList.remove('hidden');
+    });
+    
+    // Prepare data
+    const data = {
+        project_id: projectId,
+        action: action
+    };
+    
+    // Make AJAX request
+    fetch('{% url "bulk_update_project_criteria" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('success', data.message);
+            // Reload page to reflect changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showMessage('error', data.error);
+        }
+    })
+    .catch(error => {
+        showMessage('error', 'Failed to perform bulk update: ' + error.message);
+    })
+    .finally(() => {
+        // Hide loading state for all cards
+        cards.forEach(card => {
+            card.querySelector('.loading-overlay').classList.add('hidden');
+        });
+    });
+}
+
+function showMessage(type, message) {
+    const container = document.getElementById('message-container');
+    const messageDiv = document.createElement('div');
+    
+    const bgColor = type === 'success' ? 'bg-green-100 text-green-700 border-green-500' : 'bg-red-100 text-red-700 border-red-500';
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    
+    messageDiv.className = `${bgColor} border-l-4 px-6 py-4 rounded-lg shadow-md flex items-center justify-between animate-fade-in-down`;
+    messageDiv.innerHTML = `
+        <span class="flex items-center">
+            <i class="fas ${icon} mr-2"></i>
+            ${message}
+        </span>
+        <button class="text-gray-400 hover:text-gray-600 ml-4" onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    container.appendChild(messageDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.remove();
+        }
+    }, 5000);
+}
+
+function savePriority(saveBtn) {
+    const input = saveBtn.parentElement.querySelector('.priority-input');
+    const validationId = input.dataset.validationId;
+    const newPriority = parseInt(input.value);
+    const card = saveBtn.closest('.criteria-card');
+    
+    // Validate priority value
+    if (newPriority < 1 || newPriority > 10) {
+        showMessage('error', 'Priority must be between 1 and 10');
+        input.value = input.dataset.originalValue;
+        saveBtn.classList.add('hidden');
+        return;
+    }
+    
+    // Show loading state
+    const loadingOverlay = card.querySelector('.loading-overlay');
+    loadingOverlay.classList.remove('hidden');
+    
+    // Get current enabled state
+    const toggle = card.querySelector('.criteria-toggle');
+    const isEnabled = toggle.checked;
+    
+    // Prepare data
+    const data = {
+        project_id: {% if selected_project %}{{ selected_project.id }}{% else %}null{% endif %},
+        validation_id: validationId,
+        is_enabled: isEnabled,
+        priority: newPriority
+    };
+    
+    // Make AJAX request
+    fetch('{% url "update_project_criteria" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update original value and hide save button
+            input.dataset.originalValue = newPriority;
+            saveBtn.classList.add('hidden');
+            showMessage('success', `Priority updated to ${newPriority}`);
+        } else {
+            // Revert input value
+            input.value = input.dataset.originalValue;
+            saveBtn.classList.add('hidden');
+            showMessage('error', data.error);
+        }
+    })
+    .catch(error => {
+        // Revert input value
+        input.value = input.dataset.originalValue;
+        saveBtn.classList.add('hidden');
+        showMessage('error', 'Failed to update priority: ' + error.message);
+    })
+    .finally(() => {
+        // Hide loading state
+        loadingOverlay.classList.add('hidden');
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+
+<style>
+.criteria-card {
+    position: relative;
+}
+
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+@keyframes fadeInDown {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-down {
+    animation: fadeInDown 0.5s ease-out;
+}
+
+/* Enhanced toggle switch styling */
+.criteria-toggle:checked + div {
+    background: linear-gradient(to right, #10b981, #059669) !important;
+}
+
+.criteria-toggle:checked + div > div {
+    transform: translateX(1.75rem);
+    border-color: #10b981;
+}
+
+.criteria-toggle:checked + div > div > i {
+    opacity: 1;
+}
+
+.criteria-toggle:focus + div {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+}
+
+/* Hover effects */
+.criteria-card:hover {
+    transform: translateY(-2px);
+}
+
+.group:hover .criteria-toggle + div {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+</style>
+{% endblock %}

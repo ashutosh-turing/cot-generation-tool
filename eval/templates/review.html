@@ -221,6 +221,53 @@
       </div>
     </div>
 
+    <!-- Project Criteria Information -->
+    <div class="mb-6">
+      {% if project %}
+      <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <i class="fas fa-project-diagram text-green-600 text-lg mt-0.5"></i>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-semibold text-green-800">Project: {{ project.code }}</h3>
+            <p class="mt-1 text-sm text-green-700">
+              <strong>Active Validation Criteria ({{ project_criteria|length }}):</strong>
+              {% for criteria in project_criteria %}
+                {{ criteria.name }}{% if not forloop.last %}, {% endif %}
+              {% endfor %}
+            </p>
+            <p class="text-xs text-green-600 mt-1">
+              <i class="fas fa-info-circle mr-1"></i>
+              These criteria will be applied during AI analysis based on project configuration.
+            </p>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <i class="fas fa-list-check text-blue-600 text-lg mt-0.5"></i>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-semibold text-blue-800">Default Validation Criteria</h3>
+            <p class="mt-1 text-sm text-blue-700">
+              <strong>Active Validation Criteria ({{ project_criteria|length }}):</strong>
+              {% for criteria in project_criteria %}
+                {{ criteria.name }}{% if not forloop.last %}, {% endif %}
+              {% endfor %}
+            </p>
+            <p class="text-xs text-blue-600 mt-1">
+              <i class="fas fa-info-circle mr-1"></i>
+              No specific project detected. Using all available validation criteria for analysis.
+            </p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
     <!-- Results Section - Full Width at Bottom -->
     </div>
     
@@ -229,6 +276,20 @@
     </div>
   </div>
 </div>
+
+<!-- Pass project criteria to JavaScript -->
+<script>
+  window.PROJECT_CRITERIA = [
+    {% for criteria in project_criteria %}
+    {
+      "name": "{{ criteria.name|escapejs }}",
+      "description": "{{ criteria.description|default:""|escapejs }}",
+      "validation_id": "{{ criteria.validation_id|escapejs }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+  window.PROJECT_CODE = "{{ project.code|default:""|escapejs }}";
+</script>
 
 <script src="{% static 'js/marked.min.js' %}"></script>
 <script src="{% static 'js/review.js' %}"></script>

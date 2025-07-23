@@ -130,6 +130,31 @@ class UserPreferenceAdmin(admin.ModelAdmin):
 
 admin.site.register(UserPreference, UserPreferenceAdmin)
 
+from .models import ProjectCriteria
+
+@admin.register(ProjectCriteria)
+class ProjectCriteriaAdmin(admin.ModelAdmin):
+    list_display = ('project', 'validation', 'is_enabled', 'priority', 'created_at')
+    list_filter = ('project', 'is_enabled', 'validation__is_active')
+    search_fields = ('project__code', 'project__name', 'validation__name')
+    list_editable = ('is_enabled', 'priority')
+    ordering = ('project__code', 'priority', 'validation__name')
+    
+    fieldsets = (
+        ('Configuration', {
+            'fields': ('project', 'validation', 'is_enabled', 'priority')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('project', 'validation')
+
 @admin.register(LLMJob)
 class LLMJobAdmin(admin.ModelAdmin):
     list_display = ('job_id_short', 'job_type', 'status_colored', 'user', 'model', 'question_id', 'created_at', 'processing_time_formatted', 'actions_column')

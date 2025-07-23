@@ -369,6 +369,10 @@
                     <i class="fas fa-link"></i>
                     <span class="menu-text">Task Sync Config</span>
                 </a>
+                <a href="/project-config/" class="menu-item {% if request.path == '/project-config/' %}active{% endif %}">
+                    <i class="fas fa-cogs"></i>
+                    <span class="menu-text">Project Configuration</span>
+                </a>
             {% elif user_group == 'pod_lead' %}
                 <a href="{% url 'reviewer_dashboard' %}" class="menu-item {% if request.path == '/reviewer/' %}active{% endif %}">
                     <i class="fas fa-home"></i>

@@ -804,10 +804,8 @@ def reviewer_dashboard(request):
     return render(request, 'dashboard_reviewer.html', context)
 
 @login_required
+@role_required(['admin'])
 def task_sync_config_view(request):
-    user_role = get_user_role(request.user)
-    if user_role != 'admin':
-        return redirect('index')
     from .models import TaskSyncHistory, Project
     config = TaskSyncConfig.objects.first()
     message = ""
@@ -2641,9 +2639,31 @@ def edit_trainer_task(request, task_id):
 @login_required
 def review_question(request, question_id):
     """
-    Reviewer: Review a question by question_id.
+    Reviewer: Review a question by question_id with project-specific validation criteria.
     Renders the review page with input for Google Colab link, model selection, and review UI.
+    Uses project-specific criteria based on priority configuration.
     """
+    from .models import TrainerTask, Project
+    
+    # Try to determine the project from the question_id
+    # Look for a TrainerTask with this question_id to get the project
+    project = None
+    task = TrainerTask.objects.filter(question_id=question_id).first()
+    if task and task.project:
+        project = task.project
+        print(f"DEBUG: Found project {project.code} for question_id {question_id}")
+    else:
+        print(f"DEBUG: No project found for question_id {question_id}")
+    
+    # Get project-specific validation criteria using the helper function
+    project_criteria = get_project_criteria(project)
+    
+    # Convert to list if it's a QuerySet for easier template handling
+    if hasattr(project_criteria, 'all'):
+        criteria_list = list(project_criteria.all())
+    else:
+        criteria_list = list(project_criteria)
+    
     # Fetch system messages based on user preference (stream/subject)
     preferred_streams = []
     try:
@@ -2675,8 +2695,16 @@ def review_question(request, question_id):
     for i, sm in enumerate(system_messages[:3]):
         print(f"DEBUG: System message {i+1}: {sm.name} - {sm.content[:50]}...")
     
+    # Debug: Print project-specific criteria
+    print(f"DEBUG: Project: {project.code if project else 'None'}")
+    print(f"DEBUG: Active criteria count: {len(criteria_list)}")
+    for i, criteria in enumerate(criteria_list):
+        print(f"DEBUG: Criteria {i+1}: {criteria.name}")
+    
     context = {
         "question_id": question_id,
+        "project": project,
+        "project_criteria": criteria_list,
         "system_messages": system_messages,
         "llm_models": llm_models,
     }
@@ -2909,3 +2937,243 @@ def activity_end(request):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+@login_required
+@role_required(['admin'])
+def project_config_view(request):
+    """
+    Admin-only view for configuring project-specific validation criteria.
+    Allows enabling/disabling validation criteria for each project.
+    """
+    from .models import Project, Validation, ProjectCriteria
+    import json
+    
+    # Get all active projects and validations
+    projects = Project.objects.filter(is_active=True).order_by('name')
+    validations = Validation.objects.filter(is_active=True).order_by('name')
+    
+    selected_project_id = request.GET.get('project')
+    selected_project = None
+    project_criteria = []
+    
+    if selected_project_id:
+        try:
+            selected_project = Project.objects.get(id=selected_project_id, is_active=True)
+            
+            # Get existing criteria settings for this project
+            existing_criteria = {
+                pc.validation_id: pc for pc in 
+                ProjectCriteria.objects.filter(project=selected_project).select_related('validation')
+            }
+            
+            # Build criteria list with current settings
+            for validation in validations:
+                if validation.validation_id in existing_criteria:
+                    # Use existing setting
+                    criteria_obj = existing_criteria[validation.validation_id]
+                    project_criteria.append({
+                        'validation': validation,
+                        'is_enabled': criteria_obj.is_enabled,
+                        'priority': criteria_obj.priority,
+                        'has_setting': True
+                    })
+                else:
+                    # Default setting (enabled)
+                    project_criteria.append({
+                        'validation': validation,
+                        'is_enabled': True,
+                        'priority': 1,
+                        'has_setting': False
+                    })
+                    
+        except Project.DoesNotExist:
+            selected_project = None
+    
+    # Calculate statistics
+    total_projects = projects.count()
+    total_validations = validations.count()
+    configured_projects = ProjectCriteria.objects.values('project').distinct().count()
+    
+    context = {
+        'projects': projects,
+        'validations': validations,
+        'selected_project': selected_project,
+        'project_criteria': project_criteria,
+        'stats': {
+            'total_projects': total_projects,
+            'total_validations': total_validations,
+            'configured_projects': configured_projects,
+        }
+    }
+    
+    return render(request, 'project_config.html', context)
+
+
+@require_POST
+@login_required
+@role_required(['admin'])
+def update_project_criteria(request):
+    """
+    AJAX endpoint to update project criteria settings.
+    """
+    try:
+        from .models import Project, Validation, ProjectCriteria
+        import json
+        
+        data = json.loads(request.body)
+        project_id = data.get('project_id')
+        validation_id = data.get('validation_id')
+        is_enabled = data.get('is_enabled', True)
+        priority = data.get('priority', 1)
+        
+        if not project_id or not validation_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'Missing project_id or validation_id'
+            })
+        
+        try:
+            project = Project.objects.get(id=project_id, is_active=True)
+            validation = Validation.objects.get(validation_id=validation_id, is_active=True)
+        except (Project.DoesNotExist, Validation.DoesNotExist):
+            return JsonResponse({
+                'success': False,
+                'error': 'Project or validation not found'
+            })
+        
+        # Update or create the criteria setting
+        criteria, created = ProjectCriteria.objects.update_or_create(
+            project=project,
+            validation=validation,
+            defaults={
+                'is_enabled': is_enabled,
+                'priority': priority
+            }
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'created': created,
+            'message': f'{"Created" if created else "Updated"} criteria setting for {project.code} - {validation.name}'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@require_POST
+@login_required
+@role_required(['admin'])
+def bulk_update_project_criteria(request):
+    """
+    AJAX endpoint to bulk update project criteria (enable/disable all).
+    """
+    try:
+        from .models import Project, Validation, ProjectCriteria
+        import json
+        
+        data = json.loads(request.body)
+        project_id = data.get('project_id')
+        action = data.get('action')  # 'enable_all' or 'disable_all' or 'reset_defaults'
+        
+        if not project_id or not action:
+            return JsonResponse({
+                'success': False,
+                'error': 'Missing project_id or action'
+            })
+        
+        try:
+            project = Project.objects.get(id=project_id, is_active=True)
+        except Project.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Project not found'
+            })
+        
+        validations = Validation.objects.filter(is_active=True)
+        updated_count = 0
+        
+        if action == 'enable_all':
+            for validation in validations:
+                criteria, created = ProjectCriteria.objects.update_or_create(
+                    project=project,
+                    validation=validation,
+                    defaults={'is_enabled': True, 'priority': 1}
+                )
+                updated_count += 1
+                
+        elif action == 'disable_all':
+            for validation in validations:
+                criteria, created = ProjectCriteria.objects.update_or_create(
+                    project=project,
+                    validation=validation,
+                    defaults={'is_enabled': False, 'priority': 1}
+                )
+                updated_count += 1
+                
+        elif action == 'reset_defaults':
+            # Delete all custom settings (will fall back to defaults)
+            deleted_count = ProjectCriteria.objects.filter(project=project).delete()[0]
+            updated_count = deleted_count
+        
+        return JsonResponse({
+            'success': True,
+            'updated_count': updated_count,
+            'message': f'Bulk action "{action}" completed for {updated_count} criteria'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+def get_project_criteria(project):
+    """
+    Helper function to get enabled validation criteria for a project.
+    Returns all active validations by default, or project-specific settings if configured.
+    Results are ordered by priority (lower numbers first), then by name.
+    """
+    from .models import Validation, ProjectCriteria
+    
+    if not project:
+        return Validation.objects.filter(is_active=True).order_by('name')
+    
+    # Get explicit project criteria settings
+    project_criteria = ProjectCriteria.objects.filter(
+        project=project,
+        is_enabled=True
+    ).select_related('validation')
+    
+    if project_criteria.exists():
+        # Return only enabled criteria for this project, ordered by priority then name
+        validation_ids = project_criteria.values_list('validation_id', flat=True)
+        # Get the criteria with their priorities for proper ordering
+        criteria_with_priority = []
+        for pc in project_criteria:
+            if pc.validation.is_active:
+                criteria_with_priority.append((pc.validation, pc.priority))
+        
+        # Sort by priority (ascending), then by name
+        criteria_with_priority.sort(key=lambda x: (x[1], x[0].name))
+        
+        # Return just the validation objects in the correct order
+        return [criteria[0] for criteria in criteria_with_priority]
+    else:
+        # Default: return all active validations ordered by name
+        return Validation.objects.filter(is_active=True).order_by('name')
