@@ -282,7 +282,7 @@ deploy() {
     fi
 
     # 5. Run safe migrations
-    safe_migrate
+    # safe_migrate   # [REMOVED: DB migration step as per new deployment policy]
 
     # 6. Setup Pub/Sub topics and subscriptions
     log "Setting up Pub/Sub topics and subscriptions..."
@@ -417,7 +417,7 @@ rollback() {
     fi
 
     # 5. Run migrations
-    safe_migrate
+    # safe_migrate   # [REMOVED: DB migration step as per new deployment policy]
 
     # 6. Collect static files
     log "Collecting static files..."

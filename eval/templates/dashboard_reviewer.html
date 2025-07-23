@@ -260,39 +260,147 @@
                                 <td class="px-6 py-4 border-r border-gray-100 last:border-r-0 group-hover:border-blue-200">
                                     {% with field_type=field_types|get_item:header|default:"text" %}
                                     {% with field_value=task|get_field_value:header %}
-                                        {% if field_type == "url" and field_value %}
+                                        {% if field_type == "star" %}
+                                            {# Clean and intuitive star rating system #}
+                                            <div class="flex items-center space-x-2">
+                                                {% if field_value == "Hard" or field_value == "3" or field_value == 3 %}
+                                                    <div class="flex items-center space-x-1">
+                                                        <i class="fas fa-star text-red-500 text-sm"></i>
+                                                        <i class="fas fa-star text-red-500 text-sm"></i>
+                                                        <i class="fas fa-star text-red-500 text-sm"></i>
+                                                    </div>
+                                                    <span class="px-3 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-md border border-red-200">
+                                                        Hard
+                                                    </span>
+                                                {% elif field_value == "Medium" or field_value == "2" or field_value == 2 %}
+                                                    <div class="flex items-center space-x-1">
+                                                        <i class="fas fa-star text-amber-500 text-sm"></i>
+                                                        <i class="fas fa-star text-amber-500 text-sm"></i>
+                                                        <i class="far fa-star text-gray-300 text-sm"></i>
+                                                    </div>
+                                                    <span class="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-md border border-amber-200">
+                                                        Medium
+                                                    </span>
+                                                {% elif field_value == "Easy" or field_value == "1" or field_value == 1 %}
+                                                    <div class="flex items-center space-x-1">
+                                                        <i class="fas fa-star text-green-500 text-sm"></i>
+                                                        <i class="far fa-star text-gray-300 text-sm"></i>
+                                                        <i class="far fa-star text-gray-300 text-sm"></i>
+                                                    </div>
+                                                    <span class="px-3 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded-md border border-green-200">
+                                                        Easy
+                                                    </span>
+                                                {% else %}
+                                                    {# Handle numeric ratings #}
+                                                    {% with rating=field_value|add:"0" %}
+                                                        {% if rating >= 5 %}
+                                                            <div class="flex items-center space-x-1">
+                                                                <i class="fas fa-star text-purple-500 text-sm"></i>
+                                                                <i class="fas fa-star text-purple-500 text-sm"></i>
+                                                                <i class="fas fa-star text-purple-500 text-sm"></i>
+                                                                <i class="fas fa-star text-purple-500 text-sm"></i>
+                                                                <i class="fas fa-star text-purple-500 text-sm"></i>
+                                                            </div>
+                                                            <span class="px-3 py-1 bg-purple-50 text-purple-700 text-xs font-semibold rounded-md border border-purple-200">
+                                                                Expert
+                                                            </span>
+                                                        {% elif rating >= 4 %}
+                                                            <div class="flex items-center space-x-1">
+                                                                <i class="fas fa-star text-red-500 text-sm"></i>
+                                                                <i class="fas fa-star text-red-500 text-sm"></i>
+                                                                <i class="fas fa-star text-red-500 text-sm"></i>
+                                                                <i class="fas fa-star text-red-500 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                            </div>
+                                                            <span class="px-3 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-md border border-red-200">
+                                                                Very Hard
+                                                            </span>
+                                                        {% elif rating >= 3 %}
+                                                            <div class="flex items-center space-x-1">
+                                                                <i class="fas fa-star text-red-500 text-sm"></i>
+                                                                <i class="fas fa-star text-red-500 text-sm"></i>
+                                                                <i class="fas fa-star text-red-500 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                            </div>
+                                                            <span class="px-3 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-md border border-red-200">
+                                                                Hard
+                                                            </span>
+                                                        {% elif rating >= 2 %}
+                                                            <div class="flex items-center space-x-1">
+                                                                <i class="fas fa-star text-amber-500 text-sm"></i>
+                                                                <i class="fas fa-star text-amber-500 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                            </div>
+                                                            <span class="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-md border border-amber-200">
+                                                                Medium
+                                                            </span>
+                                                        {% else %}
+                                                            <div class="flex items-center space-x-1">
+                                                                <i class="fas fa-star text-green-500 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                                <i class="far fa-star text-gray-300 text-sm"></i>
+                                                            </div>
+                                                            <span class="px-3 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded-md border border-green-200">
+                                                                Easy
+                                                            </span>
+                                                        {% endif %}
+                                                    {% endwith %}
+                                                {% endif %}
+                                            </div>
+                                        {% elif field_type == "badge" %}
+                                            {# Clean and professional rating badge #}
+                                            <div class="inline-flex items-center space-x-2">
+                                                {% with rating_num=field_value|add:"0" %}
+                                                    {% if rating_num >= 3000 %}
+                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
+                                                            <i class="fas fa-crown text-purple-600 text-sm"></i>
+                                                            <span class="text-purple-800 font-semibold text-sm">{{ field_value }}</span>
+                                                            <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">Master</span>
+                                                        </div>
+                                                    {% elif rating_num >= 2500 %}
+                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                                            <i class="fas fa-medal text-blue-600 text-sm"></i>
+                                                            <span class="text-blue-800 font-semibold text-sm">{{ field_value }}</span>
+                                                            <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">Expert</span>
+                                                        </div>
+                                                    {% elif rating_num >= 2000 %}
+                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                                            <i class="fas fa-trophy text-emerald-600 text-sm"></i>
+                                                            <span class="text-emerald-800 font-semibold text-sm">{{ field_value }}</span>
+                                                            <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">Advanced</span>
+                                                        </div>
+                                                    {% elif rating_num >= 1500 %}
+                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                                                            <i class="fas fa-star text-amber-600 text-sm"></i>
+                                                            <span class="text-amber-800 font-semibold text-sm">{{ field_value }}</span>
+                                                            <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">Skilled</span>
+                                                        </div>
+                                                    {% elif rating_num >= 1000 %}
+                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
+                                                            <i class="fas fa-certificate text-orange-600 text-sm"></i>
+                                                            <span class="text-orange-800 font-semibold text-sm">{{ field_value }}</span>
+                                                            <span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded">Intermediate</span>
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                                                            <i class="fas fa-user text-gray-600 text-sm"></i>
+                                                            <span class="text-gray-800 font-semibold text-sm">{{ field_value }}</span>
+                                                            <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">Beginner</span>
+                                                        </div>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </div>
+                                        {% elif field_type == "url" and field_value %}
                                             <a href="{{ field_value }}" target="_blank" 
                                                class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 hover:text-indigo-800 transition-all duration-200">
                                                 <i class="fas fa-external-link-alt mr-2"></i>
                                                 {% if header == "problem_link" %}View Problem{% else %}View Link{% endif %}
                                             </a>
-                                        {% elif field_type == "badge" %}
-                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide
-                                                {% if field_value == "completed" or field_value == "Completed" %}
-                                                    bg-emerald-100 text-emerald-800 border border-emerald-200
-                                                {% elif field_value == "in_progress" or field_value == "In Progress" %}
-                                                    bg-amber-100 text-amber-800 border border-amber-200
-                                                {% elif field_value == "review_required" or field_value == "Review Required" %}
-                                                    bg-orange-100 text-orange-800 border border-orange-200
-                                                {% elif field_value == "pending" or field_value == "Pending" %}
-                                                    bg-blue-100 text-blue-800 border border-blue-200
-                                                {% elif field_value == "failed" or field_value == "Failed" %}
-                                                    bg-red-100 text-red-800 border border-red-200
-                                                {% else %}
-                                                    bg-gray-100 text-gray-700 border border-gray-200
-                                                {% endif %}
-                                            ">
-                                                {% if field_value == "completed" or field_value == "Completed" %}
-                                                    <i class="fas fa-check-circle mr-1"></i>
-                                                {% elif field_value == "in_progress" or field_value == "In Progress" %}
-                                                    <i class="fas fa-clock mr-1"></i>
-                                                {% elif field_value == "pending" or field_value == "Pending" %}
-                                                    <i class="fas fa-hourglass-half mr-1"></i>
-                                                {% elif field_value == "failed" or field_value == "Failed" %}
-                                                    <i class="fas fa-times-circle mr-1"></i>
-                                                {% endif %}
-                                                {{ field_value|default:"-" }}
-                                            </span>
                                         {% elif field_type == "links" and field_value %}
                                             <div class="flex flex-wrap gap-2">
                                                 {% for link in field_value|split:"," %}
@@ -315,27 +423,52 @@
                                                     {{ field_value|default:"-" }}
                                                 </p>
                                             </div>
-                                        {% elif header == "difficulty" %}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium
-                                                {% if field_value == "Easy" %}
-                                                    bg-green-100 text-green-800
-                                                {% elif field_value == "Medium" %}
-                                                    bg-yellow-100 text-yellow-800
-                                                {% elif field_value == "Hard" %}
-                                                    bg-red-100 text-red-800
+                                        {% elif header == "completed" %}
+                                            <div class="flex items-center space-x-2">
+                                                {% if field_value and field_value != "-" and field_value|lower != "pending" %}
+                                                    {% if field_value|lower == "completed" or field_value|lower == "done" %}
+                                                        <div class="flex items-center space-x-2">
+                                                            <div class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-sm"></div>
+                                                            <span class="text-sm font-bold text-emerald-800 bg-gradient-to-r from-emerald-50 to-green-100 px-4 py-2 rounded-full border-2 border-emerald-200 shadow-sm transform hover:scale-105 transition-all duration-200">
+                                                                <i class="fas fa-check-circle mr-2 text-emerald-600"></i>
+                                                                Completed
+                                                            </span>
+                                                        </div>
+                                                    {% elif field_value|lower == "in progress" or field_value|lower == "working" %}
+                                                        <div class="flex items-center space-x-2">
+                                                            <div class="w-3 h-3 bg-blue-500 rounded-full animate-pulse shadow-sm"></div>
+                                                            <span class="text-sm font-bold text-blue-800 bg-gradient-to-r from-blue-50 to-indigo-100 px-4 py-2 rounded-full border-2 border-blue-200 shadow-sm transform hover:scale-105 transition-all duration-200">
+                                                                <i class="fas fa-spinner fa-spin mr-2 text-blue-600"></i>
+                                                                In Progress
+                                                            </span>
+                                                        </div>
+                                                    {% elif field_value|lower == "review" or field_value|lower == "reviewing" %}
+                                                        <div class="flex items-center space-x-2">
+                                                            <div class="w-3 h-3 bg-purple-500 rounded-full animate-pulse shadow-sm"></div>
+                                                            <span class="text-sm font-bold text-purple-800 bg-gradient-to-r from-purple-50 to-violet-100 px-4 py-2 rounded-full border-2 border-purple-200 shadow-sm transform hover:scale-105 transition-all duration-200">
+                                                                <i class="fas fa-eye mr-2 text-purple-600"></i>
+                                                                Under Review
+                                                            </span>
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="flex items-center space-x-2">
+                                                            <div class="w-3 h-3 bg-gray-400 rounded-full shadow-sm"></div>
+                                                            <span class="text-sm font-bold text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-2 rounded-full border-2 border-gray-200 shadow-sm">
+                                                                <i class="fas fa-clock mr-2 text-gray-500"></i>
+                                                                {{ field_value|title }}
+                                                            </span>
+                                                        </div>
+                                                    {% endif %}
                                                 {% else %}
-                                                    bg-gray-100 text-gray-700
+                                                    <div class="flex items-center space-x-2">
+                                                        <div class="w-3 h-3 bg-gray-300 rounded-full shadow-sm"></div>
+                                                        <span class="text-sm font-medium text-gray-600 bg-gradient-to-r from-gray-50 to-gray-100 px-3 py-1 rounded-full border border-gray-200">
+                                                            <i class="fas fa-question-circle mr-2 text-gray-400"></i>
+                                                            Pending
+                                                        </span>
+                                                    </div>
                                                 {% endif %}
-                                            ">
-                                                {% if field_value == "Easy" %}
-                                                    <i class="fas fa-star mr-1"></i>
-                                                {% elif field_value == "Medium" %}
-                                                    <i class="fas fa-star mr-1"></i><i class="fas fa-star mr-1"></i>
-                                                {% elif field_value == "Hard" %}
-                                                    <i class="fas fa-star mr-1"></i><i class="fas fa-star mr-1"></i><i class="fas fa-star mr-1"></i>
-                                                {% endif %}
-                                                {{ field_value|default:"-" }}
-                                            </span>
+                                            </div>
                                         {% else %}
                                             <span class="text-sm text-gray-900">{{ field_value|default:"-" }}</span>
                                         {% endif %}

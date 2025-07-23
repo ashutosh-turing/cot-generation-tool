@@ -63,5 +63,10 @@ urlpatterns = [
     path('api/llm/jobs/stats/', views.get_llm_job_stats, name='api_get_llm_job_stats'),
     path('api/llm/trainer-analysis/', api_llm.submit_trainer_question_analysis, name='api_submit_trainer_analysis'),
     
+    # Activity Tracking API endpoints
+    path('api/activity/start/', views.activity_start, name='api_activity_start'),
+    path('api/activity/update/', views.activity_update, name='api_activity_update'),
+    path('api/activity/end/', views.activity_end, name='api_activity_end'),
+    
     # path('api/ground-truth-validate/', api_views.run_ground_truth_validation, name='api_ground_truth_validate'),
 ]

@@ -166,7 +166,27 @@ def sync_trainer_tasks(config, selected_project=None, sync_type="auto", synced_b
                 
                 # Scraping logic (if needed)
                 if scraping_needed and link_column and row_dict.get(link_column):
-                    obj.set_field_value("raw_prompt", f"[TO SCRAPE] {row_dict.get(link_column)}")
+                    url = row_dict.get(link_column)
+                    try:
+                        import requests
+                        from bs4 import BeautifulSoup
+                        resp = requests.get(url, timeout=10)
+                        resp.raise_for_status()
+                        soup = BeautifulSoup(resp.text, "html.parser")
+                        # Example: extract all text from the main problem statement div
+                        # (You may need to adjust the selector for your target site)
+                        problem_text = ""
+                        # Try common selectors for Codeforces/other platforms
+                        if "codeforces.com" in url:
+                            statement = soup.find("div", class_="problem-statement")
+                            if statement:
+                                problem_text = statement.get_text(separator="\n", strip=True)
+                        if not problem_text:
+                            # Fallback: get all text
+                            problem_text = soup.get_text(separator="\n", strip=True)
+                        obj.set_field_value("raw_prompt", problem_text or f"[SCRAPE FAILED] {url}")
+                    except Exception as scrape_exc:
+                        obj.set_field_value("raw_prompt", f"[SCRAPE ERROR] {url} :: {scrape_exc}")
                 elif mapping.get("prompt"):
                     # If prompt is mapped, also set raw_prompt
                     prompt_value = obj.get_field_value("prompt")

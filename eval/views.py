@@ -287,21 +287,50 @@ def trainer_dashboard(request):
     print("DEBUG: projects count =", projects.count(), "projects =", list(projects.values('id', 'code', 'name', 'is_active')))
     selected_project_id = request.GET.get('project', '').strip()
     
-    # Get all tasks for the selected project, then filter in Python for word-based match
+    # Get all tasks for the selected project, then filter for exact developer match
     if selected_project_id:
         all_tasks = TrainerTask.objects.filter(project__id=selected_project_id).order_by('-updated_at')
         # For debugging: get all developer names for this project
         all_developers = list(
             all_tasks.values_list('developer', flat=True).distinct()
         )
-        # Word-based match: show if any word in developer matches user's first/last name or username
-        user_names = {user_first_name, user_last_name, user_name}
-        def is_match(dev):
+        
+        # Debug: Print user information and available developers
+        print(f"DEBUG: Current user - username: '{user_name}', first_name: '{user_first_name}', last_name: '{user_last_name}', full_name: '{user_full_name}'")
+        print(f"DEBUG: Available developers in project: {all_developers}")
+        
+        # Priority-based exact match: try username first, then fall back to others
+        def is_exact_match(dev):
             if not dev:
                 return False
-            dev_words = {w.strip().lower() for w in dev.split()}
-            return bool(user_names & dev_words)
-        filtered_tasks = [task for task in all_tasks if is_match(task.developer)]
+            dev_clean = dev.strip().lower()
+            
+            # Priority 1: Try username first (most specific)
+            if dev_clean == user_name:
+                return True
+            
+            # Priority 2: Try full name if username doesn't match
+            if dev_clean == user_full_name:
+                return True
+            
+            # Priority 3: Try first name if neither username nor full name match
+            if dev_clean == user_first_name:
+                return True
+            
+            # Priority 4: Try last name as final fallback
+            if dev_clean == user_last_name:
+                return True
+            
+            # No match found
+            return False
+        
+        filtered_tasks = [task for task in all_tasks if is_exact_match(task.developer)]
+        
+        # Debug: Print filtering results
+        print(f"DEBUG: Found {len(filtered_tasks)} tasks matching current user out of {len(all_tasks)} total tasks")
+        if filtered_tasks:
+            sample_developers = [task.developer for task in filtered_tasks[:3]]
+            print(f"DEBUG: Sample matching developers: {sample_developers}")
     else:
         filtered_tasks = []
         all_developers = []
@@ -476,52 +505,71 @@ def reviewer_dashboard(request):
                     print(f"DEBUG: User {user.username} is {user_role}, showing all tasks")
                 else:
                     # Pod leads and regular reviewers only see tasks assigned to them
-                    # Try username first (most specific), then fall back to other identifiers
-                    base_tasks = TrainerTask.objects.none()
+                    # Get all tasks first, then filter using priority-based exact matching
+                    all_reviewer_tasks = TrainerTask.objects.filter(
+                        Q(reviewer__isnull=False) & Q(reviewer__gt='')
+                    ).distinct()
                     
-                    # First, try exact username match (most reliable)
-                    if user.username.strip():
-                        base_tasks = TrainerTask.objects.filter(
-                            Q(reviewer__isnull=False) & Q(reviewer__gt='') & 
-                            Q(reviewer__iexact=user.username)
-                        ).distinct()
-                        print(f"DEBUG: Found {base_tasks.count()} tasks with exact username match")
+                    # Get user identifiers for matching
+                    user_full_name = user.get_full_name().strip().lower()
+                    user_name = user.username.strip().lower()
+                    user_first_name = user.first_name.strip().lower()
+                    user_last_name = user.last_name.strip().lower()
                     
-                    # If no exact username match, try username contains
-                    if base_tasks.count() == 0 and user.username.strip():
-                        base_tasks = TrainerTask.objects.filter(
-                            Q(reviewer__isnull=False) & Q(reviewer__gt='') & 
-                            Q(reviewer__icontains=user.username)
-                        ).distinct()
-                        print(f"DEBUG: Found {base_tasks.count()} tasks with username contains match")
+                    # Get all reviewer names for debugging
+                    all_reviewers = list(all_reviewer_tasks.values_list('reviewer', flat=True).distinct())
                     
-                    # If still no match and user has full name, try full name exact match
-                    if base_tasks.count() == 0 and user.get_full_name().strip():
-                        base_tasks = TrainerTask.objects.filter(
-                            Q(reviewer__isnull=False) & Q(reviewer__gt='') & 
-                            Q(reviewer__iexact=user.get_full_name())
-                        ).distinct()
-                        print(f"DEBUG: Found {base_tasks.count()} tasks with full name exact match")
+                    # Debug: Print user information and available reviewers
+                    print(f"DEBUG: Current reviewer user - username: '{user_name}', first_name: '{user_first_name}', last_name: '{user_last_name}', full_name: '{user_full_name}'")
+                    print(f"DEBUG: Available reviewers in database: {all_reviewers}")
                     
-                    # If still no match and user has first name, try first name matches
-                    if base_tasks.count() == 0 and user.first_name.strip():
-                        base_tasks = TrainerTask.objects.filter(
-                            Q(reviewer__isnull=False) & Q(reviewer__gt='') & 
-                            (Q(reviewer__iexact=user.first_name) | Q(reviewer__icontains=user.first_name))
-                        ).distinct()
-                        print(f"DEBUG: Found {base_tasks.count()} tasks with first name match")
+                    # Priority-based exact match: try username first, then fall back to others
+                    def is_reviewer_match(reviewer):
+                        if not reviewer:
+                            return False
+                        reviewer_clean = reviewer.strip().lower()
+                        
+                        # Priority 1: Try username first (most specific)
+                        if reviewer_clean == user_name:
+                            return True
+                        
+                        # Priority 2: Try full name if username doesn't match
+                        if reviewer_clean == user_full_name:
+                            return True
+                        
+                        # Priority 3: Try first name if neither username nor full name match
+                        if reviewer_clean == user_first_name:
+                            return True
+                        
+                        # Priority 4: Try last name as final fallback
+                        if reviewer_clean == user_last_name:
+                            return True
+                        
+                        # No match found
+                        return False
+                    
+                    # Filter tasks using priority-based matching
+                    matching_tasks = [task for task in all_reviewer_tasks if is_reviewer_match(task.reviewer)]
+                    
+                    # Convert back to QuerySet for consistency with rest of the code
+                    if matching_tasks:
+                        task_ids = [task.id for task in matching_tasks]
+                        base_tasks = TrainerTask.objects.filter(id__in=task_ids)
+                    else:
+                        base_tasks = TrainerTask.objects.none()
                     
                     print(f"DEBUG: User {user.username} is {user_role}, filtering by assignment")
-                        
-                    # Debug: Print what we're looking for and what we found
-                    task_count = base_tasks.count()
-                    print(f"DEBUG: Looking for reviewer matching: {user.username}, {user.get_full_name()}, {user.first_name}")
-                    print(f"DEBUG: Found {task_count} tasks for current user")
                     
-                    # If no tasks found, let's see what reviewers exist
+                    # Debug: Print filtering results
+                    task_count = base_tasks.count()
+                    print(f"DEBUG: Found {task_count} tasks matching current reviewer out of {all_reviewer_tasks.count()} total reviewer tasks")
+                    if matching_tasks:
+                        sample_reviewers = [task.reviewer for task in matching_tasks[:3]]
+                        print(f"DEBUG: Sample matching reviewers: {sample_reviewers}")
+                    
+                    # If no tasks found, show available reviewers for debugging
                     if task_count == 0:
-                        all_reviewers = TrainerTask.objects.values_list('reviewer', flat=True).distinct()
-                        print(f"DEBUG: Available reviewers in database: {list(all_reviewers)}")
+                        print(f"DEBUG: No tasks found for reviewer matching: {user.username}, {user.get_full_name()}, {user.first_name}, {user.last_name}")
                 
                 # Force evaluation of the queryset to catch database errors early
                 task_count = base_tasks.count()
@@ -2683,6 +2731,162 @@ def get_llm_job_stats(request):
             'total_jobs': total_jobs,
             'status_counts': status_counts
         })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+# Activity Tracking API Endpoints
+@require_POST
+@login_required
+def activity_start(request):
+    """Start a new activity tracking session."""
+    try:
+        from .models import UserActivitySession
+        import json
+        
+        # Handle both JSON and form data
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            # Handle FormData from sendBeacon
+            data_str = request.POST.get('data')
+            if data_str:
+                data = json.loads(data_str)
+            else:
+                data = request.POST.dict()
+        
+        session_id = data.get('session_id')
+        activity_type = data.get('activity_type', 'unknown')
+        
+        if not session_id:
+            return JsonResponse({'success': False, 'error': 'Missing session_id'})
+        
+        # Create new activity session
+        session = UserActivitySession.objects.create(
+            user=request.user,
+            session_id=session_id,
+            activity_type=activity_type,
+            session_start=timezone.now(),
+            focus_time_minutes=0,
+            interactions=0
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'session_id': session.session_id
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@require_POST
+@login_required
+def activity_update(request):
+    """Update an existing activity tracking session."""
+    try:
+        from .models import UserActivitySession
+        import json
+        
+        # Handle both JSON and form data
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            # Handle FormData from sendBeacon
+            data_str = request.POST.get('data')
+            if data_str:
+                data = json.loads(data_str)
+            else:
+                data = request.POST.dict()
+        
+        session_id = data.get('session_id')
+        focus_time_minutes = int(data.get('focus_time_minutes', 0))
+        interactions = int(data.get('interactions', 0))
+        is_active = data.get('is_active', True)
+        
+        if not session_id:
+            return JsonResponse({'success': False, 'error': 'Missing session_id'})
+        
+        # Update existing session
+        try:
+            session = UserActivitySession.objects.get(
+                user=request.user,
+                session_id=session_id,
+                session_end__isnull=True  # Only update active sessions
+            )
+            
+            session.focus_time_minutes = focus_time_minutes
+            session.interactions = interactions
+            session.is_active = is_active
+            session.last_activity = timezone.now()
+            session.save()
+            
+            return JsonResponse({'success': True})
+            
+        except UserActivitySession.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Session not found or already ended'
+            })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+@require_POST
+@login_required
+def activity_end(request):
+    """End an activity tracking session."""
+    try:
+        from .models import UserActivitySession
+        import json
+        
+        # Handle both JSON and form data
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            # Handle FormData from sendBeacon
+            data_str = request.POST.get('data')
+            if data_str:
+                data = json.loads(data_str)
+            else:
+                data = request.POST.dict()
+        
+        session_id = data.get('session_id')
+        focus_time_minutes = int(data.get('focus_time_minutes', 0))
+        interactions = int(data.get('interactions', 0))
+        
+        if not session_id:
+            return JsonResponse({'success': False, 'error': 'Missing session_id'})
+        
+        # End the session
+        try:
+            session = UserActivitySession.objects.get(
+                user=request.user,
+                session_id=session_id,
+                session_end__isnull=True  # Only end active sessions
+            )
+            
+            session.focus_time_minutes = focus_time_minutes
+            session.interactions = interactions
+            session.session_end = timezone.now()
+            session.is_active = False
+            session.save()
+            
+            return JsonResponse({'success': True})
+            
+        except UserActivitySession.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Session not found or already ended'
+            })
+        
     except Exception as e:
         return JsonResponse({
             'success': False,

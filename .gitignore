@@ -57,3 +57,7 @@ nohup.out
 db_v2.sqlite3
 .gitignore
 db_v2.sqlite3
+db_v2.sqlite3
+db_v2.sqlite3
+db_v2.sqlite3
+auto_processor.pid
