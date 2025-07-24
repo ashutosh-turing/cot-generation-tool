@@ -21,6 +21,7 @@ class LLMModel(models.Model):
         help_text="Maximum tokens for response generation. Leave blank to use provider defaults. Anthropic models require this field."
     )
     is_active = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False, help_text="Use as default model when no project-specific model is set.")
 
     def __str__(self):
         return f"{self.name} ({self.get_provider_display()})"
@@ -585,6 +586,27 @@ class UserProductivityInsight(models.Model):
             models.Index(fields=['user', 'period_type', 'period_start']),
         ]
 
+
+class ProjectLLMModel(models.Model):
+    """
+    Model to tie LLM models to specific projects, allowing project-specific overrides.
+    """
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='llm_modals')
+    llm_model = models.ForeignKey(LLMModel, on_delete=models.CASCADE, related_name='project_links')
+    # Optional project-specific overrides
+    temperature = models.FloatField(null=True, blank=True, help_text="Override temperature for this project (optional)")
+    max_tokens = models.PositiveIntegerField(null=True, blank=True, help_text="Override max tokens for this project (optional)")
+    api_key = models.CharField(max_length=255, blank=True, null=True, help_text="Override API key for this project (optional)")
+    is_active = models.BooleanField(default=True, help_text="Is this model active for this project?")
+    description = models.TextField(blank=True, null=True, help_text="Project-specific description (optional)")
+
+    class Meta:
+        unique_together = ('project', 'llm_model')
+        verbose_name = "Project LLM Modal"
+        verbose_name_plural = "Project LLM Modals"
+
+    def __str__(self):
+        return f"{self.llm_model.name} for {self.project.code}"
 
 class ProjectCriteria(models.Model):
     """

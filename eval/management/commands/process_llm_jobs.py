@@ -55,7 +55,39 @@ def process_trainer_question_analysis(data):
         user = User.objects.get(id=user_id) if user_id else None
 
         # Use API key from model_obj only; all keys are managed in the database
-        api_key = model_obj.api_key
+        # Project-level override logic
+        from eval.models import ProjectLLMModel, Project
+        project_obj = None
+        project_llm_model = None
+        # Try to determine the project from the job data or question_id
+        project_id = data.get("project_id")
+        if not project_id and "question_id" in data:
+            from eval.models import TrainerTask
+            task = TrainerTask.objects.filter(question_id=data["question_id"]).first()
+            if task and task.project:
+                project_id = task.project.id
+        if project_id:
+            try:
+                project_obj = Project.objects.get(id=project_id)
+                project_llm_model = ProjectLLMModel.objects.filter(
+                    project=project_obj, llm_model=model_obj, is_active=True
+                ).first()
+            except Project.DoesNotExist:
+                project_obj = None
+                project_llm_model = None
+
+        # Use overrides if present, else fallback to model_obj
+        api_key = (project_llm_model.api_key if project_llm_model and project_llm_model.api_key else model_obj.api_key)
+        max_tokens = (project_llm_model.max_tokens if project_llm_model and project_llm_model.max_tokens else model_obj.max_tokens)
+        # Determine temperature: prefer job data, then project override, then model default
+        temperature = data.get("temp")
+        if temperature is None:
+            temperature = data.get("temperature")
+        if temperature is None and project_llm_model and project_llm_model.temperature is not None:
+            temperature = project_llm_model.temperature
+        if temperature is None:
+            temperature = model_obj.temperature
+
         client = get_ai_client(model_obj.provider, api_key, model_obj.name, model_obj)
 
         messages = []
@@ -70,7 +102,11 @@ def process_trainer_question_analysis(data):
         if temperature is None:
             temperature = model_obj.temperature
 
-        result = client.get_response(messages, temperature=temperature)
+        result = client.get_response(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
 
         # Log completion information for Anthropic responses
         if model_obj.provider.lower() == 'anthropic' and result.get('status') == 'success':

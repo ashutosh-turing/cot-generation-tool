@@ -280,15 +280,30 @@ document.addEventListener('DOMContentLoaded', function() {
             <div id="llm-models-list" class="space-y-3 h-48 overflow-y-auto">
               {% if llm_models %}
                 {% for model in llm_models %}
-                  {% if model.is_active %}
-                  <label class="flex items-center p-3 rounded-xl hover:bg-gray-50 transition-colors duration-200 cursor-pointer border border-gray-100 hover:border-gray-200">
-                    <input type="checkbox" class="model-checkbox h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" value="{{ model.id }}" data-name="{{ model.name }}" data-temperature="{{ model.temperature }}">
-                    <div class="ml-3 flex-1">
-                      <span class="font-medium text-gray-800">{{ model.name }}</span>
-                      <div class="text-xs text-gray-500 mt-1">Temperature: {{ model.temperature }}</div>
-                    </div>
-                    <span class="text-sm text-blue-600 bg-blue-100 px-2 py-1 rounded-full font-medium">{{ model.provider|default:"AI" }}</span>
-                  </label>
+                  {% if model.llm_model %}
+                    {% with base=model.llm_model %}
+                      {% if model.is_active %}
+                      <label class="flex items-center p-3 rounded-xl hover:bg-gray-50 transition-colors duration-200 cursor-pointer border border-gray-100 hover:border-gray-200">
+                        <input type="checkbox" class="model-checkbox h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" value="{{ base.id }}" data-name="{{ base.name }}" data-temperature="{{ model.temperature|default:base.temperature }}">
+                        <div class="ml-3 flex-1">
+                          <span class="font-medium text-gray-800">{{ base.name }}</span>
+                          <div class="text-xs text-gray-500 mt-1">Temperature: {{ model.temperature|default:base.temperature }}</div>
+                        </div>
+                        <span class="text-sm text-blue-600 bg-blue-100 px-2 py-1 rounded-full font-medium">{{ base.provider|default:"AI" }}</span>
+                      </label>
+                      {% endif %}
+                    {% endwith %}
+                  {% else %}
+                    {% if model.is_active %}
+                    <label class="flex items-center p-3 rounded-xl hover:bg-gray-50 transition-colors duration-200 cursor-pointer border border-gray-100 hover:border-gray-200">
+                      <input type="checkbox" class="model-checkbox h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" value="{{ model.id }}" data-name="{{ model.name }}" data-temperature="{{ model.temperature }}">
+                      <div class="ml-3 flex-1">
+                        <span class="font-medium text-gray-800">{{ model.name }}</span>
+                        <div class="text-xs text-gray-500 mt-1">Temperature: {{ model.temperature }}</div>
+                      </div>
+                      <span class="text-sm text-blue-600 bg-blue-100 px-2 py-1 rounded-full font-medium">{{ model.provider|default:"AI" }}</span>
+                    </label>
+                    {% endif %}
                   {% endif %}
                 {% endfor %}
               {% else %}

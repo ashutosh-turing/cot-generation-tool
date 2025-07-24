@@ -396,6 +396,69 @@
       {% endfor %}
     </div>
 
+    <!-- LLM Modal Grid -->
+    <div class="mt-12">
+      <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+        <i class="fas fa-robot mr-2 text-purple-600"></i>
+        LLM Modals for this Project
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="llm-modal-grid">
+        {% for modal in project_llm_modals %}
+          {% with base=modal.llm_model %}
+          <div class="llm-modal-card bg-white rounded-2xl shadow-lg border border-gray-100 p-6 transition-all duration-200 hover:shadow-xl hover:border-purple-200"
+               data-llm-modal-id="{{ modal.id }}">
+            <div class="flex items-start justify-between mb-6">
+              <div class="flex-1 pr-4">
+                <h4 class="text-lg font-semibold text-gray-800 mb-2">{{ base.name }}</h4>
+                <div class="text-xs text-gray-500 mb-1">
+                  <span class="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium mr-2">{{ base.provider|title }}</span>
+                  <span class="inline-block px-2 py-1 rounded bg-gray-100 text-gray-700 font-medium">Temperature: {{ modal.temperature|default:base.temperature }}</span>
+                </div>
+                {% if modal.description or base.description %}
+                  <p class="text-sm text-gray-600 line-clamp-3 leading-relaxed">{{ modal.description|default:base.description }}</p>
+                {% endif %}
+              </div>
+              <div class="flex-shrink-0">
+                <label class="relative inline-flex items-center cursor-pointer group">
+                  <input type="checkbox" class="sr-only peer llm-modal-toggle"
+                         data-llm-modal-id="{{ modal.id }}"
+                         {% if modal.is_active %}checked{% endif %}>
+                  <div class="relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer transition-all duration-300 peer-checked:bg-gradient-to-r peer-checked:from-green-400 peer-checked:to-green-500 shadow-inner">
+                    <div class="absolute top-0.5 left-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-all duration-300 peer-checked:translate-x-7 peer-checked:border-green-300 shadow-md flex items-center justify-center">
+                      <i class="fas fa-check text-green-500 text-xs opacity-0 peer-checked:opacity-100 transition-opacity duration-200"></i>
+                    </div>
+                  </div>
+                  <span class="ml-3 text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                    {% if modal.is_active %}ON{% else %}OFF{% endif %}
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span class="status-badge px-3 py-1.5 rounded-full text-xs font-semibold
+                           {% if modal.is_active %}bg-green-100 text-green-800 border border-green-200{% else %}bg-gray-100 text-gray-600 border border-gray-200{% endif %}">
+                <i class="fas {% if modal.is_active %}fa-check-circle{% else %}fa-times-circle{% endif %} mr-1"></i>
+                {% if modal.is_active %}Active{% else %}Inactive{% endif %}
+              </span>
+            </div>
+            <div class="loading-overlay hidden absolute inset-0 bg-white bg-opacity-90 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+              <div class="flex flex-col items-center space-y-2">
+                <div class="animate-spin rounded-full h-6 w-6 border-2 border-purple-600 border-t-transparent"></div>
+                <span class="text-sm font-medium text-gray-700">Updating...</span>
+              </div>
+            </div>
+          </div>
+          {% endwith %}
+        {% empty %}
+          <div class="col-span-full text-center text-gray-500 py-8">
+            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+            <p class="font-medium">No LLM modals assigned to this project</p>
+            <p class="text-sm">Assign LLM modals to this project in the admin panel.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
     {% else %}
     <!-- No Project Selected State -->
     <div class="text-center py-16">
@@ -446,6 +509,17 @@ document.addEventListener('DOMContentLoaded', function() {
             updateCriteria(validationId, isEnabled, card);
         });
     });
+
+    // LLM Modal toggles
+    const llmToggles = document.querySelectorAll('.llm-modal-toggle');
+    llmToggles.forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const modalId = this.dataset.llmModalId;
+            const isEnabled = this.checked;
+            const card = this.closest('.llm-modal-card');
+            updateLLMModal(modalId, isEnabled, card);
+        });
+    });
     
     // Initialize priority inputs
     const priorityInputs = document.querySelectorAll('.priority-input');
@@ -472,6 +546,63 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// AJAX handler for LLM modal toggle
+function updateLLMModal(modalId, isEnabled, card) {
+    // Show loading state
+    const loadingOverlay = card.querySelector('.loading-overlay');
+    loadingOverlay.classList.remove('hidden');
+
+    // Prepare data
+    const data = {
+        project_llm_modal_id: modalId,
+        is_active: isEnabled
+    };
+
+    // Make AJAX request (endpoint to be implemented in backend)
+    fetch('/admin/update_project_llm_modal/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateLLMModalCardStatus(card, isEnabled);
+            showMessage('success', data.message);
+        } else {
+            // Revert toggle
+            const toggle = card.querySelector('.llm-modal-toggle');
+            toggle.checked = !isEnabled;
+            showMessage('error', data.error);
+        }
+    })
+    .catch(error => {
+        const toggle = card.querySelector('.llm-modal-toggle');
+        toggle.checked = !isEnabled;
+        showMessage('error', 'Failed to update LLM modal: ' + error.message);
+    })
+    .finally(() => {
+        loadingOverlay.classList.add('hidden');
+    });
+}
+
+function updateLLMModalCardStatus(card, isEnabled) {
+    const statusBadge = card.querySelector('.status-badge');
+    const toggleLabel = card.querySelector('label span');
+    if (isEnabled) {
+        statusBadge.className = 'status-badge px-3 py-1.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200';
+        statusBadge.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Active';
+        if (toggleLabel) toggleLabel.textContent = 'ON';
+    } else {
+        statusBadge.className = 'status-badge px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200';
+        statusBadge.innerHTML = '<i class="fas fa-times-circle mr-1"></i>Inactive';
+        if (toggleLabel) toggleLabel.textContent = 'OFF';
+    }
+}
 
 function updateCriteria(validationId, isEnabled, card) {
     // Show loading state

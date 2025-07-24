@@ -269,8 +269,15 @@ def trainer_question_analysis(request, project_id, question_id):
         else:
             # Default to "Coding" stream if exists, else all
             system_messages = SystemMessage.objects.filter(category__name__icontains="coding").order_by('name') or SystemMessage.objects.all().order_by('name')
-        # Fetch all LLM models for modal
-        llm_models = LLMModel.objects.filter(is_active=True).order_by('name')
+        # Fetch project-tied LLM models for this project
+        from .models import ProjectLLMModel
+        project_llm_models = ProjectLLMModel.objects.filter(project_id=project_id).select_related('llm_model')
+        if project_llm_models.exists():
+            llm_models = project_llm_models.filter(is_active=True).order_by('llm_model__name')
+        else:
+            llm_models = LLMModel.objects.filter(is_active=True, is_default=True).order_by('name')
+            if not llm_models.exists():
+                llm_models = LLMModel.objects.filter(is_active=True).order_by('name')
 
         # Construct WebSocket URL
         websocket_scheme = 'wss' if request.is_secure() else 'ws'
@@ -2733,9 +2740,19 @@ def review_question(request, question_id):
             system_messages = SystemMessage.objects.all().order_by('name')
             print(f"DEBUG: Using all {system_messages.count()} system messages")
     
-    # Fetch all active LLM models
-    llm_models = LLMModel.objects.filter(is_active=True).order_by('name')
-    print(f"DEBUG: Found {llm_models.count()} active LLM models")
+    # Fetch project-tied LLM models if project exists, else global
+    from .models import ProjectLLMModel
+    if project:
+        project_llm_models = ProjectLLMModel.objects.filter(project=project).select_related('llm_model')
+        if project_llm_models.exists():
+            llm_models = project_llm_models.filter(is_active=True).order_by('llm_model__name')
+        else:
+            llm_models = LLMModel.objects.filter(is_active=True, is_default=True).order_by('name')
+            if not llm_models.exists():
+                llm_models = LLMModel.objects.filter(is_active=True).order_by('name')
+    else:
+        llm_models = LLMModel.objects.filter(is_active=True).order_by('name')
+    print(f"DEBUG: Found {llm_models.count()} active LLM models (project-tied or global)")
     
     # Debug: Print first few system messages
     for i, sm in enumerate(system_messages[:3]):
@@ -3037,9 +3054,12 @@ def project_config_view(request):
                         'priority': 1,
                         'has_setting': False
                     })
-                    
+            # Fetch project LLM modals for this project
+            from .models import ProjectLLMModel
+            project_llm_modals = list(ProjectLLMModel.objects.filter(project=selected_project).select_related('llm_model').order_by('llm_model__name'))
         except Project.DoesNotExist:
             selected_project = None
+            project_llm_modals = []
     
     # Calculate statistics
     total_projects = projects.count()
@@ -3051,6 +3071,7 @@ def project_config_view(request):
         'validations': validations,
         'selected_project': selected_project,
         'project_criteria': project_criteria,
+        'project_llm_modals': project_llm_modals if selected_project_id else [],
         'stats': {
             'total_projects': total_projects,
             'total_validations': total_validations,
@@ -3193,6 +3214,36 @@ def bulk_update_project_criteria(request):
             'error': str(e)
         })
 
+
+@require_POST
+@login_required
+@role_required(['admin'])
+def update_project_llm_modal(request):
+    """
+    AJAX endpoint to enable/disable a ProjectLLMModel (LLM modal) for a project.
+    """
+    try:
+        from .models import ProjectLLMModel
+        import json
+
+        data = json.loads(request.body)
+        modal_id = data.get('project_llm_modal_id')
+        is_active = data.get('is_active')
+
+        if modal_id is None or is_active is None:
+            return JsonResponse({'success': False, 'error': 'Missing project_llm_modal_id or is_active'})
+
+        try:
+            modal = ProjectLLMModel.objects.get(id=modal_id)
+        except ProjectLLMModel.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'LLM modal not found'})
+
+        modal.is_active = bool(is_active)
+        modal.save()
+
+        return JsonResponse({'success': True, 'message': f'LLM modal "{modal.llm_model.name}" has been {"enabled" if modal.is_active else "disabled"} for this project.'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 @require_POST
 @login_required

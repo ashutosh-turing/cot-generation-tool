@@ -71,6 +71,23 @@ class LLMModelAdmin(admin.ModelAdmin):
         }),
     )
 
+from .models import ProjectLLMModel
+
+@admin.register(ProjectLLMModel)
+class ProjectLLMModelAdmin(admin.ModelAdmin):
+    list_display = ('project', 'llm_model', 'is_active', 'temperature', 'max_tokens', 'api_key')
+    fieldsets = (
+        ('Assignment', {
+            'fields': ('project', 'llm_model', 'is_active')
+        }),
+        ('Overrides', {
+            'fields': ('temperature', 'max_tokens', 'api_key', 'description')
+        }),
+    )
+    list_filter = ('project', 'is_active', 'llm_model__provider')
+    search_fields = ('project__code', 'llm_model__name')
+    autocomplete_fields = ('project', 'llm_model')
+
 class ValidationAdmin(admin.ModelAdmin):
     list_display = ('name', 'validation_id', 'is_active', 'created_at')
     list_filter = ('is_active',)
@@ -130,7 +147,14 @@ class UserPreferenceAdmin(admin.ModelAdmin):
 
 admin.site.register(UserPreference, UserPreferenceAdmin)
 
-from .models import ProjectCriteria
+from .models import ProjectCriteria, Project
+
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin):
+    search_fields = ('code', 'name')
+    list_display = ('code', 'name', 'is_active', 'created_at', 'updated_at')
+    list_filter = ('is_active',)
+    ordering = ('code',)
 
 @admin.register(ProjectCriteria)
 class ProjectCriteriaAdmin(admin.ModelAdmin):

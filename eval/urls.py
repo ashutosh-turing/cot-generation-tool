@@ -67,6 +67,7 @@ urlpatterns = [
     # Project configuration API (admin only)
     path('api/update_project_criteria/', views.update_project_criteria, name='update_project_criteria'),
     path('api/bulk_update_project_criteria/', views.bulk_update_project_criteria, name='bulk_update_project_criteria'),
+    path('api/update_project_llm_modal/', views.update_project_llm_modal, name='update_project_llm_modal'),
     path('api/update_user_role/', views.update_user_role, name='update_user_role'),
     
     # Activity Tracking API endpoints

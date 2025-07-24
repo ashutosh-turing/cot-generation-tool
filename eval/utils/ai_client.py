@@ -15,12 +15,12 @@ class BaseAIClient:
         self.model_name = model_name
         self.model_instance = model_instance
 
-    def get_response(self, messages, temperature=None):
+    def get_response(self, messages, temperature=None, max_tokens=None):
         """Universal response method with transparent streaming support."""
         if self._should_use_streaming():
-            return self._get_response_with_streaming(messages, temperature)
+            return self._get_response_with_streaming(messages, temperature, max_tokens)
         else:
-            return self._get_response_without_streaming(messages, temperature)
+            return self._get_response_without_streaming(messages, temperature, max_tokens)
 
     def _should_use_streaming(self):
         """Determine if streaming should be used based on configuration and smart defaults."""
@@ -54,7 +54,7 @@ class BaseAIClient:
         """Get default max_tokens - to be implemented by subclasses."""
         return 4096  # Conservative default
 
-    def _get_response_with_streaming(self, messages, temperature=None):
+    def _get_response_with_streaming(self, messages, temperature=None, max_tokens=None):
         """Universal streaming collection that works for all providers."""
         full_response = ""
         chunk_count = 0
@@ -62,7 +62,7 @@ class BaseAIClient:
         try:
             logger.info(f"Starting streaming response for {self.model_name}")
             
-            for chunk in self._stream_response(messages, temperature):
+            for chunk in self._stream_response(messages, temperature, max_tokens):
                 if chunk:  # Only add non-empty chunks
                     full_response += chunk
                     chunk_count += 1
@@ -81,16 +81,16 @@ class BaseAIClient:
             
         except NotImplementedError:
             logger.info("Streaming not implemented for this provider, using non-streaming")
-            return self._get_response_without_streaming(messages, temperature)
+            return self._get_response_without_streaming(messages, temperature, max_tokens)
         except Exception as e:
             logger.warning(f"Streaming failed: {e}, falling back to non-streaming")
-            return self._get_response_without_streaming(messages, temperature)
+            return self._get_response_without_streaming(messages, temperature, max_tokens)
 
-    def _get_response_without_streaming(self, messages, temperature=None):
+    def _get_response_without_streaming(self, messages, temperature=None, max_tokens=None):
         """Fallback to non-streaming response - to be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement non-streaming response method.")
 
-    def _stream_response(self, messages, temperature=None):
+    def _stream_response(self, messages, temperature=None, max_tokens=None):
         """Provider-specific streaming implementation - to be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement streaming method.")
 
@@ -116,7 +116,7 @@ class OpenAIClient(BaseAIClient):
         else:
             return 4096  # Conservative default
 
-    def _stream_response(self, messages, temperature=None):
+    def _stream_response(self, messages, temperature=None, max_tokens=None):
         """OpenAI streaming implementation."""
         params = {
             "model": self.model_name,
@@ -124,11 +124,12 @@ class OpenAIClient(BaseAIClient):
             "stream": True
         }
         
-        # Add max_tokens if specified
-        if self.model_instance and self.model_instance.max_tokens:
+        # Use max_tokens parameter if provided, else fall back to model_instance or default
+        if max_tokens is not None:
+            params["max_tokens"] = max_tokens
+        elif self.model_instance and self.model_instance.max_tokens:
             params["max_tokens"] = self.model_instance.max_tokens
         else:
-            # For streaming, we can use higher token limits
             params["max_tokens"] = self._get_default_max_tokens()
             
         if temperature is not None:
@@ -143,7 +144,7 @@ class OpenAIClient(BaseAIClient):
             logger.error(f"OpenAI streaming error: {e}")
             raise
 
-    def _get_response_without_streaming(self, messages, temperature=None):
+    def _get_response_without_streaming(self, messages, temperature=None, max_tokens=None):
         """OpenAI non-streaming fallback implementation."""
         params = {
             "model": self.model_name,
@@ -151,8 +152,10 @@ class OpenAIClient(BaseAIClient):
             "stream": False
         }
         
-        # Only add max_tokens if it's specified in the database
-        if self.model_instance and self.model_instance.max_tokens:
+        # Use max_tokens parameter if provided, else fall back to model_instance or default
+        if max_tokens is not None:
+            params["max_tokens"] = max_tokens
+        elif self.model_instance and self.model_instance.max_tokens:
             params["max_tokens"] = self.model_instance.max_tokens
             
         if temperature is not None:
@@ -202,7 +205,7 @@ class AnthropicClient(BaseAIClient):
         else:
             return 8192   # Conservative default for unknown models
 
-    def _stream_response(self, messages, temperature=None):
+    def _stream_response(self, messages, temperature=None, max_tokens=None):
         """Anthropic streaming implementation."""
         # Anthropic's API requires the system message to be passed separately
         system_message = ""
@@ -210,17 +213,18 @@ class AnthropicClient(BaseAIClient):
             system_message = messages[0]['content']
             messages = messages[1:]
 
-        # Get max_tokens - use full capacity for streaming
-        max_tokens = None
-        if self.model_instance and self.model_instance.max_tokens:
-            max_tokens = self.model_instance.max_tokens
+        # Use max_tokens parameter if provided, else fall back to model_instance or default
+        if max_tokens is not None:
+            effective_max_tokens = max_tokens
+        elif self.model_instance and self.model_instance.max_tokens:
+            effective_max_tokens = self.model_instance.max_tokens
         else:
-            max_tokens = self._get_default_max_tokens()
+            effective_max_tokens = self._get_default_max_tokens()
         
         params = {
             "model": self.model_name,
             "messages": messages,
-            "max_tokens": max_tokens
+            "max_tokens": effective_max_tokens
         }
         
         if system_message:
@@ -238,11 +242,11 @@ class AnthropicClient(BaseAIClient):
             logger.error(f"Anthropic streaming error: {e}")
             raise
 
-    def _get_response_without_streaming(self, messages, temperature=None):
+    def _get_response_without_streaming(self, messages, temperature=None, max_tokens=None):
         """Anthropic non-streaming fallback with continuation logic."""
-        return self._get_response_with_continuation(messages, temperature)
+        return self._get_response_with_continuation(messages, temperature, max_tokens=max_tokens)
 
-    def _get_response_with_continuation(self, messages, temperature=None, max_retries=3):
+    def _get_response_with_continuation(self, messages, temperature=None, max_retries=3, max_tokens=None):
         """Original continuation-based approach as fallback."""
         # Anthropic's API requires the system message to be passed separately
         system_message = ""
@@ -250,30 +254,31 @@ class AnthropicClient(BaseAIClient):
             system_message = messages[0]['content']
             messages = messages[1:]
 
-        # Use more conservative limits for non-streaming to avoid timeouts
-        max_tokens = None
-        if self.model_instance and self.model_instance.max_tokens:
-            max_tokens = min(self.model_instance.max_tokens, 16000)  # Cap at 16K for non-streaming
+        # Use max_tokens parameter if provided, else fall back to model_instance or default
+        if max_tokens is not None:
+            effective_max_tokens = min(max_tokens, 16000)  # Cap at 16K for non-streaming
+        elif self.model_instance and self.model_instance.max_tokens:
+            effective_max_tokens = min(self.model_instance.max_tokens, 16000)
         else:
             # Conservative limits for non-streaming with improved model detection
             model_lower = self.model_name.lower()
             if ('claude-sonnet-4' in model_lower or 'sonnet-4' in model_lower or 
                 'claude-4-sonnet' in model_lower or '4-sonnet' in model_lower):
-                max_tokens = 16000  # Conservative for non-streaming Claude Sonnet 4
+                effective_max_tokens = 16000  # Conservative for non-streaming Claude Sonnet 4
                 logger.info(f"Using conservative 16K tokens for non-streaming Claude Sonnet 4: {self.model_name}")
             elif 'sonnet' in model_lower:
-                max_tokens = 8192
+                effective_max_tokens = 8192
             elif 'haiku' in model_lower:
-                max_tokens = 4096
+                effective_max_tokens = 4096
             elif 'opus' in model_lower:
-                max_tokens = 4096
+                effective_max_tokens = 4096
             else:
-                max_tokens = 8192
+                effective_max_tokens = 8192
         
         params = {
             "model": self.model_name,
             "messages": messages,
-            "max_tokens": max_tokens
+            "max_tokens": effective_max_tokens
         }
         
         if system_message:
@@ -510,14 +515,16 @@ class GeminiClient(BaseAIClient):
         else:
             return 8192  # Default for Gemini models
 
-    def _stream_response(self, messages, temperature=None):
+    def _stream_response(self, messages, temperature=None, max_tokens=None):
         """Gemini streaming implementation."""
         # Gemini's API has a different structure for messages
         gemini_messages = [msg['content'] for msg in messages if msg['role'] != 'system']
         
         # Set up generation config
         generation_config = {}
-        if self.model_instance and self.model_instance.max_tokens:
+        if max_tokens is not None:
+            generation_config["max_output_tokens"] = max_tokens
+        elif self.model_instance and self.model_instance.max_tokens:
             generation_config["max_output_tokens"] = self.model_instance.max_tokens
         else:
             generation_config["max_output_tokens"] = self._get_default_max_tokens()
@@ -540,14 +547,16 @@ class GeminiClient(BaseAIClient):
             logger.error(f"Gemini streaming error: {e}")
             raise
 
-    def _get_response_without_streaming(self, messages, temperature=None):
+    def _get_response_without_streaming(self, messages, temperature=None, max_tokens=None):
         """Gemini non-streaming fallback implementation."""
         # Gemini's API has a different structure for messages
         gemini_messages = [msg['content'] for msg in messages if msg['role'] != 'system']
         
-        # Only add max_output_tokens if it's specified in the database
+        # Use max_tokens parameter if provided, else fall back to model_instance or default
         generation_config = {}
-        if self.model_instance and self.model_instance.max_tokens:
+        if max_tokens is not None:
+            generation_config["max_output_tokens"] = max_tokens
+        elif self.model_instance and self.model_instance.max_tokens:
             generation_config["max_output_tokens"] = self.model_instance.max_tokens
             
         if temperature is not None:
