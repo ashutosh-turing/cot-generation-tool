@@ -214,8 +214,17 @@ Your response should be ONLY the JSON object, nothing else.
         
         # Call the appropriate LLM API based on the model
         if "gpt" in model_name.lower():
+            # Use API key from model if available, else error
+            api_key = getattr(model, "api_key", None)
+            if not api_key:
+                return {
+                    "error": "OpenAI API key not found in model object.",
+                    "match_category": "Unknown",
+                    "similarity_score": 0,
+                    "reasoning": "Could not validate due to missing OpenAI API key"
+                }
             client = OpenAI(
-                api_key=settings.OPENAI_API_KEY,
+                api_key=api_key,
                 base_url=getattr(settings, "OPENAI_API_URL", "https://api.openai.com/v1")
             )
             response = client.chat.completions.create(
@@ -232,7 +241,16 @@ Your response should be ONLY the JSON object, nothing else.
         elif "claude" in model_name.lower():
             try:
                 import anthropic
-                claude_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+                # Use API key from model if available, else error
+                api_key = getattr(model, "api_key", None)
+                if not api_key:
+                    return {
+                        "error": "Anthropic API key not found in model object.",
+                        "match_category": "Unknown",
+                        "similarity_score": 0,
+                        "reasoning": "Could not validate due to missing Anthropic API key"
+                    }
+                claude_client = anthropic.Anthropic(api_key=api_key)
                 
                 response = claude_client.messages.create(
                     model=model_name,
@@ -250,6 +268,14 @@ Your response should be ONLY the JSON object, nothing else.
                     "match_category": "Unknown",
                     "similarity_score": 0,
                     "reasoning": "Could not validate due to missing Anthropic SDK"
+                }
+            except Exception as e:
+                logger.error(f"Anthropic API error: {str(e)}")
+                return {
+                    "error": f"Anthropic API error: {str(e)}",
+                    "match_category": "Unknown",
+                    "similarity_score": 0,
+                    "reasoning": f"Could not validate due to Anthropic API error: {str(e)}"
                 }
         
         # Google models
@@ -431,8 +457,12 @@ def call_llm_api(model, prompt, num_replies):
         
         # OpenAI models
         if "gpt" in model_name.lower():
+            # Use API key from model if available, else error
+            api_key = getattr(model, "api_key", None)
+            if not api_key:
+                raise Exception("OpenAI API key not found in model object.")
             client = OpenAI(
-                api_key=settings.OPENAI_API_KEY,
+                api_key=api_key,
                 base_url=getattr(settings, "OPENAI_API_URL", "https://api.openai.com/v1")
             )
             
@@ -452,7 +482,11 @@ def call_llm_api(model, prompt, num_replies):
             # If using Anthropic's API
             try:
                 import anthropic
-                claude_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+                # Use API key from model if available, else error
+                api_key = getattr(model, "api_key", None)
+                if not api_key:
+                    raise Exception("Anthropic API key not found in model object.")
+                claude_client = anthropic.Anthropic(api_key=api_key)
                 
                 for _ in range(num_replies):
                     response = claude_client.messages.create(
@@ -466,6 +500,9 @@ def call_llm_api(model, prompt, num_replies):
             except ImportError:
                 # Fallback to mock responses if Anthropic SDK is not available
                 responses = [f"Claude would respond to: {prompt} (response #{i+1})" for i in range(num_replies)]
+            except Exception as e:
+                logger.error(f"Anthropic API error: {str(e)}")
+                responses = [f"Error with Anthropic API: {str(e)}"]
         
         # Google models
         elif "gemini" in model_name.lower():
