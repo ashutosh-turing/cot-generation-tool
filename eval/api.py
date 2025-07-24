@@ -596,7 +596,11 @@ def call_llm_api(model, prompt, num_replies):
             try:
                 from processor.utils import evaluate_with_llm
                 from processor.models import Prompt
-                from django.conf import settings  # Ensure settings is available
+
+                # Try to get an API key from the model if available
+                api_key = getattr(model, "api_key", None)
+                if not api_key:
+                    raise Exception("API key not found in model object for fallback evaluation.")
 
                 # Create a dummy prompt object
                 dummy_prompt = Prompt(system_message="You are a helpful assistant.")
@@ -611,7 +615,7 @@ def call_llm_api(model, prompt, num_replies):
 
                 # Call the existing evaluation function
                 for _ in range(num_replies):
-                    response = evaluate_with_llm(json_result, settings.OPENAI_API_KEY, model, dummy_prompt)
+                    response = evaluate_with_llm(json_result, api_key, model, dummy_prompt)
                     responses.append(response)
 
                 logger.info(f"Used evaluate_with_llm for model {model_name}")
@@ -622,7 +626,7 @@ def call_llm_api(model, prompt, num_replies):
 
     except Exception as e:
         logger.error(f"Error calling LLM API: {str(e)}")
-        # Return error message as response
+        # Ensure responses is always defined as a list
         responses = [f"Error generating response: {str(e)}"]
     
     return responses
