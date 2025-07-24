@@ -95,6 +95,32 @@ def trainer_question_analysis(request, project_id, question_id):
     from django.http import JsonResponse
     from .models import TaskSyncConfig, TrainerTask, Project
 
+    # Helper to scrape content from URL
+    def scrape_content(url):
+        problem_title = ""
+        problem_statement = ""
+        references = []
+        error = None
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+            }
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, "html.parser")
+                title_tag = soup.find("div", class_="title")
+                if title_tag:
+                    problem_title = title_tag.text.strip()
+                statement_tag = soup.find("div", class_="problem-statement")
+                if statement_tag:
+                    problem_statement = statement_tag.text.strip()
+                references = [a['href'] for a in statement_tag.find_all("a", href=True)] if statement_tag else []
+            else:
+                error = f"Failed to fetch problem from Codeforces (status {resp.status_code})"
+        except Exception as e:
+            error = f"Error scraping Codeforces: {str(e)}"
+        return problem_title, problem_statement, references, error
+
     # Helper to scrape Codeforces
     def scrape_codeforces(qid):
         codeforces_url = f"https://codeforces.com/problemset/problem/{qid}"
@@ -210,7 +236,9 @@ def trainer_question_analysis(request, project_id, question_id):
                     references = [link.strip().strip("'").strip('"') for link in ref_val.split(",") if link.strip()]
             # Scraping fallback if needed
             if scraping_needed and link_column and getattr(task, link_column, None):
-                problem_statement = f"[TO SCRAPE] {getattr(task, link_column)}"
+                link = getattr(task, link_column)
+                problem_title, problem_statement, references, error = scrape_content(link)
+
             # Collect all mapped extra fields
             for logical, sheet_col in mapping.items():
                 if logical not in ("prompt", "title", "reference_links"):
