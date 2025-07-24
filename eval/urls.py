@@ -12,7 +12,6 @@ urlpatterns = [
     path('modal_playground/', views.modal_playground, name='modal_playground'),
     path('trainer/task/edit/<int:task_id>/', views.edit_trainer_task, name='edit_trainer_task'),
     path('review/<path:question_id>/', views.review_question, name='review_question'),
-    path('task-sync/', views.task_sync_config_view, name='task_sync_config'),
     path('project-config/', views.project_config_view, name='project_config'),
     path('dashboard/tasks/', views.trainer_dashboard, name='trainer_dashboard'),
     path('reviewer/', views.reviewer_dashboard, name='reviewer_dashboard'),
@@ -47,6 +46,7 @@ urlpatterns = [
     path('ground_truth/', views.ground_truth, name='ground_truth'),
     
     # API endpoints
+    path('api/task-sync/', views.task_sync_config_view, name='task_sync_config'),
     path('api/fetch-colab-content/', api_views.fetch_colab_content, name='api_fetch_colab_content'),
     path('api/transfer-to-colab/', api_views.transfer_to_colab, name='api_transfer_to_colab'),
     path('api/llm-models/', api.get_llm_models, name='api_llm_models'),
