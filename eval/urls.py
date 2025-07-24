@@ -13,6 +13,7 @@ urlpatterns = [
     path('trainer/task/edit/<int:task_id>/', views.edit_trainer_task, name='edit_trainer_task'),
     path('review/<path:question_id>/', views.review_question, name='review_question'),
     path('task-sync/', views.task_sync_config_view, name='task_sync_config'),
+    path('project-config/', views.project_config_view, name='project_config'),
     path('dashboard/tasks/', views.trainer_dashboard, name='trainer_dashboard'),
     path('reviewer/', views.reviewer_dashboard, name='reviewer_dashboard'),
     path('trainer/question/<int:project_id>/<path:question_id>/', views.trainer_question_analysis, name='trainer_question_analysis'),
@@ -62,6 +63,11 @@ urlpatterns = [
     path('api/llm/jobs/', api_llm.list_user_jobs, name='api_list_user_jobs'),
     path('api/llm/jobs/stats/', views.get_llm_job_stats, name='api_get_llm_job_stats'),
     path('api/llm/trainer-analysis/', api_llm.submit_trainer_question_analysis, name='api_submit_trainer_analysis'),
+    
+    # Project configuration API (admin only)
+    path('api/update_project_criteria/', views.update_project_criteria, name='update_project_criteria'),
+    path('api/bulk_update_project_criteria/', views.bulk_update_project_criteria, name='bulk_update_project_criteria'),
+    path('api/update_user_role/', views.update_user_role, name='update_user_role'),
     
     # Activity Tracking API endpoints
     path('api/activity/start/', views.activity_start, name='api_activity_start'),

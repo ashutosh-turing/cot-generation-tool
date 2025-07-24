@@ -144,6 +144,32 @@ def process_review_colab(data):
         model_obj = LLMModel.objects.get(id=model_id)
         user = User.objects.get(id=user_id) if user_id else None
 
+        # Get project-specific validation criteria
+        from eval.models import TrainerTask, Project
+        from eval.views import get_project_criteria
+        
+        project = None
+        if question_id:
+            # Try to determine the project from the question_id
+            task = TrainerTask.objects.filter(question_id=question_id).first()
+            if task and task.project:
+                project = task.project
+                print(f"DEBUG: Found project {project.code} for question_id {question_id}")
+            else:
+                print(f"DEBUG: No project found for question_id {question_id}")
+        
+        # Get enabled criteria for this project
+        project_criteria = get_project_criteria(project)
+        
+        # Convert to list and get criteria names
+        if hasattr(project_criteria, 'all'):
+            criteria_list = list(project_criteria.all())
+        else:
+            criteria_list = list(project_criteria)
+        
+        enabled_criteria_names = [criteria.name for criteria in criteria_list]
+        print(f"DEBUG: Enabled criteria for analysis: {enabled_criteria_names}")
+
         # Extract Implementation section with multi-language support
         def extract_implementation(content):
             import re
@@ -321,149 +347,206 @@ def process_review_colab(data):
             print(f"DEBUG: Content length: {len(colab_content)}")
             print(f"DEBUG: Content preview: {colab_content[:500]}...")
 
-        # 1. Grammar check
-        grammar_prompt = (
-            "You are a grammar expert. Review the following notebook content for grammar and language issues. "
-            "List all errors and suggest corrections. If there are no issues, say 'No grammar issues found.'\n\n"
-            f"Notebook Content:\n{colab_content}"
-        )
-        grammar_result = call_llm_api(model_obj, grammar_prompt, 1)[0]
+        # Initialize result dictionary
+        result = {"success": True}
 
-        # 2. Plagiarism check (on implementation code)
-        if implementation_code.strip():
-            plagiarism_prompt = (
-                "You are an expert code plagiarism detector. Analyze the following code for potential plagiarism.\n\n"
-                "Please evaluate:\n"
-                "1. Code originality and uniqueness\n"
-                "2. Common patterns vs. copied solutions\n"
-                "3. Variable naming conventions\n"
-                "4. Code structure and style\n"
-                "5. Likelihood of being copied from online sources\n\n"
-                "Provide a plagiarism score from 0-100% where:\n"
-                "- 0-20%: Highly original code\n"
-                "- 21-40%: Some common patterns but mostly original\n"
-                "- 41-60%: Mix of common and potentially copied elements\n"
-                "- 61-80%: Likely contains copied code segments\n"
-                "- 81-100%: High likelihood of plagiarism\n\n"
-                "Format your response as:\n"
-                "PLAGIARISM SCORE: [X]%\n"
-                "ANALYSIS: [Your detailed analysis]\n\n"
-                f"Code to analyze:\n{implementation_code}"
+        # Only run analyses for enabled criteria
+        # 1. Grammar Check
+        if "Grammar Check" in enabled_criteria_names:
+            print("DEBUG: Running Grammar Check analysis")
+            grammar_prompt = (
+                "You are a grammar expert. Review the following notebook content for grammar and language issues. "
+                "List all errors and suggest corrections. If there are no issues, say 'No grammar issues found.'\n\n"
+                f"Notebook Content:\n{colab_content}"
             )
-            plagiarism_result = call_llm_api(model_obj, plagiarism_prompt, 1)[0]
-            
-            # Try to extract a score from the response with improved regex
-            import re
-            
-            print(f"DEBUG: Plagiarism result to parse: {plagiarism_result[:300]}...")
-            
-            score_patterns = [
-                r"PLAGIARISM SCORE:\s*(\d{1,3})\s*%",
-                r"Score:\s*(\d{1,3})\s*%",
-                r"Plagiarism\s*Score:\s*(\d{1,3})\s*%",
-                r"(\d{1,3})\s*%\s*plagiarism",
-                r"plagiarism.*?(\d{1,3})\s*%",
-                r"score.*?(\d{1,3})\s*%",
-                r"(\d{1,3})\s*%\s*likelihood",
-                r"likelihood.*?(\d{1,3})\s*%",
-                r"(\d{1,3})\s*percent",
-                r"(\d{1,3})\s*%"
-            ]
-            
-            plagiarism_score = None
-            for i, pattern in enumerate(score_patterns):
-                score_match = re.search(pattern, plagiarism_result, re.IGNORECASE)
-                if score_match:
-                    try:
-                        score = int(score_match.group(1))
-                        if 0 <= score <= 100:  # Validate score range
-                            plagiarism_score = score
-                            print(f"DEBUG: Found plagiarism score {score}% using pattern {i+1}")
-                            break
-                    except (ValueError, IndexError):
-                        continue
-            
-            # If no score found, try to infer from text
-            if plagiarism_score is None:
-                print("DEBUG: No numeric score found, trying to infer from text")
-                lower_result = plagiarism_result.lower()
+            result["grammar"] = call_llm_api(model_obj, grammar_prompt, 1)[0]
+        else:
+            print("DEBUG: Skipping Grammar Check - not enabled for this project")
+            result["grammar"] = "Grammar check disabled for this project."
+
+        # 2. Plagiarism Check
+        if "Plagiarism Check" in enabled_criteria_names:
+            print("DEBUG: Running Plagiarism Check analysis")
+            if implementation_code.strip():
+                plagiarism_prompt = (
+                    "You are an expert code plagiarism detector. Analyze the following code for potential plagiarism.\n\n"
+                    "Please evaluate:\n"
+                    "1. Code originality and uniqueness\n"
+                    "2. Common patterns vs. copied solutions\n"
+                    "3. Variable naming conventions\n"
+                    "4. Code structure and style\n"
+                    "5. Likelihood of being copied from online sources\n\n"
+                    "Provide a plagiarism score from 0-100% where:\n"
+                    "- 0-20%: Highly original code\n"
+                    "- 21-40%: Some common patterns but mostly original\n"
+                    "- 41-60%: Mix of common and potentially copied elements\n"
+                    "- 61-80%: Likely contains copied code segments\n"
+                    "- 81-100%: High likelihood of plagiarism\n\n"
+                    "Format your response as:\n"
+                    "PLAGIARISM SCORE: [X]%\n"
+                    "ANALYSIS: [Your detailed analysis]\n\n"
+                    f"Code to analyze:\n{implementation_code}"
+                )
+                plagiarism_result = call_llm_api(model_obj, plagiarism_prompt, 1)[0]
                 
-                # More comprehensive text analysis
-                if any(phrase in lower_result for phrase in [
-                    'no plagiarism', 'not plagiarized', 'original code', 'unique implementation',
-                    'highly original', 'completely original', 'no copied', 'not copied'
-                ]):
-                    plagiarism_score = 10
-                    print("DEBUG: Inferred very low plagiarism (10%)")
-                elif any(phrase in lower_result for phrase in [
-                    'low plagiarism', 'minimal plagiarism', 'slight similarity', 'mostly original',
-                    'low likelihood', 'unlikely to be copied', 'minor similarities'
-                ]):
-                    plagiarism_score = 25
-                    print("DEBUG: Inferred low plagiarism (25%)")
-                elif any(phrase in lower_result for phrase in [
-                    'moderate plagiarism', 'some similarities', 'partial copying', 'mixed originality',
-                    'moderate likelihood', 'some copied elements', 'moderate concern'
-                ]):
-                    plagiarism_score = 50
-                    print("DEBUG: Inferred moderate plagiarism (50%)")
-                elif any(phrase in lower_result for phrase in [
-                    'high plagiarism', 'likely copied', 'probable plagiarism', 'significant similarities',
-                    'high likelihood', 'mostly copied', 'substantial copying'
-                ]):
-                    plagiarism_score = 75
-                    print("DEBUG: Inferred high plagiarism (75%)")
-                elif any(phrase in lower_result for phrase in [
-                    'definitely copied', 'clearly plagiarized', 'stolen code', 'direct copy',
-                    'very high plagiarism', 'almost certainly copied', 'obvious plagiarism'
-                ]):
-                    plagiarism_score = 90
-                    print("DEBUG: Inferred very high plagiarism (90%)")
-                else:
-                    # Try to find any percentage mentioned in the text
-                    percentage_matches = re.findall(r'(\d{1,3})\s*(?:%|percent)', lower_result)
-                    if percentage_matches:
+                # Try to extract a score from the response with improved regex
+                import re
+                
+                print(f"DEBUG: Plagiarism result to parse: {plagiarism_result[:300]}...")
+                
+                score_patterns = [
+                    r"PLAGIARISM SCORE:\s*(\d{1,3})\s*%",
+                    r"Score:\s*(\d{1,3})\s*%",
+                    r"Plagiarism\s*Score:\s*(\d{1,3})\s*%",
+                    r"(\d{1,3})\s*%\s*plagiarism",
+                    r"plagiarism.*?(\d{1,3})\s*%",
+                    r"score.*?(\d{1,3})\s*%",
+                    r"(\d{1,3})\s*%\s*likelihood",
+                    r"likelihood.*?(\d{1,3})\s*%",
+                    r"(\d{1,3})\s*percent",
+                    r"(\d{1,3})\s*%"
+                ]
+                
+                plagiarism_score = None
+                for i, pattern in enumerate(score_patterns):
+                    score_match = re.search(pattern, plagiarism_result, re.IGNORECASE)
+                    if score_match:
                         try:
-                            score = int(percentage_matches[0])
-                            if 0 <= score <= 100:
+                            score = int(score_match.group(1))
+                            if 0 <= score <= 100:  # Validate score range
                                 plagiarism_score = score
-                                print(f"DEBUG: Found percentage {score}% in text")
-                        except ValueError:
-                            pass
+                                print(f"DEBUG: Found plagiarism score {score}% using pattern {i+1}")
+                                break
+                        except (ValueError, IndexError):
+                            continue
+                
+                # If no score found, try to infer from text
+                if plagiarism_score is None:
+                    print("DEBUG: No numeric score found, trying to infer from text")
+                    lower_result = plagiarism_result.lower()
                     
-                    if plagiarism_score is None:
-                        plagiarism_score = 0  # Default to 0 if cannot determine
-                        print("DEBUG: Could not determine plagiarism score, defaulting to 0%")
-            
-            print(f"DEBUG: Final plagiarism score: {plagiarism_score}%")
+                    # More comprehensive text analysis
+                    if any(phrase in lower_result for phrase in [
+                        'no plagiarism', 'not plagiarized', 'original code', 'unique implementation',
+                        'highly original', 'completely original', 'no copied', 'not copied'
+                    ]):
+                        plagiarism_score = 10
+                        print("DEBUG: Inferred very low plagiarism (10%)")
+                    elif any(phrase in lower_result for phrase in [
+                        'low plagiarism', 'minimal plagiarism', 'slight similarity', 'mostly original',
+                        'low likelihood', 'unlikely to be copied', 'minor similarities'
+                    ]):
+                        plagiarism_score = 25
+                        print("DEBUG: Inferred low plagiarism (25%)")
+                    elif any(phrase in lower_result for phrase in [
+                        'moderate plagiarism', 'some similarities', 'partial copying', 'mixed originality',
+                        'moderate likelihood', 'some copied elements', 'moderate concern'
+                    ]):
+                        plagiarism_score = 50
+                        print("DEBUG: Inferred moderate plagiarism (50%)")
+                    elif any(phrase in lower_result for phrase in [
+                        'high plagiarism', 'likely copied', 'probable plagiarism', 'significant similarities',
+                        'high likelihood', 'mostly copied', 'substantial copying'
+                    ]):
+                        plagiarism_score = 75
+                        print("DEBUG: Inferred high plagiarism (75%)")
+                    elif any(phrase in lower_result for phrase in [
+                        'definitely copied', 'clearly plagiarized', 'stolen code', 'direct copy',
+                        'very high plagiarism', 'almost certainly copied', 'obvious plagiarism'
+                    ]):
+                        plagiarism_score = 90
+                        print("DEBUG: Inferred very high plagiarism (90%)")
+                    else:
+                        # Try to find any percentage mentioned in the text
+                        percentage_matches = re.findall(r'(\d{1,3})\s*(?:%|percent)', lower_result)
+                        if percentage_matches:
+                            try:
+                                score = int(percentage_matches[0])
+                                if 0 <= score <= 100:
+                                    plagiarism_score = score
+                                    print(f"DEBUG: Found percentage {score}% in text")
+                            except ValueError:
+                                pass
+                        
+                        if plagiarism_score is None:
+                            plagiarism_score = 0  # Default to 0 if cannot determine
+                            print("DEBUG: Could not determine plagiarism score, defaulting to 0%")
+                
+                print(f"DEBUG: Final plagiarism score: {plagiarism_score}%")
+                result["plagiarism_score"] = plagiarism_score
+                result["plagiarism_result"] = plagiarism_result
+            else:
+                result["plagiarism_result"] = "No implementation code found to analyze for plagiarism."
+                result["plagiarism_score"] = 0
         else:
-            plagiarism_result = "No implementation code found to analyze for plagiarism."
-            plagiarism_score = 0
+            print("DEBUG: Skipping Plagiarism Check - not enabled for this project")
+            result["plagiarism_result"] = "Plagiarism check disabled for this project."
+            result["plagiarism_score"] = None
 
-        # 3. Code quality and improvements
-        code_quality_prompt = (
-            "You are a code reviewer. Review the following code for quality, readability, and best practices. "
-            "Suggest any improvements or refactoring. If the code is good, say 'Code quality is good.'\n\n"
-            f"Code:\n{implementation_code or '[No code found]'}"
-        )
-        code_quality_result = call_llm_api(model_obj, code_quality_prompt, 1)[0]
-
-        # Try to split improvements if present
-        improvements = ""
-        if "improvement" in code_quality_result.lower():
-            improvements = code_quality_result
-        else:
-            improvements = ""
-
-        # Construct the result dictionary
-        result = {
-            "grammar": grammar_result,
-            "plagiarism_score": plagiarism_score,
-            "plagiarism_result": plagiarism_result,
-            "code_quality": code_quality_result,
-            "improvements": improvements,
-            "success": True
+        # 3. Code Style Check, Logic Validation, Performance Analysis, Security Review
+        # Map criteria names to analysis types
+        criteria_analysis_map = {
+            "Code Style Check": "code_style",
+            "Logic Validation": "logic_validation", 
+            "Performance Analysis": "performance_analysis",
+            "Security Review": "security_review"
         }
+
+        for criteria_name, result_key in criteria_analysis_map.items():
+            if criteria_name in enabled_criteria_names:
+                print(f"DEBUG: Running {criteria_name} analysis")
+                if criteria_name == "Code Style Check":
+                    prompt = (
+                        "You are a code style expert. Review the following code for style, formatting, and coding conventions. "
+                        "Check for proper indentation, naming conventions, comments, and overall readability. "
+                        "Suggest improvements if needed. If the style is good, say 'Code style is good.'\n\n"
+                        f"Code:\n{implementation_code or '[No code found]'}"
+                    )
+                elif criteria_name == "Logic Validation":
+                    prompt = (
+                        "You are a logic validation expert. Review the following code for logical correctness and algorithmic soundness. "
+                        "Check for logical errors, edge cases, and algorithm efficiency. "
+                        "Identify any potential bugs or logical flaws. If the logic is sound, say 'Logic is correct.'\n\n"
+                        f"Code:\n{implementation_code or '[No code found]'}"
+                    )
+                elif criteria_name == "Performance Analysis":
+                    prompt = (
+                        "You are a performance analysis expert. Review the following code for performance issues and optimization opportunities. "
+                        "Analyze time complexity, space complexity, and suggest performance improvements. "
+                        "If performance is good, say 'Performance is acceptable.'\n\n"
+                        f"Code:\n{implementation_code or '[No code found]'}"
+                    )
+                elif criteria_name == "Security Review":
+                    prompt = (
+                        "You are a security expert. Review the following code for security vulnerabilities and potential risks. "
+                        "Check for input validation, buffer overflows, injection attacks, and other security concerns. "
+                        "If the code is secure, say 'No security issues found.'\n\n"
+                        f"Code:\n{implementation_code or '[No code found]'}"
+                    )
+                
+                result[result_key] = call_llm_api(model_obj, prompt, 1)[0]
+            else:
+                print(f"DEBUG: Skipping {criteria_name} - not enabled for this project")
+                result[result_key] = f"{criteria_name} disabled for this project."
+
+        # Legacy code quality field for backward compatibility
+        if "Code Style Check" in enabled_criteria_names or "Logic Validation" in enabled_criteria_names:
+            result["code_quality"] = result.get("code_style", "") + "\n\n" + result.get("logic_validation", "")
+        else:
+            result["code_quality"] = "Code quality analysis disabled for this project."
+
+        # Improvements field - combine suggestions from enabled analyses
+        improvements_parts = []
+        for criteria_name, result_key in criteria_analysis_map.items():
+            if criteria_name in enabled_criteria_names and result_key in result:
+                analysis_result = result[result_key]
+                if "improvement" in analysis_result.lower() or "suggest" in analysis_result.lower():
+                    improvements_parts.append(f"**{criteria_name}:**\n{analysis_result}")
+        
+        if improvements_parts:
+            result["improvements"] = "\n\n".join(improvements_parts)
+        else:
+            result["improvements"] = ""
 
         # Store the result in both cache and database
         if job_id:

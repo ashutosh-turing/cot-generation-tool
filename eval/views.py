@@ -2675,6 +2675,12 @@ def review_question(request, question_id):
     else:
         criteria_list = list(project_criteria)
     
+    # Debug: Print current criteria to help troubleshoot
+    print(f"DEBUG: review_question - Project: {project.code if project else 'None'}")
+    print(f"DEBUG: review_question - Found {len(criteria_list)} active criteria:")
+    for i, criteria in enumerate(criteria_list):
+        print(f"DEBUG: review_question - Criteria {i+1}: {criteria.name}")
+    
     # Fetch system messages based on user preference (stream/subject)
     preferred_streams = []
     try:
@@ -3344,34 +3350,59 @@ def sync_status_api(request):
 def get_project_criteria(project):
     """
     Helper function to get enabled validation criteria for a project.
-    Returns all active validations by default, or project-specific settings if configured.
+    Returns all active validations by default if no project found.
+    If project found, returns all active validations EXCEPT those explicitly disabled.
+    If all criteria are disabled for a project, falls back to a minimal default set.
     Results are ordered by priority (lower numbers first), then by name.
     """
     from .models import Validation, ProjectCriteria
     
     if not project:
+        # No project found, return all active validations as default
         return Validation.objects.filter(is_active=True).order_by('name')
     
-    # Get explicit project criteria settings
-    project_criteria = ProjectCriteria.objects.filter(
-        project=project,
-        is_enabled=True
-    ).select_related('validation')
+    # Get all active validations
+    all_validations = Validation.objects.filter(is_active=True)
     
-    if project_criteria.exists():
-        # Return only enabled criteria for this project, ordered by priority then name
-        validation_ids = project_criteria.values_list('validation_id', flat=True)
-        # Get the criteria with their priorities for proper ordering
-        criteria_with_priority = []
-        for pc in project_criteria:
-            if pc.validation.is_active:
-                criteria_with_priority.append((pc.validation, pc.priority))
+    # Get explicit project criteria settings for this project
+    project_criteria_settings = ProjectCriteria.objects.filter(project=project).select_related('validation')
+    
+    if project_criteria_settings.exists():
+        # Project has explicit criteria settings
+        # Create a mapping of validation_id to ProjectCriteria
+        criteria_map = {pc.validation.validation_id: pc for pc in project_criteria_settings}
+        
+        enabled_criteria = []
+        for validation in all_validations:
+            if validation.validation_id in criteria_map:
+                # Use explicit setting - only include if enabled
+                pc = criteria_map[validation.validation_id]
+                if pc.is_enabled:
+                    enabled_criteria.append((validation, pc.priority))
+            else:
+                # No explicit setting, default to enabled
+                enabled_criteria.append((validation, 1))  # Default priority
+        
+        # Check if no criteria are enabled (edge case)
+        if not enabled_criteria:
+            print(f"WARNING: No criteria enabled for project {project.code}. Using minimal fallback set.")
+            # Fallback to a minimal essential set - at least Grammar Check and Code Quality
+            fallback_criteria = all_validations.filter(
+                name__in=['Grammar Check', 'Code Style Check', 'Logic Validation']
+            ).order_by('name')
+            
+            if fallback_criteria.exists():
+                return list(fallback_criteria)
+            else:
+                # Ultimate fallback - return the first available validation
+                first_validation = all_validations.first()
+                return [first_validation] if first_validation else []
         
         # Sort by priority (ascending), then by name
-        criteria_with_priority.sort(key=lambda x: (x[1], x[0].name))
+        enabled_criteria.sort(key=lambda x: (x[1], x[0].name))
         
         # Return just the validation objects in the correct order
-        return [criteria[0] for criteria in criteria_with_priority]
+        return [criteria[0] for criteria in enabled_criteria]
     else:
-        # Default: return all active validations ordered by name
-        return Validation.objects.filter(is_active=True).order_by('name')
+        # No explicit project criteria settings exist, return all active validations
+        return all_validations.order_by('name')

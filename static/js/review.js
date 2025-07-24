@@ -334,6 +334,172 @@ document.addEventListener("DOMContentLoaded", function () {
           if (statusData.status === 'completed') {
             // Show successful result
             const result = statusData.result_data;
+            
+            // Build sections dynamically based on available results
+            let sectionsHtml = '';
+            
+            // Grammar Analysis
+            if (result.grammar && !result.grammar.includes('disabled for this project')) {
+              sectionsHtml += `
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
+                  <div class="flex items-center mb-3">
+                    <div class="p-2 bg-blue-100 rounded-lg mr-3">
+                      <i class="fas fa-spell-check text-blue-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800">Grammar Analysis</h4>
+                  </div>
+                  <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
+                    ${window.marked && result.grammar ? window.marked.parse(result.grammar) : (result.grammar || "No grammar analysis available")}
+                  </div>
+                </div>
+              `;
+            }
+            
+            // Plagiarism Check
+            if (result.plagiarism_result && !result.plagiarism_result.includes('disabled for this project')) {
+              sectionsHtml += `
+                <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-5 border border-orange-100">
+                  <div class="flex items-center mb-3">
+                    <div class="p-2 bg-orange-100 rounded-lg mr-3">
+                      <i class="fas fa-search text-orange-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800">Plagiarism Check</h4>
+                  </div>
+                  <div class="mb-3">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-sm font-medium text-gray-600">Similarity Score</span>
+                      <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
+                        (result.plagiarism_score != null && result.plagiarism_score > 50) ? 'bg-red-100 text-red-800' : 
+                        (result.plagiarism_score != null && result.plagiarism_score > 25) ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-green-100 text-green-800'
+                      }">
+                        ${result.plagiarism_score != null && result.plagiarism_score !== undefined ? result.plagiarism_score + "%" : "N/A"}
+                      </span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                      <div class="h-2 rounded-full ${
+                        (result.plagiarism_score != null && result.plagiarism_score > 50) ? 'bg-red-500' : 
+                        (result.plagiarism_score != null && result.plagiarism_score > 25) ? 'bg-yellow-500' : 
+                        'bg-green-500'
+                      }" style="width: ${result.plagiarism_score != null ? result.plagiarism_score : 0}%"></div>
+                    </div>
+                  </div>
+                  ${result.plagiarism_result && result.plagiarism_result.trim() ? `
+                    <div class="prose prose-xs max-w-none text-gray-600 max-h-48 overflow-y-auto">
+                      ${window.marked ? window.marked.parse(result.plagiarism_result) : result.plagiarism_result}
+                    </div>
+                  ` : `
+                    <div class="text-sm text-gray-500 italic">
+                      <i class="fas fa-info-circle mr-1"></i>
+                      No plagiarism analysis available
+                    </div>
+                  `}
+                </div>
+              `;
+            }
+            
+            // Code Style Check
+            if (result.code_style && !result.code_style.includes('disabled for this project')) {
+              sectionsHtml += `
+                <div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-5 border border-purple-100">
+                  <div class="flex items-center mb-3">
+                    <div class="p-2 bg-purple-100 rounded-lg mr-3">
+                      <i class="fas fa-code text-purple-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800">Code Style Check</h4>
+                  </div>
+                  <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
+                    ${window.marked ? window.marked.parse(result.code_style) : result.code_style}
+                  </div>
+                </div>
+              `;
+            }
+            
+            // Logic Validation
+            if (result.logic_validation && !result.logic_validation.includes('disabled for this project')) {
+              sectionsHtml += `
+                <div class="bg-gradient-to-br from-green-50 to-teal-50 rounded-xl p-5 border border-green-100">
+                  <div class="flex items-center mb-3">
+                    <div class="p-2 bg-green-100 rounded-lg mr-3">
+                      <i class="fas fa-check-circle text-green-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800">Logic Validation</h4>
+                  </div>
+                  <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
+                    ${window.marked ? window.marked.parse(result.logic_validation) : result.logic_validation}
+                  </div>
+                </div>
+              `;
+            }
+            
+            // Performance Analysis
+            if (result.performance_analysis && !result.performance_analysis.includes('disabled for this project')) {
+              sectionsHtml += `
+                <div class="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-5 border border-yellow-100">
+                  <div class="flex items-center mb-3">
+                    <div class="p-2 bg-yellow-100 rounded-lg mr-3">
+                      <i class="fas fa-tachometer-alt text-yellow-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800">Performance Analysis</h4>
+                  </div>
+                  <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
+                    ${window.marked ? window.marked.parse(result.performance_analysis) : result.performance_analysis}
+                  </div>
+                </div>
+              `;
+            }
+            
+            // Security Review
+            if (result.security_review && !result.security_review.includes('disabled for this project')) {
+              sectionsHtml += `
+                <div class="bg-gradient-to-br from-red-50 to-pink-50 rounded-xl p-5 border border-red-100">
+                  <div class="flex items-center mb-3">
+                    <div class="p-2 bg-red-100 rounded-lg mr-3">
+                      <i class="fas fa-shield-alt text-red-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800">Security Review</h4>
+                  </div>
+                  <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
+                    ${window.marked ? window.marked.parse(result.security_review) : result.security_review}
+                  </div>
+                </div>
+              `;
+            }
+            
+            // Legacy Code Quality (fallback)
+            if (result.code_quality && !result.code_quality.includes('disabled for this project') && !result.code_style && !result.logic_validation) {
+              sectionsHtml += `
+                <div class="bg-gradient-to-br from-green-50 to-teal-50 rounded-xl p-5 border border-green-100">
+                  <div class="flex items-center mb-3">
+                    <div class="p-2 bg-green-100 rounded-lg mr-3">
+                      <i class="fas fa-code text-green-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800">Code Quality</h4>
+                  </div>
+                  <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
+                    ${window.marked && result.code_quality ? window.marked.parse(result.code_quality) : (result.code_quality || "No quality summary available")}
+                  </div>
+                </div>
+              `;
+            }
+            
+            // Improvements
+            if (result.improvements && result.improvements.trim() && result.improvements.trim().toLowerCase() !== "n/a") {
+              sectionsHtml += `
+                <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-5 border border-indigo-100">
+                  <div class="flex items-center mb-3">
+                    <div class="p-2 bg-indigo-100 rounded-lg mr-3">
+                      <i class="fas fa-lightbulb text-indigo-600"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800">Suggested Improvements</h4>
+                  </div>
+                  <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
+                    ${window.marked ? window.marked.parse(result.improvements) : result.improvements}
+                  </div>
+                </div>
+              `;
+            }
+            
             placeholder.innerHTML = `
               <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
                 <div class="flex items-center justify-between">
@@ -357,87 +523,7 @@ document.addEventListener("DOMContentLoaded", function () {
               
               <div class="p-6">
                 <div class="space-y-6">
-                  
-                  <!-- Grammar Analysis -->
-                  <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
-                    <div class="flex items-center mb-3">
-                      <div class="p-2 bg-blue-100 rounded-lg mr-3">
-                        <i class="fas fa-spell-check text-blue-600"></i>
-                      </div>
-                      <h4 class="text-lg font-semibold text-gray-800">Grammar Analysis</h4>
-                    </div>
-                    <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
-                      ${window.marked && result.grammar ? window.marked.parse(result.grammar) : (result.grammar || "No grammar analysis available")}
-                    </div>
-                  </div>
-                  
-                  <!-- Plagiarism Check -->
-                  <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-5 border border-orange-100">
-                    <div class="flex items-center mb-3">
-                      <div class="p-2 bg-orange-100 rounded-lg mr-3">
-                        <i class="fas fa-search text-orange-600"></i>
-                      </div>
-                      <h4 class="text-lg font-semibold text-gray-800">Plagiarism Check</h4>
-                    </div>
-                    <div class="mb-3">
-                      <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-medium text-gray-600">Similarity Score</span>
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
-                          (result.plagiarism_score != null && result.plagiarism_score > 50) ? 'bg-red-100 text-red-800' : 
-                          (result.plagiarism_score != null && result.plagiarism_score > 25) ? 'bg-yellow-100 text-yellow-800' : 
-                          'bg-green-100 text-green-800'
-                        }">
-                          ${result.plagiarism_score != null && result.plagiarism_score !== undefined ? result.plagiarism_score + "%" : "N/A"}
-                        </span>
-                      </div>
-                      <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="h-2 rounded-full ${
-                          (result.plagiarism_score != null && result.plagiarism_score > 50) ? 'bg-red-500' : 
-                          (result.plagiarism_score != null && result.plagiarism_score > 25) ? 'bg-yellow-500' : 
-                          'bg-green-500'
-                        }" style="width: ${result.plagiarism_score != null ? result.plagiarism_score : 0}%"></div>
-                      </div>
-                    </div>
-                    ${result.plagiarism_result && result.plagiarism_result.trim() ? `
-                      <div class="prose prose-xs max-w-none text-gray-600 max-h-48 overflow-y-auto">
-                        ${window.marked ? window.marked.parse(result.plagiarism_result) : result.plagiarism_result}
-                      </div>
-                    ` : `
-                      <div class="text-sm text-gray-500 italic">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        No plagiarism analysis available
-                      </div>
-                    `}
-                  </div>
-                  
-                  ${result.improvements && result.improvements.trim() && result.improvements.trim().toLowerCase() !== "n/a" ? `
-                  <!-- Improvements -->
-                  <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border border-purple-100">
-                    <div class="flex items-center mb-3">
-                      <div class="p-2 bg-purple-100 rounded-lg mr-3">
-                        <i class="fas fa-lightbulb text-purple-600"></i>
-                      </div>
-                      <h4 class="text-lg font-semibold text-gray-800">Suggested Improvements</h4>
-                    </div>
-                    <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
-                      ${window.marked ? window.marked.parse(result.improvements) : result.improvements}
-                    </div>
-                  </div>
-                  ` : ''}
-                  
-                  <!-- Code Quality Summary -->
-                  <div class="bg-gradient-to-br from-green-50 to-teal-50 rounded-xl p-5 border border-green-100">
-                    <div class="flex items-center mb-3">
-                      <div class="p-2 bg-green-100 rounded-lg mr-3">
-                        <i class="fas fa-code text-green-600"></i>
-                      </div>
-                      <h4 class="text-lg font-semibold text-gray-800">Quality Summary</h4>
-                    </div>
-                    <div class="prose prose-sm max-w-none text-gray-700 max-h-64 overflow-y-auto">
-                      ${window.marked && result.code_quality ? window.marked.parse(result.code_quality) : (result.code_quality || "No quality summary available")}
-                    </div>
-                  </div>
-                  
+                  ${sectionsHtml}
                 </div>
               </div>
             `;
