@@ -12,6 +12,7 @@ urlpatterns = [
     path('modal_playground/', views.modal_playground, name='modal_playground'),
     path('trainer/task/edit/<int:task_id>/', views.edit_trainer_task, name='edit_trainer_task'),
     path('review/<path:question_id>/', views.review_question, name='review_question'),
+    path('task-sync/', views.task_sync_config_view, name='task_sync_config'),
     path('project-config/', views.project_config_view, name='project_config'),
     path('dashboard/tasks/', views.trainer_dashboard, name='trainer_dashboard'),
     path('reviewer/', views.reviewer_dashboard, name='reviewer_dashboard'),
@@ -46,7 +47,6 @@ urlpatterns = [
     path('ground_truth/', views.ground_truth, name='ground_truth'),
     
     # API endpoints
-    path('api/task-sync/', views.task_sync_config_view, name='task_sync_config'),
     path('api/fetch-colab-content/', api_views.fetch_colab_content, name='api_fetch_colab_content'),
     path('api/transfer-to-colab/', api_views.transfer_to_colab, name='api_transfer_to_colab'),
     path('api/llm-models/', api.get_llm_models, name='api_llm_models'),
@@ -73,6 +73,9 @@ urlpatterns = [
     path('api/activity/start/', views.activity_start, name='api_activity_start'),
     path('api/activity/update/', views.activity_update, name='api_activity_update'),
     path('api/activity/end/', views.activity_end, name='api_activity_end'),
+
+    # Task Sync Status
+    path('api/sync-status/', views.sync_status_api, name='api_sync_status'),
     
     # path('api/ground-truth-validate/', api_views.run_ground_truth_validation, name='api_ground_truth_validate'),
 ]
