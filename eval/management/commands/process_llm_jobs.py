@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import logging
 from django.core.management.base import BaseCommand
 from google.cloud import pubsub_v1
 from django.conf import settings
@@ -11,6 +12,8 @@ from django.core.cache import cache
 from eval.utils.pubsub import publish_notification
 from django.utils import timezone
 from concurrent.futures import ThreadPoolExecutor
+
+logger = logging.getLogger(__name__)
 
 def process_trainer_question_analysis(data):
     """Processes a trainer question analysis job."""
@@ -59,7 +62,27 @@ def process_trainer_question_analysis(data):
             messages.append({"role": "system", "content": system_message})
         messages.append({"role": "user", "content": full_input})
 
-        result = client.get_response(messages)
+        # Determine temperature: prefer job data, else model default
+        temperature = data.get("temp")
+        if temperature is None:
+            temperature = data.get("temperature")
+        if temperature is None:
+            temperature = model_obj.temperature
+
+        result = client.get_response(messages, temperature=temperature)
+
+        # Log completion information for Anthropic responses
+        if model_obj.provider.lower() == 'anthropic' and result.get('status') == 'success':
+            completion_attempts = result.get('completion_attempts', 1)
+            was_continued = result.get('was_continued', False)
+            warning = result.get('warning', '')
+            
+            if was_continued:
+                logger.info(f"Trainer analysis for question {question_id} required {completion_attempts} attempts to complete")
+                if warning:
+                    logger.warning(f"Trainer analysis for question {question_id}: {warning}")
+            else:
+                logger.info(f"Trainer analysis for question {question_id} completed in single attempt")
 
         # Store the result in both cache and database
         cache_key = f"analysis_result_{job_id}_{model_id}"
@@ -103,21 +126,45 @@ def process_trainer_question_analysis(data):
                 llm_job.mark_failed(str(e))
 
 
-def call_llm_api(model_obj, prompt, n):
-    """A helper function to call the LLM API and get n responses."""
-    # Use API key from model_obj only; all keys are managed in the database
-    api_key = model_obj.api_key
-    client = get_ai_client(model_obj.provider, api_key, model_obj.name, model_obj)
-    
-    messages = [{"role": "user", "content": prompt}]
-    
-    responses = []
-    for _ in range(n):
-        result = client.get_response(messages)
-        if result['status'] == 'success':
-            responses.append(result['response'])
+    def call_llm_api(model_obj, prompt, n):
+        """A helper function to call the LLM API and get n responses with completion tracking."""
+        # Use API key from model_obj only; all keys are managed in the database
+        api_key = model_obj.api_key
+        client = get_ai_client(model_obj.provider, api_key, model_obj.name, model_obj)
+        
+        messages = [{"role": "user", "content": prompt}]
+        # Always use model's default temperature for generic API calls
+        temperature = getattr(model_obj, "temperature", 0.7)
+
+        responses = []
+        for i in range(n):
+            result = client.get_response(messages, temperature=temperature)
+            if result['status'] == 'success':
+                response_text = result['response']
+            
+            # Log completion information for all providers
+            completion_attempts = result.get('completion_attempts', 1)
+            was_continued = result.get('was_continued', False)
+            used_streaming = result.get('used_streaming', False)
+            chunk_count = result.get('chunk_count', 0)
+            warning = result.get('warning', '')
+            
+            # Log streaming and completion details
+            if used_streaming:
+                logger.info(f"Response {i+1}/{n} used streaming: {len(response_text)} chars, {chunk_count} chunks")
+            elif was_continued:
+                logger.info(f"Response {i+1}/{n} required {completion_attempts} continuation attempts")
+            else:
+                logger.info(f"Response {i+1}/{n} completed in single non-streaming call")
+            
+            if warning:
+                logger.warning(f"Response {i+1}/{n}: {warning}")
+            
+            responses.append(response_text)
         else:
-            responses.append(f"Error: {result.get('error', 'Unknown error')}")
+            error_msg = f"Error: {result.get('error', 'Unknown error')}"
+            logger.error(f"API call {i+1}/{n} failed: {error_msg}")
+            responses.append(error_msg)
             
     return responses
 
