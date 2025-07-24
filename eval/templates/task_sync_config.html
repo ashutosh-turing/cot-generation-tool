@@ -24,178 +24,146 @@
             </div>
         </div>
 
-        <!-- Project Configuration Section -->
+        <!-- Sync Daemon Status Monitor -->
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8">
-            <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-indigo-50">
-                <h2 class="text-xl font-bold text-gray-800 flex items-center">
-                    <i class="fas fa-plus-circle mr-3 text-purple-600"></i>
-                    Create New Project
-                </h2>
-                <p class="text-sm text-gray-600 mt-1">Add a new project to the system</p>
+            <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-cyan-50 to-blue-50">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                            <i class="fas fa-heartbeat mr-3 text-cyan-600"></i>
+                            Sync Daemon Status Monitor
+                        </h2>
+                        <p class="text-sm text-gray-600 mt-1">Real-time synchronization status and scheduling information</p>
+                    </div>
+                    <div class="mt-4 sm:mt-0 flex items-center space-x-3">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                            <span class="text-sm font-medium text-gray-700">Live Status</span>
+                        </div>
+                        <button onclick="refreshSyncStatus()" 
+                                class="inline-flex items-center px-3 py-2 bg-cyan-100 text-cyan-700 rounded-lg hover:bg-cyan-200 transition-colors text-sm font-medium">
+                            <i class="fas fa-sync-alt mr-1" id="refresh-icon"></i>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <div class="p-6">
-                <form method="post" class="space-y-6">
-                    {% csrf_token %}
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div>
-                            <label for="project_code" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-code mr-1 text-purple-500"></i>
-                                Project Code
-                            </label>
-                            <input type="text" id="project_code" name="project_code" 
-                                   class="w-full rounded-xl border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
-                                   placeholder="e.g. Code-Data-Repack-SFT">
-                        </div>
-                        <div>
-                            <label for="project_name" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-tag mr-1 text-indigo-500"></i>
-                                Project Name
-                            </label>
-                            <input type="text" id="project_name" name="project_name" 
-                                   class="w-full rounded-xl border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
-                                   placeholder="Project Name">
-                        </div>
-                        <div>
-                            <label for="project_description" class="block text-sm font-medium text-gray-700 mb-2">
-                                <i class="fas fa-align-left mr-1 text-blue-500"></i>
-                                Description
-                            </label>
-                            <input type="text" id="project_description" name="project_description" 
-                                   class="w-full rounded-xl border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
-                                   placeholder="Project Description">
-                        </div>
+                <div id="sync-status-container">
+                    <!-- Status will be loaded here -->
+                    <div class="flex items-center justify-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-2 border-cyan-600 border-t-transparent"></div>
+                        <span class="ml-3 text-gray-600">Loading sync status...</span>
                     </div>
-                    <div class="flex justify-end">
-                        <button type="submit" name="create_project" value="1" 
-                                class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg">
-                            <i class="fas fa-plus mr-2"></i>
-                            Add Project
-                        </button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
 
-        <!-- Project Management Table -->
+        <!-- Sync Configurations Section -->
+        {% if selected_project_filter and selected_project_filter != 'all' %}
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8">
-            <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+            <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-cyan-50">
                 <h2 class="text-xl font-bold text-gray-800 flex items-center">
-                    <i class="fas fa-project-diagram mr-3 text-indigo-600"></i>
-                    Project Management
+                    <i class="fas fa-cogs mr-3 text-blue-600"></i>
+                    Project Sync Configurations
                 </h2>
-                <p class="text-sm text-gray-600 mt-1">Manage existing projects and their status</p>
+                <p class="text-sm text-gray-600 mt-1">Active sync configurations for the selected project</p>
             </div>
             
-            <div class="overflow-x-auto">
-                <table class="min-w-full">
-                    <thead>
-                        <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <div class="flex items-center space-x-1">
-                                    <i class="fas fa-code text-purple-500"></i>
-                                    <span>Code</span>
-                                </div>
-                            </th>
-                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <div class="flex items-center space-x-1">
-                                    <i class="fas fa-tag text-indigo-500"></i>
-                                    <span>Name</span>
-                                </div>
-                            </th>
-                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <div class="flex items-center space-x-1">
-                                    <i class="fas fa-align-left text-blue-500"></i>
-                                    <span>Description</span>
-                                </div>
-                            </th>
-                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <div class="flex items-center space-x-1">
-                                    <i class="fas fa-toggle-on text-green-500"></i>
-                                    <span>Status</span>
-                                </div>
-                            </th>
-                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <div class="flex items-center space-x-1">
-                                    <i class="fas fa-cog text-gray-500"></i>
-                                    <span>Action</span>
-                                </div>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-100">
-                        {% for project in projects %}
-                        <tr class="hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50 transition-all duration-300 group">
-                            <td class="px-6 py-4 border-r border-gray-100 group-hover:border-purple-200">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-8 w-8">
-                                        <div class="h-8 w-8 rounded-full bg-gradient-to-r from-purple-400 to-indigo-500 flex items-center justify-center">
-                                            <span class="text-white font-bold text-xs">{{ project.code|slice:":2"|upper }}</span>
+            <div class="p-6">
+                {% if sync_configs %}
+                    <div class="space-y-4">
+                        {% for sync_config in sync_configs %}
+                        <div class="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow duration-200">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center mb-2">
+                                        <h3 class="text-lg font-semibold text-gray-900">
+                                            {{ sync_config.project.code }} - {{ sync_config.project.name }}
+                                        </h3>
+                                        {% if sync_config.is_active %}
+                                            <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-green-100 text-green-800 border border-green-200">
+                                                <i class="fas fa-check-circle mr-1"></i>
+                                                Active
+                                            </span>
+                                        {% else %}
+                                            <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-red-100 text-red-800 border border-red-200">
+                                                <i class="fas fa-times-circle mr-1"></i>
+                                                Inactive
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                                        <div>
+                                            <span class="font-medium text-gray-700">Sheet URL:</span>
+                                            <p class="text-gray-600 truncate">{{ sync_config.sheet_url }}</p>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium text-gray-700">Sync Interval:</span>
+                                            <p class="text-gray-600">{{ sync_config.sync_interval_minutes }} minutes</p>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium text-gray-700">Primary Key:</span>
+                                            <p class="text-gray-600">{{ sync_config.primary_key_column }}</p>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium text-gray-700">Sync Mode:</span>
+                                            <p class="text-gray-600">{{ sync_config.sync_mode|title }}</p>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium text-gray-700">Last Synced:</span>
+                                            <p class="text-gray-600">
+                                                {% if sync_config.last_synced %}
+                                                    <span class="user-tz-timestamp" data-timestamp="{{ sync_config.last_synced|date:'c' }}"></span>
+                                                {% else %}
+                                                    Never
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium text-gray-700">Scraping:</span>
+                                            <p class="text-gray-600">
+                                                {% if sync_config.scraping_needed %}
+                                                    <span class="text-green-600"><i class="fas fa-check mr-1"></i>Enabled</span>
+                                                {% else %}
+                                                    <span class="text-gray-500"><i class="fas fa-times mr-1"></i>Disabled</span>
+                                                {% endif %}
+                                            </p>
                                         </div>
                                     </div>
-                                    <div class="ml-3">
-                                        <div class="text-sm font-medium text-gray-900">{{ project.code }}</div>
+                                    
+                                    {% if sync_config.column_mapping %}
+                                    <div class="mt-4">
+                                        <span class="font-medium text-gray-700">Column Mapping:</span>
+                                        <div class="mt-2 flex flex-wrap gap-2">
+                                            {% for logical, sheet_col in sync_config.column_mapping.items %}
+                                                <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                                    {{ logical }} → {{ sheet_col }}
+                                                </span>
+                                            {% endfor %}
+                                        </div>
                                     </div>
+                                    {% endif %}
                                 </div>
-                            </td>
-                            <td class="px-6 py-4 border-r border-gray-100 group-hover:border-purple-200">
-                                <div class="text-sm font-medium text-gray-900">{{ project.name }}</div>
-                            </td>
-                            <td class="px-6 py-4 border-r border-gray-100 group-hover:border-purple-200">
-                                <div class="text-sm text-gray-600">{{ project.description|default:"-" }}</div>
-                            </td>
-                            <td class="px-6 py-4 border-r border-gray-100 group-hover:border-purple-200">
-                                {% if project.is_active %}
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-green-100 text-green-800 border border-green-200">
-                                        <i class="fas fa-check-circle mr-1"></i>
-                                        Active
-                                    </span>
-                                {% else %}
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-red-100 text-red-800 border border-red-200">
-                                        <i class="fas fa-times-circle mr-1"></i>
-                                        Inactive
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4">
-                                <form method="post" class="inline">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="toggle_project" value="{{ project.id }}">
-                                    <button type="submit" 
-                                            class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200
-                                                   {% if project.is_active %}
-                                                       bg-red-100 text-red-700 hover:bg-red-200 border border-red-200
-                                                   {% else %}
-                                                       bg-green-100 text-green-700 hover:bg-green-200 border border-green-200
-                                                   {% endif %}">
-                                        {% if project.is_active %}
-                                            <i class="fas fa-toggle-off mr-1"></i>
-                                            Deactivate
-                                        {% else %}
-                                            <i class="fas fa-toggle-on mr-1"></i>
-                                            Activate
-                                        {% endif %}
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="px-6 py-16 text-center">
-                                <div class="flex flex-col items-center">
-                                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                        <i class="fas fa-project-diagram text-2xl text-gray-400"></i>
-                                    </div>
-                                    <h3 class="text-lg font-semibold text-gray-900 mb-2">No projects found</h3>
-                                    <p class="text-gray-500 max-w-sm">Create your first project to start managing task synchronization.</p>
-                                </div>
-                            </td>
-                        </tr>
+                            </div>
+                        </div>
                         {% endfor %}
-                    </tbody>
-                </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-8">
+                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-cogs text-2xl text-gray-400"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">No sync configurations found</h3>
+                        <p class="text-gray-500">No active sync configurations exist for the selected project.</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
+        {% endif %}
+
         <!-- Configuration Upload Section -->
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8">
             <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
@@ -563,6 +531,9 @@
     </div>
 </div>
 <script>
+let syncStatusInterval;
+let countdownIntervals = [];
+
 document.addEventListener("DOMContentLoaded", function() {
     function formatToUserTimezone(isoString) {
         if (!isoString) return "";
@@ -585,6 +556,259 @@ document.addEventListener("DOMContentLoaded", function() {
         const iso = el.getAttribute("data-timestamp");
         el.textContent = formatToUserTimezone(iso);
     });
+    
+    // Load sync status on page load
+    loadSyncStatus();
+    
+    // Auto-refresh every 30 seconds
+    syncStatusInterval = setInterval(loadSyncStatus, 30000);
+});
+
+function loadSyncStatus() {
+    fetch('/api/sync-status/', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displaySyncStatus(data.configurations);
+        } else {
+            displaySyncError(data.error || 'Failed to load sync status');
+        }
+    })
+    .catch(error => {
+        console.error('Error loading sync status:', error);
+        displaySyncError('Network error while loading sync status');
+    });
+}
+
+function displaySyncStatus(configurations) {
+    const container = document.getElementById('sync-status-container');
+    
+    if (!configurations || configurations.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-cogs text-2xl text-gray-400"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">No Active Configurations</h3>
+                <p class="text-gray-500">No sync configurations are currently active.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Clear existing countdown intervals
+    countdownIntervals.forEach(interval => clearInterval(interval));
+    countdownIntervals = [];
+    
+    const statusHtml = `
+        <div class="mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-server text-cyan-600"></i>
+                    <span class="text-lg font-semibold text-gray-800">Total Configurations: ${configurations.length}</span>
+                </div>
+                <div class="text-sm text-gray-500">
+                    Last updated: <span id="last-updated">${new Date().toLocaleTimeString()}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="space-y-6">
+            ${configurations.map((config, index) => `
+                <div class="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow duration-200">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <h3 class="text-xl font-bold text-gray-900 mr-3">
+                                    Config ${index + 1}: ${config.project_code}
+                                </h3>
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${config.is_active ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}">
+                                    <i class="fas ${config.is_active ? 'fa-check-circle' : 'fa-times-circle'} mr-1"></i>
+                                    ${config.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                            </div>
+                            <p class="text-gray-600 text-sm mb-4">${config.sheet_url}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                            <div class="flex items-center mb-1">
+                                <i class="fas fa-clock text-blue-600 mr-2"></i>
+                                <span class="text-sm font-medium text-blue-800">Sync Interval</span>
+                            </div>
+                            <p class="text-lg font-bold text-blue-900">${config.sync_interval_minutes} minutes</p>
+                        </div>
+                        
+                        <div class="bg-green-50 rounded-lg p-3 border border-green-200">
+                            <div class="flex items-center mb-1">
+                                <i class="fas fa-history text-green-600 mr-2"></i>
+                                <span class="text-sm font-medium text-green-800">Last Synced</span>
+                            </div>
+                            <p class="text-sm font-bold text-green-900">
+                                ${config.last_synced ? formatTimeAgo(config.last_synced) : 'Never'}
+                            </p>
+                        </div>
+                        
+                        <div class="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+                            <div class="flex items-center mb-1">
+                                <i class="fas fa-question-circle text-yellow-600 mr-2"></i>
+                                <span class="text-sm font-medium text-yellow-800">Should Sync Now</span>
+                            </div>
+                            <p class="text-lg font-bold ${config.should_sync_now ? 'text-red-600' : 'text-green-600'}">
+                                ${config.should_sync_now ? 'Yes' : 'No'}
+                            </p>
+                        </div>
+                        
+                        <div class="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                            <div class="flex items-center mb-1">
+                                <i class="fas fa-forward text-purple-600 mr-2"></i>
+                                <span class="text-sm font-medium text-purple-800">Next Sync In</span>
+                            </div>
+                            <p class="text-lg font-bold text-purple-900" id="countdown-${index}">
+                                ${config.next_sync_in || 'N/A'}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    ${config.should_sync_now ? `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                            <div class="flex items-center">
+                                <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                                <span class="text-sm font-medium text-red-800">
+                                    This configuration is overdue for synchronization!
+                                </span>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    container.innerHTML = statusHtml;
+    
+    // Start countdown timers for each configuration
+    configurations.forEach((config, index) => {
+        if (config.next_sync_seconds && config.next_sync_seconds > 0) {
+            startCountdown(index, config.next_sync_seconds);
+        }
+    });
+}
+
+function displaySyncError(error) {
+    const container = document.getElementById('sync-status-container');
+    container.innerHTML = `
+        <div class="text-center py-8">
+            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-exclamation-triangle text-2xl text-red-500"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Error Loading Status</h3>
+            <p class="text-gray-500 mb-4">${error}</p>
+            <button onclick="loadSyncStatus()" 
+                    class="inline-flex items-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium">
+                <i class="fas fa-retry mr-2"></i>
+                Retry
+            </button>
+        </div>
+    `;
+}
+
+function startCountdown(configIndex, initialSeconds) {
+    let seconds = initialSeconds;
+    const countdownElement = document.getElementById(`countdown-${configIndex}`);
+    
+    if (!countdownElement) return;
+    
+    const interval = setInterval(() => {
+        if (seconds <= 0) {
+            countdownElement.textContent = 'Syncing...';
+            countdownElement.className = 'text-lg font-bold text-red-600 animate-pulse';
+            clearInterval(interval);
+            // Refresh status after a short delay to show updated sync time
+            setTimeout(loadSyncStatus, 5000);
+            return;
+        }
+        
+        countdownElement.textContent = formatDuration(seconds);
+        seconds--;
+    }, 1000);
+    
+    countdownIntervals.push(interval);
+}
+
+function formatTimeAgo(timestamp) {
+    const now = new Date();
+    const syncTime = new Date(timestamp);
+    const diffMs = now - syncTime;
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffDays > 0) {
+        return `${diffDays}d ${diffHours % 24}h ${diffMinutes % 60}m ago`;
+    } else if (diffHours > 0) {
+        return `${diffHours}h ${diffMinutes % 60}m ${diffSeconds % 60}s ago`;
+    } else if (diffMinutes > 0) {
+        return `${diffMinutes}m ${diffSeconds % 60}s ago`;
+    } else {
+        return `${diffSeconds}s ago`;
+    }
+}
+
+function formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${secs}s`;
+    } else {
+        return `${secs}s`;
+    }
+}
+
+function refreshSyncStatus() {
+    const refreshIcon = document.getElementById('refresh-icon');
+    refreshIcon.classList.add('animate-spin');
+    
+    loadSyncStatus();
+    
+    setTimeout(() => {
+        refreshIcon.classList.remove('animate-spin');
+    }, 1000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Cleanup intervals when page is unloaded
+window.addEventListener('beforeunload', function() {
+    if (syncStatusInterval) {
+        clearInterval(syncStatusInterval);
+    }
+    countdownIntervals.forEach(interval => clearInterval(interval));
 });
 </script>
 {% endblock %}

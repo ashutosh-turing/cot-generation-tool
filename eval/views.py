@@ -1020,8 +1020,18 @@ def task_sync_config_view(request):
         # Redirect to avoid form resubmission on refresh
         from django.http import HttpResponseRedirect
         return HttpResponseRedirect("/task-sync/")
+    
     # Get project filter parameter
     selected_project_filter = request.GET.get('project_filter', '')
+    
+    # Get sync configurations - show all or filter by project
+    sync_configs = TaskSyncConfig.objects.all().order_by('-created_at')
+    if selected_project_filter and selected_project_filter != 'all':
+        try:
+            filter_project = Project.objects.get(id=selected_project_filter)
+            sync_configs = sync_configs.filter(project=filter_project)
+        except Project.DoesNotExist:
+            pass  # Invalid project ID, show all results
     
     # Pagination for sync history with project filtering
     if config:
@@ -1056,6 +1066,7 @@ def task_sync_config_view(request):
         "config": config,
         "message": message,
         "history": history,
+        "sync_configs": sync_configs,  # Add sync configurations to context
         "history_pagination": {
             "current_page": page,
             "total_pages": total_history_pages,
@@ -2783,6 +2794,9 @@ def get_llm_job_stats(request):
         }, status=500)
 
 # Activity Tracking API Endpoints
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
 @require_POST
 @login_required
 def activity_start(request):
@@ -2815,7 +2829,7 @@ def activity_start(request):
             activity_type=activity_type,
             session_start=timezone.now(),
             focus_time_minutes=0,
-            interactions=0
+            page_interactions=0
         )
         
         return JsonResponse({
@@ -2829,6 +2843,7 @@ def activity_start(request):
             'error': str(e)
         }, status=500)
 
+@csrf_exempt
 @require_POST
 @login_required
 def activity_update(request):
@@ -2884,6 +2899,7 @@ def activity_update(request):
             'error': str(e)
         }, status=500)
 
+@csrf_exempt
 @require_POST
 @login_required
 def activity_end(request):
@@ -3141,6 +3157,188 @@ def bulk_update_project_criteria(request):
             'success': False,
             'error': str(e)
         })
+
+
+@require_POST
+@login_required
+@role_required(['admin'])
+def update_user_role(request):
+    """
+    AJAX endpoint to update a user's role (group membership).
+    Only admins can access this endpoint.
+    """
+    try:
+        import json
+        from django.contrib.auth.models import User, Group
+        
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        new_role = data.get('new_role')
+        
+        if not user_id or not new_role:
+            return JsonResponse({
+                'success': False,
+                'error': 'Missing user_id or new_role'
+            })
+        
+        # Validate the new role
+        valid_roles = ['trainer', 'pod_lead', 'admin']
+        if new_role not in valid_roles:
+            return JsonResponse({
+                'success': False,
+                'error': f'Invalid role. Must be one of: {", ".join(valid_roles)}'
+            })
+        
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'User not found'
+            })
+        
+        # Don't allow changing superuser roles
+        if user.is_superuser:
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot change superuser roles'
+            })
+        
+        try:
+            # Get the new group
+            new_group = Group.objects.get(name=new_role)
+        except Group.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'Group "{new_role}" does not exist'
+            })
+        
+        # Remove user from all existing groups (to ensure single role)
+        user.groups.clear()
+        
+        # Add user to the new group
+        user.groups.add(new_group)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Successfully updated {user.username}\'s role to {new_role}'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+
+@require_http_methods(["GET"])
+@login_required
+def sync_status_api(request):
+    """
+    API endpoint to get real-time sync daemon status information.
+    Returns configuration details, timing, and next sync schedules.
+    """
+    try:
+        from .models import TaskSyncConfig
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Get all active sync configurations
+        configs = TaskSyncConfig.objects.filter(is_active=True).select_related('project')
+        
+        configurations = []
+        current_time = timezone.now()
+        
+        for config in configs:
+            # Calculate time since last sync
+            time_since_last_sync = None
+            if config.last_synced:
+                time_since_last_sync = current_time - config.last_synced
+            
+            # Calculate next sync time
+            next_sync_time = None
+            next_sync_seconds = None
+            should_sync_now = False
+            
+            if config.last_synced and config.sync_interval_minutes:
+                next_sync_time = config.last_synced + timedelta(minutes=config.sync_interval_minutes)
+                time_until_next_sync = next_sync_time - current_time
+                next_sync_seconds = int(time_until_next_sync.total_seconds())
+                
+                # Check if sync is overdue
+                should_sync_now = next_sync_seconds <= 0
+                
+                # Format next sync display
+                if should_sync_now:
+                    next_sync_in = "Overdue"
+                else:
+                    # Format as human readable
+                    hours = next_sync_seconds // 3600
+                    minutes = (next_sync_seconds % 3600) // 60
+                    seconds = next_sync_seconds % 60
+                    
+                    if hours > 0:
+                        next_sync_in = f"{hours}h {minutes}m {seconds}s"
+                    elif minutes > 0:
+                        next_sync_in = f"{minutes}m {seconds}s"
+                    else:
+                        next_sync_in = f"{seconds}s"
+            else:
+                next_sync_in = "Never synced"
+                should_sync_now = True
+            
+            # Format last synced time
+            if time_since_last_sync:
+                total_seconds = int(time_since_last_sync.total_seconds())
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                secs = total_seconds % 60
+                
+                if hours > 0:
+                    last_synced_ago = f"{hours}h {minutes}m {secs}s ago"
+                elif minutes > 0:
+                    last_synced_ago = f"{minutes}m {secs}s ago"
+                else:
+                    last_synced_ago = f"{secs}s ago"
+            else:
+                last_synced_ago = "Never"
+            
+            config_data = {
+                'project_code': config.project.code if config.project else 'Unknown',
+                'project_name': config.project.name if config.project else 'Unknown',
+                'sheet_url': config.sheet_url,
+                'sync_interval_minutes': config.sync_interval_minutes,
+                'is_active': config.is_active,
+                'last_synced': config.last_synced.isoformat() if config.last_synced else None,
+                'last_synced_ago': last_synced_ago,
+                'should_sync_now': should_sync_now,
+                'next_sync_in': next_sync_in,
+                'next_sync_seconds': max(0, next_sync_seconds) if next_sync_seconds is not None else 0,
+                'primary_key_column': config.primary_key_column,
+                'sync_mode': config.sync_mode,
+                'scraping_needed': config.scraping_needed
+            }
+            
+            configurations.append(config_data)
+        
+        return JsonResponse({
+            'success': True,
+            'timestamp': current_time.isoformat(),
+            'total_configurations': len(configurations),
+            'configurations': configurations
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'timestamp': timezone.now().isoformat()
+        }, status=500)
 
 
 def get_project_criteria(project):

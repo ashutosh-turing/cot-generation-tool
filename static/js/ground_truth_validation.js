@@ -186,10 +186,18 @@ document.addEventListener('DOMContentLoaded', function() {
         validationModelSelect.innerHTML = '';
         
         // Add models to selects
+        // Provider display mapping
+        const providerDisplayMap = {
+            "openai": "OpenAI",
+            "anthropic": "Anthropic",
+            "gemini": "Google Gemini"
+        };
         models.forEach(model => {
             const option = document.createElement('option');
             option.value = model.id;
-            option.textContent = model.provider ? `${model.name} - ${model.provider}` : `${model.name} - Unknown Provider`;
+            option.textContent = model.provider
+                ? `${model.name} - ${providerDisplayMap[model.provider] || "Unknown Provider"}`
+                : `${model.name} - Unknown Provider`;
             
             const validationOption = option.cloneNode(true);
             

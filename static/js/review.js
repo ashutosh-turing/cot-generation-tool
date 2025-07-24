@@ -77,97 +77,23 @@ document.addEventListener("DOMContentLoaded", function () {
     return cookieValue;
   }
 
-  // Load LLM models
-  function loadModels() {
-    if (!modelsList) {
-      console.error("Models list element not found");
-      return;
-    }
-    
-    modelsList.innerHTML = `
-      <div class="flex items-center justify-center py-8">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span class="ml-3 text-gray-500">Loading models...</span>
-      </div>
-    `;
-    
-    fetch("/api/llm-models/")
-      .then((res) => res.json())
-      .then((data) => {
-        modelsList.innerHTML = "";
-        if (data.models && data.models.length > 0) {
-          data.models.forEach((model) => {
-            const modelCard = document.createElement("div");
-            modelCard.className = "flex items-center p-3 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 cursor-pointer";
-            
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.className = "model-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded";
-            checkbox.value = model.id;
-            checkbox.name = "llm_model";
-            checkbox.id = `model-${model.id}`;
-            
-            const label = document.createElement("label");
-            label.className = "ml-3 flex-1 cursor-pointer";
-            label.htmlFor = `model-${model.id}`;
-            
-            const modelName = document.createElement("div");
-            modelName.className = "text-sm font-medium text-gray-900";
-            modelName.textContent = model.name;
-            
-            const modelProvider = document.createElement("div");
-            modelProvider.className = "text-xs text-gray-500 mt-1";
-            modelProvider.textContent = model.provider ? ` - ${model.provider}` : " - Unknown Provider";
-            
-            label.appendChild(modelName);
-            label.appendChild(modelProvider);
-            
-            modelCard.appendChild(checkbox);
-            modelCard.appendChild(label);
-            
-            // Add click handler to the card
-            modelCard.addEventListener('click', (e) => {
-              if (e.target !== checkbox) {
-                checkbox.checked = !checkbox.checked;
-              }
-              // Validate requirements when model selection changes
-              validateRequirements();
-            });
-            
-            // Add change handler to checkbox for direct clicks
-            checkbox.addEventListener('change', validateRequirements);
-            
-            modelsList.appendChild(modelCard);
-          });
-        } else {
-          modelsList.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-8 text-gray-400">
-              <i class="fas fa-robot text-3xl mb-3"></i>
-              <p class="text-sm font-medium">No models available</p>
-              <p class="text-xs">Please check your configuration</p>
-            </div>
-          `;
-        }
-        // Validate requirements after models are loaded
-        validateRequirements();
-      })
-      .catch(() => {
-        modelsList.innerHTML = `
-          <div class="flex flex-col items-center justify-center py-8 text-red-400">
-            <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
-            <p class="text-sm font-medium">Failed to load models</p>
-            <p class="text-xs">Please try refreshing</p>
-          </div>
-        `;
-        // Validate requirements after error
-        validateRequirements();
-      });
+  // Add event listeners to existing model checkboxes (rendered server-side)
+  function setupModelCheckboxes() {
+    const checkboxes = modelsList ? modelsList.querySelectorAll('.model-checkbox') : [];
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', validateRequirements);
+    });
   }
 
+  // Setup model checkboxes on page load
+  setupModelCheckboxes();
+
   if (refreshModelsBtn) {
-    refreshModelsBtn.addEventListener("click", loadModels);
+    refreshModelsBtn.addEventListener("click", function() {
+      // Refresh the page to reload models from server
+      window.location.reload();
+    });
   }
-  loadModels();
 
   // Initial validation check
   validateRequirements();

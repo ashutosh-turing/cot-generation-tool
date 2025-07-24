@@ -37,6 +37,179 @@
       </div>
     </div>
 
+    <!-- Create New Project Section -->
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8">
+      <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+          <i class="fas fa-plus-circle mr-3 text-purple-600"></i>
+          Create New Project
+        </h2>
+        <p class="text-sm text-gray-600 mt-1">Add a new project to the system</p>
+      </div>
+      
+      <div class="p-6">
+        <form method="post" class="space-y-6">
+          {% csrf_token %}
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+              <label for="project_code" class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-code mr-1 text-purple-500"></i>
+                Project Code
+              </label>
+              <input type="text" id="project_code" name="project_code" 
+                     class="w-full rounded-xl border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
+                     placeholder="e.g. Code-Data-Repack-SFT">
+            </div>
+            <div>
+              <label for="project_name" class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-tag mr-1 text-indigo-500"></i>
+                Project Name
+              </label>
+              <input type="text" id="project_name" name="project_name" 
+                     class="w-full rounded-xl border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
+                     placeholder="Project Name">
+            </div>
+            <div>
+              <label for="project_description" class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-align-left mr-1 text-blue-500"></i>
+                Description
+              </label>
+              <input type="text" id="project_description" name="project_description" 
+                     class="w-full rounded-xl border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
+                     placeholder="Project Description">
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" name="create_project" value="1" 
+                    class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg">
+              <i class="fas fa-plus mr-2"></i>
+              Add Project
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Project Management Table -->
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8">
+      <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+          <i class="fas fa-project-diagram mr-3 text-indigo-600"></i>
+          Project Management
+        </h2>
+        <p class="text-sm text-gray-600 mt-1">Manage existing projects and their status</p>
+      </div>
+      
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead>
+            <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <div class="flex items-center space-x-1">
+                  <i class="fas fa-code text-purple-500"></i>
+                  <span>Code</span>
+                </div>
+              </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <div class="flex items-center space-x-1">
+                  <i class="fas fa-tag text-indigo-500"></i>
+                  <span>Name</span>
+                </div>
+              </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <div class="flex items-center space-x-1">
+                  <i class="fas fa-align-left text-blue-500"></i>
+                  <span>Description</span>
+                </div>
+              </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <div class="flex items-center space-x-1">
+                  <i class="fas fa-toggle-on text-green-500"></i>
+                  <span>Status</span>
+                </div>
+              </th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                <div class="flex items-center space-x-1">
+                  <i class="fas fa-cog text-gray-500"></i>
+                  <span>Action</span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            {% for project in projects %}
+            <tr class="hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50 transition-all duration-300 group">
+              <td class="px-6 py-4 border-r border-gray-100 group-hover:border-purple-200">
+                <div class="flex items-center">
+                  <div class="flex-shrink-0 h-8 w-8">
+                    <div class="h-8 w-8 rounded-full bg-gradient-to-r from-purple-400 to-indigo-500 flex items-center justify-center">
+                      <span class="text-white font-bold text-xs">{{ project.code|slice:":2"|upper }}</span>
+                    </div>
+                  </div>
+                  <div class="ml-3">
+                    <div class="text-sm font-medium text-gray-900">{{ project.code }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4 border-r border-gray-100 group-hover:border-purple-200">
+                <div class="text-sm font-medium text-gray-900">{{ project.name }}</div>
+              </td>
+              <td class="px-6 py-4 border-r border-gray-100 group-hover:border-purple-200">
+                <div class="text-sm text-gray-600">{{ project.description|default:"-" }}</div>
+              </td>
+              <td class="px-6 py-4 border-r border-gray-100 group-hover:border-purple-200">
+                {% if project.is_active %}
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-green-100 text-green-800 border border-green-200">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    Active
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-red-100 text-red-800 border border-red-200">
+                    <i class="fas fa-times-circle mr-1"></i>
+                    Inactive
+                  </span>
+                {% endif %}
+              </td>
+              <td class="px-6 py-4">
+                <form method="post" class="inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="toggle_project" value="{{ project.id }}">
+                  <button type="submit" 
+                          class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200
+                                 {% if project.is_active %}
+                                     bg-red-100 text-red-700 hover:bg-red-200 border border-red-200
+                                 {% else %}
+                                     bg-green-100 text-green-700 hover:bg-green-200 border border-green-200
+                                 {% endif %}">
+                    {% if project.is_active %}
+                      <i class="fas fa-toggle-off mr-1"></i>
+                      Deactivate
+                    {% else %}
+                      <i class="fas fa-toggle-on mr-1"></i>
+                      Activate
+                    {% endif %}
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="px-6 py-16 text-center">
+                <div class="flex flex-col items-center">
+                  <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-project-diagram text-2xl text-gray-400"></i>
+                  </div>
+                  <h3 class="text-lg font-semibold text-gray-900 mb-2">No projects found</h3>
+                  <p class="text-gray-500 max-w-sm">Create your first project to start managing validation criteria.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Project Selection Section -->
     <div class="mb-8">
       <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
@@ -44,7 +217,7 @@
           <div class="p-2 bg-blue-100 rounded-lg mr-3">
             <i class="fas fa-folder-open text-blue-600 text-lg"></i>
           </div>
-          <h3 class="text-lg font-semibold text-gray-800">Select Project</h3>
+          <h3 class="text-lg font-semibold text-gray-800">Select Project for Configuration</h3>
         </div>
         
         <form method="GET" class="flex items-center space-x-4">
@@ -257,6 +430,9 @@
 <div id="message-container" class="fixed top-20 right-4 z-50 space-y-2"></div>
 
 <script>
+// Set project ID from Django template
+const SELECTED_PROJECT_ID = {% if selected_project %}{{ selected_project.id }}{% else %}null{% endif %};
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize toggle switches
     const toggles = document.querySelectorAll('.criteria-toggle');
@@ -304,7 +480,7 @@ function updateCriteria(validationId, isEnabled, card) {
     
     // Prepare data
     const data = {
-        project_id: {% if selected_project %}{{ selected_project.id }}{% else %}null{% endif %},
+        project_id: SELECTED_PROJECT_ID,
         validation_id: validationId,
         is_enabled: isEnabled,
         priority: 1
@@ -360,8 +536,7 @@ function updateCardStatus(card, isEnabled) {
 }
 
 function bulkUpdateCriteria(action) {
-    const projectId = {% if selected_project %}{{ selected_project.id }}{% else %}null{% endif %};
-    if (!projectId) {
+    if (!SELECTED_PROJECT_ID) {
         showMessage('error', 'Please select a project first');
         return;
     }
@@ -392,7 +567,7 @@ function bulkUpdateCriteria(action) {
     
     // Prepare data
     const data = {
-        project_id: projectId,
+        project_id: SELECTED_PROJECT_ID,
         action: action
     };
     
@@ -480,7 +655,7 @@ function savePriority(saveBtn) {
     
     // Prepare data
     const data = {
-        project_id: {% if selected_project %}{{ selected_project.id }}{% else %}null{% endif %},
+        project_id: SELECTED_PROJECT_ID,
         validation_id: validationId,
         is_enabled: isEnabled,
         priority: newPriority

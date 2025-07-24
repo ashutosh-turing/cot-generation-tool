@@ -143,10 +143,26 @@
           </div>
           
           <div id="llm-models-list" class="space-y-3 h-48 overflow-y-auto">
+            {% for model in llm_models %}
+            {% if model.is_active %}
+            <label class="flex items-center p-3 rounded-xl hover:bg-gray-50 transition-colors duration-200 cursor-pointer border border-gray-100 hover:border-gray-200">
+              <input type="checkbox" class="model-checkbox h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" value="{{ model.id }}">
+              <div class="ml-3 flex-1">
+                <span class="font-medium text-gray-800">{{ model.name }}</span>
+                <div class="text-xs text-gray-500 mt-1">Temperature: {{ model.temperature }}</div>
+              </div>
+              <span class="text-sm {% if model.provider == 'openai' %}text-blue-600 bg-blue-100{% elif model.provider == 'anthropic' %}text-yellow-700 bg-yellow-100{% elif model.provider == 'gemini' %}text-purple-600 bg-purple-100{% else %}text-gray-600 bg-gray-100{% endif %} px-2 py-1 rounded-full font-medium">{{ model.get_provider_display }}</span>
+            </label>
+            {% endif %}
+            {% empty %}
             <div class="flex items-center justify-center py-8">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span class="ml-3 text-gray-500">Loading models...</span>
+              <div class="text-center text-gray-500">
+                <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+                <p class="font-medium">No LLM models available</p>
+                <p class="text-sm">Please contact an administrator</p>
+              </div>
             </div>
+            {% endfor %}
           </div>
         </div>
       </div>
@@ -278,17 +294,9 @@
 </div>
 
 <!-- Pass project criteria to JavaScript -->
-<script>
-  window.PROJECT_CRITERIA = [
-    {% for criteria in project_criteria %}
-    {
-      "name": "{{ criteria.name|escapejs }}",
-      "description": "{{ criteria.description|default:""|escapejs }}",
-      "validation_id": "{{ criteria.validation_id|escapejs }}"
-    }{% if not forloop.last %},{% endif %}
-    {% endfor %}
-  ];
-  window.PROJECT_CODE = "{{ project.code|default:""|escapejs }}";
+<script type="text/javascript">
+  window.PROJECT_CRITERIA = [];
+  window.PROJECT_CODE = "";
 </script>
 
 <script src="{% static 'js/marked.min.js' %}"></script>
