@@ -1030,6 +1030,7 @@ def task_sync_config_view(request):
         try:
             filter_project = Project.objects.get(id=selected_project_filter)
             sync_configs = sync_configs.filter(project=filter_project)
+            config = sync_configs.first()
         except Project.DoesNotExist:
             pass  # Invalid project ID, show all results
     
