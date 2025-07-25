@@ -288,6 +288,11 @@ Your response should be ONLY the JSON object, nothing else.
                 genai_model = genai.GenerativeModel(model_name)
                 response = genai_model.generate_content(validation_prompt)
                 validation_text = response.text
+            except Exception as e:
+                if "API_KEY_SERVICE_BLOCKED" in str(e):
+                    return {"error": "Your Google API key is not authorized for the Generative Language API. Please check your Google Cloud project and API key settings."}
+                else:
+                    raise    
             except ImportError:
                 # Fallback if Google SDK is not available
                 return {
