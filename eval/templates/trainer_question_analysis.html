@@ -182,10 +182,8 @@ document.addEventListener('DOMContentLoaded', function() {
       
       <div class="space-y-4">
         <div>
-          <h4 class="text-md font-semibold text-gray-700 mb-2">{{ problem_title }}</h4>
-          <div class="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-700 text-sm max-h-48 overflow-y-auto">
-            {{ problem_statement }}
-          </div>
+          <label for="problem_statement" class="text-md font-semibold text-gray-700 mb-2">{{ problem_title }}</label>
+          <textarea name="problem_statement" id="problem_statement" rows="5" class="bg-gray-75 border border-gray-200 p-4 rounded-xl w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-all duration-200 resize-none p-3" placeholder="Enter your prompt(s) here...">{{problem_statement}}</textarea>
         </div>
       </div>
     </div>
@@ -462,6 +460,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const form = e.target;
             const systemMessage = document.getElementById('system_message').value;
             const additionalContext = document.getElementById('additional_context').value;
+            const problemStatement = document.getElementById('problem_statement').value
 
             const resultDiv = document.getElementById('analysis-result');
             resultDiv.innerHTML = '';
@@ -487,7 +486,7 @@ document.addEventListener('DOMContentLoaded', function() {
         );
 
             // Prepare full input with additional context
-            let fullInput = `{{ problem_statement|escapejs }}`;
+            let fullInput = `${problemStatement}`;
             if (additionalContext.trim()) {
                 fullInput += '\n\nAdditional Context:\n' + additionalContext.trim();
             }

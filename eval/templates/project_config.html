@@ -420,17 +420,23 @@
               </div>
               <div class="flex-shrink-0">
                 <label class="relative inline-flex items-center cursor-pointer group">
-                  <input type="checkbox" class="sr-only peer llm-modal-toggle"
-                         data-llm-modal-id="{{ modal.id }}"
-                         {% if modal.is_active %}checked{% endif %}>
-                  <div class="relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer transition-all duration-300 peer-checked:bg-gradient-to-r peer-checked:from-green-400 peer-checked:to-green-500 shadow-inner">
-                    <div class="absolute top-0.5 left-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-all duration-300 peer-checked:translate-x-7 peer-checked:border-green-300 shadow-md flex items-center justify-center">
+                  <!-- FIXED: Ensure correct peer/peer-checked structure for Tailwind toggle -->
+                  <input type="checkbox"
+                        class="sr-only peer llm-modal-toggle"
+                        data-llm-modal-id="{{ modal.id }}"
+                        {% if modal.is_active %}checked{% endif %}>
+                  <div class="relative w-14 h-7 bg-gray-200 rounded-full transition-all duration-300
+                              peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300
+                              peer-checked:bg-gradient-to-r peer-checked:from-green-400 peer-checked:to-green-500 shadow-inner">
+                    <div class="absolute top-0.5 left-0.5 bg-white border border-gray-300 rounded-full h-6 w-6 transition-all duration-300
+                                peer-checked:translate-x-7 peer-checked:border-green-300 shadow-md flex items-center justify-center">
                       <i class="fas fa-check text-green-500 text-xs opacity-0 peer-checked:opacity-100 transition-opacity duration-200"></i>
                     </div>
                   </div>
                   <span class="ml-3 text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
                     {% if modal.is_active %}ON{% else %}OFF{% endif %}
                   </span>
+<!-- If toggle still does not work, ensure Tailwind safelists the required peer-checked classes in tailwind.config.js -->
                 </label>
               </div>
             </div>
@@ -560,7 +566,7 @@ function updateLLMModal(modalId, isEnabled, card) {
     };
 
     // Make AJAX request (endpoint to be implemented in backend)
-    fetch('/admin/update_project_llm_modal/', {
+    fetch('/api/update_project_llm_modal/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -871,20 +877,24 @@ function getCookie(name) {
 }
 
 /* Enhanced toggle switch styling */
-.criteria-toggle:checked + div {
+.criteria-toggle:checked + div,
+.llm-modal-toggle:checked + div {
     background: linear-gradient(to right, #10b981, #059669) !important;
 }
 
-.criteria-toggle:checked + div > div {
+.criteria-toggle:checked + div > div,
+.llm-modal-toggle:checked + div > div {
     transform: translateX(1.75rem);
     border-color: #10b981;
 }
 
-.criteria-toggle:checked + div > div > i {
+.criteria-toggle:checked + div > div > i,
+.llm-modal-toggle:checked + div > div > i {
     opacity: 1;
 }
 
-.criteria-toggle:focus + div {
+.criteria-toggle:focus + div,
+.llm-modal-toggle:focus + div {
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
 }
 
@@ -893,7 +903,8 @@ function getCookie(name) {
     transform: translateY(-2px);
 }
 
-.group:hover .criteria-toggle + div {
+.group:hover .criteria-toggle + div,
+.group:hover .llm-modal-toggle + div {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 </style>

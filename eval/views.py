@@ -58,8 +58,8 @@ def role_required(roles):
             if user_role in roles:
                 return view_func(request, *args, **kwargs)
             else:
-                messages.error(request, "You don't have permission to access this page.")
-                return redirect('index')  # Redirect to home page
+                messages.error(request, "Access denied: You do not have permission to access this page.")
+                return redirect('index')
         return _wrapped_view
     return decorator
 

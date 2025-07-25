@@ -16,7 +16,6 @@ class TuringDomainMiddleware:
         # Define paths that should always be accessible
         self.public_paths = [
             '/accounts/',  # All auth URLs
-            '/admin/',    # Admin URLs
             '/static/',   # Static files
         ]
         
