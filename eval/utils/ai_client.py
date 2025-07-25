@@ -135,7 +135,7 @@ class OpenAIClient(BaseAIClient):
         else:
             params["max_tokens"] = self._get_default_max_tokens()
             
-        if temperature is not None:
+        if temperature is not None and 'o4-mini'not in self.model_name:
             params["temperature"] = temperature
 
         try:

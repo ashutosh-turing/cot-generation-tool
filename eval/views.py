@@ -272,7 +272,7 @@ def trainer_question_analysis(request, project_id, question_id):
             system_messages = SystemMessage.objects.filter(category__name__icontains="coding").order_by('name') or SystemMessage.objects.all().order_by('name')
         # Fetch project-tied LLM models for this project
         from .models import ProjectLLMModel
-        project_llm_models = ProjectLLMModel.objects.filter(project_id=project_id).select_related('llm_model')
+        project_llm_models = ProjectLLMModel.objects.filter(project_id=project_id, is_active=True).select_related('llm_model')
         if project_llm_models.exists():
             llm_models = project_llm_models.filter(is_active=True).order_by('llm_model__name')
         else:
