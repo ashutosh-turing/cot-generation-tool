@@ -157,11 +157,14 @@ class OpenAIClient(BaseAIClient):
         
         # Use max_tokens parameter if provided, else fall back to model_instance or default
         if max_tokens is not None:
-            params["max_tokens"] = max_tokens
+            if 'o4-mini' in self.model_name:
+                params["max_completion_tokens"] = max_tokens
+            else:
+                params["max_tokens"] = max_tokens
         elif self.model_instance and self.model_instance.max_tokens:
             params["max_tokens"] = self.model_instance.max_tokens
             
-        if temperature is not None:
+        if temperature is not None and 'o4-mini' not in self.model_name:
             params["temperature"] = temperature
 
         try:

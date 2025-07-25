@@ -20,6 +20,7 @@ class LLMModel(models.Model):
         blank=True, 
         help_text="Maximum tokens for response generation. Leave blank to use provider defaults. Anthropic models require this field."
     )
+    use_streaming = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     is_default = models.BooleanField(default=False, help_text="Use as default model when no project-specific model is set.")
 
@@ -593,6 +594,7 @@ class ProjectLLMModel(models.Model):
     """
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='llm_modals')
     llm_model = models.ForeignKey(LLMModel, on_delete=models.CASCADE, related_name='project_links')
+    use_streaming = models.BooleanField(default=True)
     # Optional project-specific overrides
     temperature = models.FloatField(null=True, blank=True, help_text="Override temperature for this project (optional)")
     max_tokens = models.PositiveIntegerField(null=True, blank=True, help_text="Override max tokens for this project (optional)")

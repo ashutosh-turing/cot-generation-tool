@@ -58,15 +58,15 @@ admin.site.register(Prompt)
 
 @admin.register(LLMModel)
 class LLMModelAdmin(admin.ModelAdmin):
-    list_display = ('name', 'provider', 'is_active', 'temperature', 'max_tokens')
-    list_filter = ('provider', 'is_active')
+    list_display = ('name', 'provider', 'is_active', 'temperature', 'max_tokens', 'use_streaming')
+    list_filter = ('provider', 'is_active', 'use_streaming')
     search_fields = ('name', 'description')
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'provider', 'description', 'is_active')
         }),
         ('Configuration', {
-            'fields': ('api_key', 'temperature', 'max_tokens'),
+            'fields': ('api_key', 'temperature', 'max_tokens', 'use_streaming'),
             'description': 'Model configuration settings. Leave max_tokens blank to use provider defaults. Anthropic models require this field.'
         }),
     )
@@ -75,16 +75,16 @@ from .models import ProjectLLMModel
 
 @admin.register(ProjectLLMModel)
 class ProjectLLMModelAdmin(admin.ModelAdmin):
-    list_display = ('project', 'llm_model', 'is_active', 'temperature', 'max_tokens', 'api_key')
+    list_display = ('project', 'llm_model', 'is_active', 'temperature', 'max_tokens', 'api_key', 'use_streaming')
     fieldsets = (
         ('Assignment', {
             'fields': ('project', 'llm_model', 'is_active')
         }),
         ('Overrides', {
-            'fields': ('temperature', 'max_tokens', 'api_key', 'description')
+            'fields': ('temperature', 'max_tokens', 'api_key', 'use_streaming', 'description')
         }),
     )
-    list_filter = ('project', 'is_active', 'llm_model__provider')
+    list_filter = ('project', 'is_active', 'llm_model__provider', 'use_streaming')
     search_fields = ('project__code', 'llm_model__name')
     autocomplete_fields = ('project', 'llm_model')
 
