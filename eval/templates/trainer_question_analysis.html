@@ -240,11 +240,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <h3 class="text-lg font-semibold text-gray-800">LLM Models</h3>
               </div>
-              <button class="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200" 
+              <!-- <button class="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200" 
                       id="refresh-models-btn">
                 <i class="fas fa-sync-alt mr-1"></i>
                 Refresh
-              </button>
+              </button> -->
             </div>
             
             <!-- Temperature Setting -->
@@ -523,6 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         body: JSON.stringify({
                             model_id: modelId,
                             question_id: '{{ question_id|escapejs }}',
+                            project_id: '{{ project_id|escapejs }}',
                             system_message: systemMessage,
                             full_input: fullInput
                         })

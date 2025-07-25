@@ -4,9 +4,10 @@ from django.views.decorators.http import require_http_methods
 import json
 import logging
 from django.contrib.auth.models import User
-from eval.models import LLMModel, LLMJob
+from eval.models import LLMModel, LLMJob, ProjectLLMModel, TrainerTask
 from eval.utils.pubsub import publish_message
 import uuid
+from eval.utils.logger import log
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,9 @@ def submit_llm_job(request):
         model_id = data.get('model_id')
         input_data = data.get('input_data', {})
         question_id = data.get('question_id')
+
+        task = TrainerTask.objects.filter(question_id=question_id).first()
+        project_models = ProjectLLMModel.objects.filter(project_id=task.project) if task.project else ProjectLLMModel.objects.none()
         
         if not job_type or not model_id:
             return JsonResponse({
@@ -51,7 +55,18 @@ def submit_llm_job(request):
         
         # Validate model exists
         try:
-            model = LLMModel.objects.get(id=model_id, is_active=True)
+            model = None
+            if project_models.exists():
+                project_model_instance = project_models.filter(llm_model_id=model_id, is_active=True).select_related('llm_model').first()
+                if not project_model_instance:
+                    raise LLMModel.DoesNotExist
+                model = project_model_instance.llm_model
+            else:
+                # No overrides defined for project — fallback to global model
+                model = LLMModel.objects.get(id=model_id, is_active=True) 
+            if model is None:
+                raise LLMModel.DoesNotExist
+                
         except LLMModel.DoesNotExist:
             return JsonResponse({
                 "success": False,
@@ -355,6 +370,7 @@ def submit_trainer_question_analysis(request):
     {
         "model_id": "uuid-of-llm-model",
         "question_id": "question-identifier",
+        "project_id": "project-identifier",
         "system_message": "system instructions",
         "full_input": "the full input text to analyze"
     }
@@ -363,6 +379,7 @@ def submit_trainer_question_analysis(request):
         data = json.loads(request.body)
         model_id = data.get('model_id')
         question_id = data.get('question_id')
+        project_id = data.get('project_id')
         system_message = data.get('system_message', '')
         full_input = data.get('full_input')
         
@@ -380,12 +397,26 @@ def submit_trainer_question_analysis(request):
         
         # Create the job using the generic endpoint logic
         try:
-            model = LLMModel.objects.get(id=model_id, is_active=True)
+            model = None
+            # Check if project has any tied models at all
+            project_models = ProjectLLMModel.objects.filter(project_id=project_id) if project_id else ProjectLLMModel.objects.none()
+
+            if project_models.exists():
+                # Must use a model from ProjectLLMModel — filter by id and active status
+                project_model_instance = project_models.filter(llm_model_id=model_id, is_active=True).select_related('llm_model').first()
+                if not project_model_instance:
+                    raise LLMModel.DoesNotExist
+                model = project_model_instance.llm_model
+            else:
+                # No overrides defined for project — fallback to global model
+                model = LLMModel.objects.get(id=model_id, is_active=True)
+
         except LLMModel.DoesNotExist:
             return JsonResponse({
                 "success": False,
-                "error": f"LLM model with id {model_id} not found or inactive"
+                "error": f"LLM model with id {model_id} not found or inactive for this project"
             }, status=400)
+
         
         # Create job record
         job = LLMJob.objects.create(
