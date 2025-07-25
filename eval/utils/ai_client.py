@@ -42,7 +42,7 @@ class BaseAIClient:
         elif provider == 'gemini':
             return True  # Gemini supports streaming
         
-        return True  # Default to streaming for reliability
+        return False  # Default to streaming for reliability
 
     def _get_effective_max_tokens(self):
         """Get the effective max_tokens that will be used."""
@@ -497,11 +497,7 @@ class AnthropicClient(BaseAIClient):
 class GeminiClient(BaseAIClient):
     def __init__(self, api_key, model_name, model_instance=None):
         super().__init__(api_key, model_name, model_instance)
-        # Use the API key from the database (passed as parameter) or fallback to settings
-        api_key_to_use = self.api_key if self.api_key else getattr(settings, 'GOOGLE_API_KEY', None)
-        if not api_key_to_use:
-            raise ValueError("No API key provided for Gemini model. Please set the API key in the LLMModel database record or in GOOGLE_API_KEY setting.")
-        genai.configure(api_key=api_key_to_use)
+        genai.configure(api_key=self.api_key)
         self.client = genai.GenerativeModel(self.model_name)
         self.provider = 'gemini'
 
