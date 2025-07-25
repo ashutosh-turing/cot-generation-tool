@@ -282,7 +282,8 @@ Your response should be ONLY the JSON object, nothing else.
         elif "gemini" in model_name.lower():
             try:
                 import google.generativeai as genai
-                genai.configure(api_key=settings.GOOGLE_API_KEY)
+                api_key = getattr(model, "api_key", None)
+                genai.configure(api_key=api_key)
                 
                 genai_model = genai.GenerativeModel(model_name)
                 response = genai_model.generate_content(validation_prompt)
@@ -509,7 +510,9 @@ def call_llm_api(model, prompt, num_replies):
             # If using Google's API
             try:
                 import google.generativeai as genai
-                genai.configure(api_key=settings.GOOGLE_API_KEY)
+                # Use API key from model if available, else error
+                api_key = getattr(model, "api_key", None)
+                genai.configure(api_key=api_key)
                 
                 genai_model = genai.GenerativeModel(model_name)
                 for _ in range(num_replies):
@@ -523,8 +526,9 @@ def call_llm_api(model, prompt, num_replies):
         elif "deepseek" in model_name.lower():
             try:
                 # Get DeepSeek API key and remove any quotes
-                deepseek_key = settings.DEEPSEEK_API_KEY.strip("'\"")
-                logger.info(f"Using DeepSeek API with base URL: {settings.DEEPSEEK_API_URL}")
+                # Use API key from model if available, else error
+                deepseek_key = getattr(model, "api_key", None)
+                logger.info(f"Using DeepSeek API with base URL: {deepseek_key}")
                 
                 # Create DeepSeek client
                 deepseek_client = OpenAI(
@@ -553,7 +557,7 @@ def call_llm_api(model, prompt, num_replies):
                 from fireworks.client import Fireworks
                 
                 # Get Fireworks API key
-                fireworks_api_key = settings.FIREWORKS_API
+                fireworks_api_key = getattr(model, "api_key", None)
                 logger.info(f"Using Fireworks API for LLaMA model with base URL: {getattr(settings, 'FIREWORKS_API_URL', None)}")
                 
                 # Create Fireworks client
