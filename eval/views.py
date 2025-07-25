@@ -26,6 +26,7 @@ import random
 from .models import ModelEvaluationHistory
 from django.utils import timezone
 from django.contrib.auth.models import User
+from .utils import logger
 
 # Helper function to get user role
 def get_user_role(user):
@@ -298,9 +299,9 @@ def trainer_question_analysis(request, project_id, question_id):
             "WEBSOCKET_URL": websocket_url,
             "debug_message": "DEBUG: trainer_question_analysis view is being called correctly!",
         }
-        print(f"DEBUG: trainer_question_analysis view called for project_id: {project_id}, question_id: {question_id}")
-        print(f"DEBUG: Using template: trainer_question_analysis.html")
-        print(f"DEBUG: WebSocket URL: {websocket_url}")
+        logger.log(f"DEBUG: trainer_question_analysis view called for project_id: {project_id}, question_id: {question_id}")
+        logger.log(f"DEBUG: Using template: trainer_question_analysis.html")
+        logger.log(f"DEBUG: WebSocket URL: {websocket_url}")
         return render(request, "trainer_question_analysis.html", context)
 
 @login_required
@@ -314,12 +315,13 @@ def trainer_dashboard(request):
     from django.utils import timezone
     
     user_full_name = user.get_full_name().strip().lower()
+    user_email = user.email.strip().lower()
     user_name = user.username.strip().lower()
     user_first_name = user.first_name.strip().lower()
     user_last_name = user.last_name.strip().lower()
     from .models import Project
     projects = Project.objects.filter(is_active=True).order_by('name')
-    print("DEBUG: projects count =", projects.count(), "projects =", list(projects.values('id', 'code', 'name', 'is_active')))
+    logger.log("DEBUG: projects count =", projects.count(), "projects =", list(projects.values('id', 'code', 'name', 'is_active')))
     selected_project_id = request.GET.get('project', '').strip()
     
     # Get all tasks for the selected project, then filter for exact developer match
@@ -329,43 +331,35 @@ def trainer_dashboard(request):
         all_developers = list(
             all_tasks.values_list('developer', flat=True).distinct()
         )
-        
         # Debug: Print user information and available developers
-        print(f"DEBUG: Current user - username: '{user_name}', first_name: '{user_first_name}', last_name: '{user_last_name}', full_name: '{user_full_name}'")
-        print(f"DEBUG: Available developers in project: {all_developers}")
+        logger.log(f"DEBUG: Current user - username: '{user_name}', first_name: '{user_first_name}', last_name: '{user_last_name}', full_name: '{user_full_name}'")
+        logger.log(f"DEBUG: Available developers in project: {all_developers}")
+        logger.log(f"DEBUG: Available tasks in project: {list(all_tasks)}")
         
         # Priority-based exact match: try username first, then fall back to others
         def is_exact_match(dev):
             if not dev:
                 return False
-            dev_clean = dev.strip().lower()
+            dev_clean = str(dev).strip().lower()
             
-            # Priority 1: Try username first (most specific)
             if dev_clean == user_name:
                 return True
-            
-            # Priority 2: Try full name if username doesn't match
-            if dev_clean == user_full_name:
+            if dev_clean in user_email:
                 return True
-            
-            # Priority 3: Try first name if neither username nor full name match
+            if dev_clean in user_full_name:
+                return True
             if dev_clean == user_first_name:
                 return True
-            
-            # Priority 4: Try last name as final fallback
             if dev_clean == user_last_name:
                 return True
-            
-            # No match found
             return False
-        
         filtered_tasks = [task for task in all_tasks if is_exact_match(task.developer)]
         
         # Debug: Print filtering results
-        print(f"DEBUG: Found {len(filtered_tasks)} tasks matching current user out of {len(all_tasks)} total tasks")
+        logger.log(f"DEBUG: Found {len(filtered_tasks)} tasks matching current user out of {len(all_tasks)} total tasks")
         if filtered_tasks:
             sample_developers = [task.developer for task in filtered_tasks[:3]]
-            print(f"DEBUG: Sample matching developers: {sample_developers}")
+            logger.log(f"DEBUG: Sample matching developers: {sample_developers}")
     else:
         filtered_tasks = []
         all_developers = []
@@ -445,6 +439,7 @@ def trainer_dashboard(request):
         if config:
             # Use the config's display fields method
             headers = config.get_display_fields()
+            logger.log(f"headers => {headers}")
             # Get field types and labels
             for field in headers:
                 field_types[field] = config.get_field_type(field)
@@ -515,7 +510,7 @@ def reviewer_dashboard(request):
     import time
     
     user = request.user
-    print(f"DEBUG: Current user: {user.username}, Full name: {user.get_full_name()}, Email: {user.email}")
+    logger.log(f"DEBUG: Current user: {user.username}, Full name: {user.get_full_name()}, Email: {user.email}")
     
     # Filters
     project_id = request.GET.get('project', '').strip()
@@ -527,17 +522,17 @@ def reviewer_dashboard(request):
     
     for attempt in range(max_retries):
         try:
-            print(f"Database query attempt {attempt + 1}")
+            logger.log(f"Database query attempt {attempt + 1}")
             
             # Filter tasks based on user role
             user_role = get_user_role(user)
-            print(f"DEBUG: User {user.username} determined as role: {user_role}")
+            logger.log(f"DEBUG: User {user.username} determined as role: {user_role}")
             
             with transaction.atomic():
                 if user_role == 'admin':
                     # Only admins can see all tasks
                     base_tasks = TrainerTask.objects.all()
-                    print(f"DEBUG: User {user.username} is {user_role}, showing all tasks")
+                    logger.log(f"DEBUG: User {user.username} is {user_role}, showing all tasks")
                 else:
                     # Pod leads and regular reviewers only see tasks assigned to them
                     # Get all tasks first, then filter using priority-based exact matching
@@ -548,6 +543,7 @@ def reviewer_dashboard(request):
                     # Get user identifiers for matching
                     user_full_name = user.get_full_name().strip().lower()
                     user_name = user.username.strip().lower()
+                    user_email = user.email.strip().lower()     
                     user_first_name = user.first_name.strip().lower()
                     user_last_name = user.last_name.strip().lower()
                     
@@ -555,8 +551,8 @@ def reviewer_dashboard(request):
                     all_reviewers = list(all_reviewer_tasks.values_list('reviewer', flat=True).distinct())
                     
                     # Debug: Print user information and available reviewers
-                    print(f"DEBUG: Current reviewer user - username: '{user_name}', first_name: '{user_first_name}', last_name: '{user_last_name}', full_name: '{user_full_name}'")
-                    print(f"DEBUG: Available reviewers in database: {all_reviewers}")
+                    logger.log(f"DEBUG: Current reviewer user - username: '{user_name}', first_name: '{user_first_name}', last_name: '{user_last_name}', full_name: '{user_full_name}'")
+                    logger.log(f"DEBUG: Available reviewers in database: {all_reviewers}")
                     
                     # Priority-based exact match: try username first, then fall back to others
                     def is_reviewer_match(reviewer):
@@ -568,8 +564,10 @@ def reviewer_dashboard(request):
                         if reviewer_clean == user_name:
                             return True
                         
+                        if reviewer_clean in user_email:
+                            return True
                         # Priority 2: Try full name if username doesn't match
-                        if reviewer_clean == user_full_name:
+                        if reviewer_clean in user_full_name:
                             return True
                         
                         # Priority 3: Try first name if neither username nor full name match
@@ -593,26 +591,26 @@ def reviewer_dashboard(request):
                     else:
                         base_tasks = TrainerTask.objects.none()
                     
-                    print(f"DEBUG: User {user.username} is {user_role}, filtering by assignment")
+                    logger.log(f"DEBUG: User {user.username} is {user_role}, filtering by assignment")
                     
                     # Debug: Print filtering results
                     task_count = base_tasks.count()
-                    print(f"DEBUG: Found {task_count} tasks matching current reviewer out of {all_reviewer_tasks.count()} total reviewer tasks")
+                    logger.log(f"DEBUG: Found {task_count} tasks matching current reviewer out of {all_reviewer_tasks.count()} total reviewer tasks")
                     if matching_tasks:
                         sample_reviewers = [task.reviewer for task in matching_tasks[:3]]
-                        print(f"DEBUG: Sample matching reviewers: {sample_reviewers}")
+                        logger.log(f"DEBUG: Sample matching reviewers: {sample_reviewers}")
                     
                     # If no tasks found, show available reviewers for debugging
                     if task_count == 0:
-                        print(f"DEBUG: No tasks found for reviewer matching: {user.username}, {user.get_full_name()}, {user.first_name}, {user.last_name}")
+                        logger.log(f"DEBUG: No tasks found for reviewer matching: {user.username}, {user.get_full_name()}, {user.first_name}, {user.last_name}")
                 
                 # Force evaluation of the queryset to catch database errors early
                 task_count = base_tasks.count()
-                print(f"DEBUG: Total tasks after filtering: {task_count}")
+                logger.log(f"DEBUG: Total tasks after filtering: {task_count}")
             break
             
         except Exception as e:
-            print(f"Database error on attempt {attempt + 1}: {str(e)}")
+            logger.log(f"Database error on attempt {attempt + 1}: {str(e)}")
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
                 retry_delay *= 2  # Exponential backoff
@@ -650,13 +648,13 @@ def reviewer_dashboard(request):
     # DEBUG: Print the first task's fields for troubleshooting
     first_task = base_tasks.first()
     if first_task:
-        print("DEBUG: First reviewer task fields:")
-        print("developer:", first_task.developer)
-        print("question_id:", first_task.question_id)
-        print("problem_link:", first_task.problem_link)
-        print("labelling_tool_id_link:", first_task.labelling_tool_id_link)
-        print("screenshot_drive_link:", first_task.screenshot_drive_link)
-        print("codeforces_submission_id:", first_task.codeforces_submission_id)
+        logger.log("DEBUG: First reviewer task fields:")
+        logger.log("developer:", first_task.developer)
+        logger.log("question_id:", first_task.question_id)
+        logger.log("problem_link:", first_task.problem_link)
+        logger.log("labelling_tool_id_link:", first_task.labelling_tool_id_link)
+        logger.log("screenshot_drive_link:", first_task.screenshot_drive_link)
+        logger.log("codeforces_submission_id:", first_task.codeforces_submission_id)
 
     # Get all users from the 'trainer' group for the dropdown, excluding the logged-in user
     from django.contrib.auth.models import Group
@@ -669,9 +667,9 @@ def reviewer_dashboard(request):
             trainers_qs = trainers_qs.exclude(groups=admin_group)
         trainers_qs = trainers_qs.exclude(id=user.id).exclude(is_superuser=True).exclude(is_staff=True)
         trainers = sorted([t for t in trainers_qs.values_list('username', flat=True) if t and t.strip()])
-        print(f"DEBUG: Found {len(trainers)} users in trainer group (excluding logged-in user and admins): {trainers}")
+        logger.log(f"DEBUG: Found {len(trainers)} users in trainer group (excluding logged-in user and admins): {trainers}")
     except Group.DoesNotExist:
-        print("DEBUG: 'trainer' group does not exist, falling back to developer field")
+        logger.log("DEBUG: 'trainer' group does not exist, falling back to developer field")
         # Fallback to existing logic if trainer group doesn't exist, excluding the logged-in user and admins
         admin_usernames = set(User.objects.filter(
             is_superuser=True
@@ -925,7 +923,7 @@ def task_sync_config_view(request):
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
-            print(tb)
+            logger.log(tb)
             message = f"Failed to process config.json: {str(e)}\nTraceback:\n{tb}"
 
     # Handle project creation and toggle
@@ -1034,7 +1032,7 @@ def task_sync_config_view(request):
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
-            print(tb)
+            logger.log(tb)
             sync_status = "failure"
             sync_summary = "Sync failed"
             sync_details = f"{str(e)}\nTraceback:\n{tb}"
@@ -1458,7 +1456,7 @@ class CodeToJsonConverter:
 
             if atomic_match:
                 if not current_section:
-                    print(f"Warning: Found atomic marker before section marker at line: {line}")
+                    logger.log(f"Warning: Found atomic marker before section marker at line: {line}")
                     i += 1
                     continue
 
@@ -1669,12 +1667,12 @@ def perform_validation(request):
                         continue
                     
                     function_name = match.group(1)
-                    # print(f"Detected function name: {function_name}")  # Debug log
+                    # logger.log(f"Detected function name: {function_name}")  # Debug log
 
                     # 🔹 Prepare execution scope
                     local_scope = {"json": json}
 
-                    # print(f"Available in local_scope: {local_scope.keys()}") # Debug log
+                    # logger.log(f"Available in local_scope: {local_scope.keys()}") # Debug log
 
                     # 🔹 Execute function definition safely
                     exec(validation_code, {}, local_scope)
@@ -1691,7 +1689,7 @@ def perform_validation(request):
 
                     # 🔹 Execute function with JSON data
                     result = func(json_data)
-                    # print(f"Function executed successfully, result: {result}")  # Debug log
+                    # logger.log(f"Function executed successfully, result: {result}")  # Debug log
 
                     # 🔹 Validate result format
                     if isinstance(result, tuple) and len(result) == 2:
@@ -1733,9 +1731,9 @@ def perform_validation(request):
 def logical_checks(request):
     fs = FileSystemStorage(location='eval/static/converted_jsons/')
     json_files = [file for file in fs.listdir('')[1] if file.endswith('.json')]
-    print("___________________")
-    print(f"JSON files: {json_files}")
-    print("___________________")
+    logger.log("___________________")
+    logger.log(f"JSON files: {json_files}")
+    logger.log("___________________")
     
     return render(request, 'logical_checks.html', {'json_files': json_files})
 
@@ -1787,10 +1785,10 @@ def model_evaluation(request):
 def evaluate_model_async(model_id, manual_prompt, system_message, session_id, username):
     """Evaluate a single model asynchronously"""
     try:
-        print(f"Starting evaluation for model ID: {model_id} in session: {session_id}")
+        logger.log(f"Starting evaluation for model ID: {model_id} in session: {session_id}")
         model = LLMModel.objects.get(id=model_id)
         if not model.is_active:
-            print(f"Model {model.name} is inactive, skipping")
+            logger.log(f"Model {model.name} is inactive, skipping")
             result = {
                 'model_name': model.name,
                 'status': 'error',
@@ -1799,7 +1797,7 @@ def evaluate_model_async(model_id, manual_prompt, system_message, session_id, us
                 'time_taken': 0
             }
             model_results_queues[session_id].put(result)
-            print(f"Added inactive result for {model.name} to queue")
+            logger.log(f"Added inactive result for {model.name} to queue")
             return result
 
         start_time = time.time()
@@ -1843,15 +1841,15 @@ def evaluate_model_async(model_id, manual_prompt, system_message, session_id, us
                     temperature=model.temperature if model.temperature is not None else 0.7,
                     max_tokens=2048,  # Default value
                     evaluation_metrics={'timing': elapsed_time, 'status': 'success'},
-                    response=response_text,
+                    response=result['response'],
                     username=username
                 )
-                print(f"Automatically saved evaluation for {model.name} to history")
+                logger.log(f"Automatically saved evaluation for {model.name} to history")
             except Exception as save_error:
-                print(f"Error saving to history: {str(save_error)}")
+                logger.log(f"Error saving to history: {str(save_error)}")
                 
         except Exception as e:
-            print(f"API Error for {model.name}: {str(e)}")
+            logger.log(f"API Error for {model.name}: {str(e)}")
             result = {
                 'model_name': model.name,
                 'status': 'error',
@@ -1861,7 +1859,7 @@ def evaluate_model_async(model_id, manual_prompt, system_message, session_id, us
             }
 
     except LLMModel.DoesNotExist:
-        print(f"Model with ID {model_id} not found")
+        logger.log(f"Model with ID {model_id} not found")
         result = {
             'model_name': f'Unknown Model (ID: {model_id})',
             'status': 'error',
@@ -1872,7 +1870,7 @@ def evaluate_model_async(model_id, manual_prompt, system_message, session_id, us
     
     # Add result to the queue
     model_results_queues[session_id].put(result)
-    print(f"Added result for {result['model_name']} to queue, status: {result['status']}")
+    logger.log(f"Added result for {result['model_name']} to queue, status: {result['status']}")
     
     # Return the result
     return result
@@ -1933,12 +1931,12 @@ def get_model_results(request, session_id):
         should_log = random.random() < 0.1  # Log roughly 10% of requests
         
         if should_log:
-            print(f"Getting results for session: {session_id}")
+            logger.log(f"Getting results for session: {session_id}")
         
         # Initialize the results array for this session if it doesn't exist
         if session_id not in model_results:
             model_results[session_id] = []
-            print(f"Initialized empty results array for session: {session_id}")
+            logger.log(f"Initialized empty results array for session: {session_id}")
         
         # Get the last seen index from the query parameters
         last_seen_index = int(request.GET.get('last_seen', '0'))
@@ -1955,8 +1953,8 @@ def get_model_results(request, session_id):
                     new_result['evaluation_metrics'] = new_result.get('metrics', {})
                 
                 model_results[session_id].append(new_result)
-                print(f"Added new result for model: {new_result['model_name']}")
-                print(f"Result data: {new_result}")
+                logger.log(f"Added new result for model: {new_result['model_name']}")
+                logger.log(f"Result data: {new_result}")
                 
                 # Return the new result immediately
                 current_index = len(model_results[session_id])
@@ -1964,7 +1962,7 @@ def get_model_results(request, session_id):
                 total = request.session.get('selected_models', [])
                 total_models = len(total)
                 
-                print(f"Returning 1 new result (total completed: {completed}, queue size: {model_results_queues[session_id].qsize() if session_id in model_results_queues else 0})")
+                logger.log(f"Returning 1 new result (total completed: {completed}, queue size: {model_results_queues[session_id].qsize() if session_id in model_results_queues else 0})")
                 
                 # Find active threads for this session to determine which models are still processing
                 processing_models = []
@@ -1972,7 +1970,7 @@ def get_model_results(request, session_id):
                 
                 if not active_threads and completed < total_models:
                     # If no active threads but not all models completed, some may have failed silently
-                    print(f"Warning: No active threads but only {completed}/{total_models} completed")
+                    logger.log(f"Warning: No active threads but only {completed}/{total_models} completed")
                 
                 return JsonResponse({
                     'results': [new_result],
@@ -1986,7 +1984,7 @@ def get_model_results(request, session_id):
             # Queue is empty, continue to check for previously processed results
             pass
         except Exception as e:
-            print(f"Error getting results from queue: {str(e)}")
+            logger.log(f"Error getting results from queue: {str(e)}")
             # We'll try returning previously processed results instead
         
         # If there's no new result from the queue, check if there are any results
@@ -2006,8 +2004,8 @@ def get_model_results(request, session_id):
             total_models = len(total)
             
             if should_log:
-                print(f"Returning 1 previously processed result (total completed: {completed})")
-                print(f"Result data: {next_result}")
+                logger.log(f"Returning 1 previously processed result (total completed: {completed})")
+                logger.log(f"Result data: {next_result}")
             
             return JsonResponse({
                 'results': [next_result],
@@ -2028,7 +2026,7 @@ def get_model_results(request, session_id):
         has_more = len(active_threads) > 0 or (session_id in model_results_queues and not model_results_queues[session_id].empty())
         
         if should_log and (has_more or completed < total_models):
-            print(f"No new results to return (total completed: {completed}, active threads: {len(active_threads)})")
+            logger.log(f"No new results to return (total completed: {completed}, active threads: {len(active_threads)})")
         
         # Return a special response code for the "no results yet" case
         return JsonResponse({
@@ -2041,7 +2039,7 @@ def get_model_results(request, session_id):
         }, status=204 if not has_more and completed == 0 else 200)  # Use 204 for "No Content Yet"
         
     except Exception as e:
-        print(f"Error in get_model_results: {str(e)}")
+        logger.log(f"Error in get_model_results: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
     
 
@@ -2296,7 +2294,7 @@ def get_model_analytics(request):
 def get_user_analytics(request):
     """Get user analytics data for the dashboard."""
     try:
-        print("get_user_analytics called by user:", request.user.username)
+        logger.log("get_user_analytics called by user:", request.user.username)
         
         # Get the last 30 days of evaluations
         thirty_days_ago = timezone.now() - timezone.timedelta(days=30)
@@ -2305,7 +2303,7 @@ def get_user_analytics(request):
             is_active=True
         )
         
-        print(f"Found {recent_evaluations.count()} evaluations in the last 30 days")
+        logger.log(f"Found {recent_evaluations.count()} evaluations in the last 30 days")
 
         # Get unique users and their evaluation counts
         user_stats = {}
@@ -2325,7 +2323,7 @@ def get_user_analytics(request):
             user_stats[username]['total_response_time'] += eval.evaluation_metrics.get('timing', 0)
             user_stats[username]['models_used'].add(eval.model_name)
 
-        print(f"Found {len(user_stats)} unique users with evaluations")
+        logger.log(f"Found {len(user_stats)} unique users with evaluations")
 
         # Calculate per-user metrics
         user_metrics = []
@@ -2344,15 +2342,15 @@ def get_user_analytics(request):
         # Sort users by total evaluations
         user_metrics.sort(key=lambda x: x['total_evaluations'], reverse=True)
         
-        print(f"Returning {len(user_metrics)} user metrics")
-        print("Sample user metrics:", user_metrics[:2] if user_metrics else "No user metrics")
+        logger.log(f"Returning {len(user_metrics)} user metrics")
+        logger.log("Sample user metrics:", user_metrics[:2] if user_metrics else "No user metrics")
 
         return JsonResponse({
             'success': True,
             'user_metrics': user_metrics
         })
     except Exception as e:
-        print(f"Error in get_user_analytics: {str(e)}")
+        logger.log(f"Error in get_user_analytics: {str(e)}")
         import traceback
         traceback.print_exc()
         return JsonResponse({
@@ -2369,7 +2367,7 @@ def save_edited_response(request):
         model_id = data.get('model_id')
         edited_content = data.get('edited_content')
         
-        print(f"Saving edited response: response_id={response_id}, model_id={model_id}")
+        logger.log(f"Saving edited response: response_id={response_id}, model_id={model_id}")
         
         if not edited_content:
             return JsonResponse({'success': False, 'error': 'Missing edited content'})
@@ -2381,12 +2379,12 @@ def save_edited_response(request):
         if not session_id and model_results:
             # Use the most recent session ID (assuming it's the current one)
             session_id = list(model_results.keys())[-1]
-            print(f"Using most recent session ID: {session_id}")
+            logger.log(f"Using most recent session ID: {session_id}")
             # Store it in the session for future use
             request.session['current_session_id'] = session_id
         
         # Debug information
-        print(f"Available sessions: {list(model_results.keys())}")
+        logger.log(f"Available sessions: {list(model_results.keys())}")
         
         # First, try to find and update the record in the database
         db_updated = False
@@ -2411,7 +2409,7 @@ def save_edited_response(request):
                         entry.formatted_response = edited_content
                         entry.is_edited = True
                         entry.save()
-                    print(f"Updated database entry for model {model_id}")
+                    logger.log(f"Updated database entry for model {model_id}")
                     db_updated = True
             
             # If we couldn't find by model_id, try by response_id if it's a UUID
@@ -2430,13 +2428,13 @@ def save_edited_response(request):
                             entry.formatted_response = edited_content
                             entry.is_edited = True
                             entry.save()
-                        print(f"Updated database entry with ID {response_id}")
+                        logger.log(f"Updated database entry with ID {response_id}")
                         db_updated = True
                 except (ValueError, TypeError):
                     # Not a valid UUID, continue with in-memory updates
                     pass
         except Exception as db_error:
-            print(f"Error updating database: {str(db_error)}")
+            logger.log(f"Error updating database: {str(db_error)}")
             # Continue with in-memory updates even if DB update fails
         
         # Now update the in-memory model_results as well
@@ -2444,20 +2442,20 @@ def save_edited_response(request):
         
         # Try to find the result by response_id directly
         if response_id and response_id in model_results:
-            print(f"Found result by response_id: {response_id}")
+            logger.log(f"Found result by response_id: {response_id}")
             model_results[response_id]['response'] = edited_content
             memory_updated = True
         
         # Try to find the result in the session by model_id
         if not memory_updated and session_id and session_id in model_results:
-            print(f"Checking session {session_id} with {len(model_results[session_id])} results")
+            logger.log(f"Checking session {session_id} with {len(model_results[session_id])} results")
             
             # Check if model_results[session_id] is a list or a dict
             if isinstance(model_results[session_id], list):
                 for i, result in enumerate(model_results[session_id]):
-                    print(f"Comparing model_id: {result.get('model_id')} with {model_id}")
+                    logger.log(f"Comparing model_id: {result.get('model_id')} with {model_id}")
                     if str(result.get('model_id')) == str(model_id) or result.get('model_name') == model_id:
-                        print(f"Found match at index {i}")
+                        logger.log(f"Found match at index {i}")
                         model_results[session_id][i]['response'] = edited_content
                         memory_updated = True
                         break
@@ -2470,11 +2468,11 @@ def save_edited_response(request):
         # If we still haven't found it, try searching all sessions
         if not memory_updated:
             for sess_id, results in model_results.items():
-                print(f"Searching session {sess_id}")
+                logger.log(f"Searching session {sess_id}")
                 if isinstance(results, list):
                     for i, result in enumerate(results):
                         if str(result.get('model_id')) == str(model_id) or result.get('model_name') == model_id:
-                            print(f"Found match in session {sess_id} at index {i}")
+                            logger.log(f"Found match in session {sess_id} at index {i}")
                             model_results[sess_id][i]['response'] = edited_content
                             memory_updated = True
                             break
@@ -2488,7 +2486,7 @@ def save_edited_response(request):
         
         # Last resort: create a new entry in the current session and database
         if not memory_updated and not db_updated and session_id:
-            print(f"Creating new entry in session {session_id}")
+            logger.log(f"Creating new entry in session {session_id}")
             new_result = {
                 'model_id': model_id,
                 'model_name': 'Edited Response',
@@ -2530,10 +2528,10 @@ def save_edited_response(request):
                         'editor': request.user.username
                     }]
                     new_entry.save()
-                print(f"Created new database entry for edited response")
+                logger.log(f"Created new database entry for edited response")
                 db_updated = True
             except Exception as create_error:
-                print(f"Error creating new database entry: {str(create_error)}")
+                logger.log(f"Error creating new database entry: {str(create_error)}")
             
             memory_updated = True
         
@@ -2545,17 +2543,17 @@ def save_edited_response(request):
             })
         
         # If we reach here, we couldn't find the result to update
-        print(f"Could not find response to update. response_id={response_id}, model_id={model_id}")
+        logger.log(f"Could not find response to update. response_id={response_id}, model_id={model_id}")
         return JsonResponse({
             'success': False, 
             'error': 'Could not find the response to update. Please try again.'
         })
         
     except json.JSONDecodeError as e:
-        print(f"JSON decode error: {str(e)}")
+        logger.log(f"JSON decode error: {str(e)}")
         return JsonResponse({'success': False, 'error': 'Invalid JSON in request'})
     except Exception as e:
-        print(f"Error saving edited response: {str(e)}")
+        logger.log(f"Error saving edited response: {str(e)}")
         import traceback
         traceback.print_exc()
         return JsonResponse({'success': False, 'error': str(e)})
@@ -2698,9 +2696,9 @@ def review_question(request, question_id):
     task = TrainerTask.objects.filter(question_id=question_id).first()
     if task and task.project:
         project = task.project
-        print(f"DEBUG: Found project {project.code} for question_id {question_id}")
+        logger.log(f"DEBUG: Found project {project.code} for question_id {question_id}")
     else:
-        print(f"DEBUG: No project found for question_id {question_id}")
+        logger.log(f"DEBUG: No project found for question_id {question_id}")
     
     # Get project-specific validation criteria using the helper function
     project_criteria = get_project_criteria(project)
@@ -2712,33 +2710,33 @@ def review_question(request, question_id):
         criteria_list = list(project_criteria)
     
     # Debug: Print current criteria to help troubleshoot
-    print(f"DEBUG: review_question - Project: {project.code if project else 'None'}")
-    print(f"DEBUG: review_question - Found {len(criteria_list)} active criteria:")
+    logger.log(f"DEBUG: review_question - Project: {project.code if project else 'None'}")
+    logger.log(f"DEBUG: review_question - Found {len(criteria_list)} active criteria:")
     for i, criteria in enumerate(criteria_list):
-        print(f"DEBUG: review_question - Criteria {i+1}: {criteria.name}")
+        logger.log(f"DEBUG: review_question - Criteria {i+1}: {criteria.name}")
     
     # Fetch system messages based on user preference (stream/subject)
     preferred_streams = []
     try:
         prefs = request.user.preference
         preferred_streams = prefs.streams_and_subjects.all()
-        print(f"DEBUG: User {request.user.username} has {preferred_streams.count()} preferred streams")
+        logger.log(f"DEBUG: User {request.user.username} has {preferred_streams.count()} preferred streams")
     except Exception as e:
         preferred_streams = []
-        print(f"DEBUG: No user preferences found: {e}")
+        logger.log(f"DEBUG: No user preferences found: {e}")
     
     if preferred_streams:
         system_messages = SystemMessage.objects.filter(category__in=preferred_streams).order_by('name')
-        print(f"DEBUG: Found {system_messages.count()} system messages for preferred streams")
+        logger.log(f"DEBUG: Found {system_messages.count()} system messages for preferred streams")
     else:
         # Default to "Coding" stream if exists, else all
         coding_messages = SystemMessage.objects.filter(category__name__icontains="coding").order_by('name')
         if coding_messages.exists():
             system_messages = coding_messages
-            print(f"DEBUG: Using {system_messages.count()} coding-related system messages")
+            logger.log(f"DEBUG: Using {system_messages.count()} coding-related system messages")
         else:
             system_messages = SystemMessage.objects.all().order_by('name')
-            print(f"DEBUG: Using all {system_messages.count()} system messages")
+            logger.log(f"DEBUG: Using all {system_messages.count()} system messages")
     
     # Fetch project-tied LLM models if project exists, else global
     from .models import ProjectLLMModel
@@ -2752,17 +2750,17 @@ def review_question(request, question_id):
                 llm_models = LLMModel.objects.filter(is_active=True).order_by('name')
     else:
         llm_models = LLMModel.objects.filter(is_active=True).order_by('name')
-    print(f"DEBUG: Found {llm_models.count()} active LLM models (project-tied or global)")
+    logger.log(f"DEBUG: Found {llm_models.count()} active LLM models (project-tied or global)")
     
     # Debug: Print first few system messages
     for i, sm in enumerate(system_messages[:3]):
-        print(f"DEBUG: System message {i+1}: {sm.name} - {sm.content[:50]}...")
+        logger.log(f"DEBUG: System message {i+1}: {sm.name} - {sm.content[:50]}...")
     
     # Debug: Print project-specific criteria
-    print(f"DEBUG: Project: {project.code if project else 'None'}")
-    print(f"DEBUG: Active criteria count: {len(criteria_list)}")
+    logger.log(f"DEBUG: Project: {project.code if project else 'None'}")
+    logger.log(f"DEBUG: Active criteria count: {len(criteria_list)}")
     for i, criteria in enumerate(criteria_list):
-        print(f"DEBUG: Criteria {i+1}: {criteria.name}")
+        logger.log(f"DEBUG: Criteria {i+1}: {criteria.name}")
     
     context = {
         "question_id": question_id,
@@ -3465,7 +3463,7 @@ def get_project_criteria(project):
         
         # Check if no criteria are enabled (edge case)
         if not enabled_criteria:
-            print(f"WARNING: No criteria enabled for project {project.code}. Using minimal fallback set.")
+            logger.log(f"WARNING: No criteria enabled for project {project.code}. Using minimal fallback set.")
             # Fallback to a minimal essential set - at least Grammar Check and Code Quality
             fallback_criteria = all_validations.filter(
                 name__in=['Grammar Check', 'Code Style Check', 'Logic Validation']

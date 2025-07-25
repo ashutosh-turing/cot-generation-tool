@@ -353,47 +353,11 @@
                                                 {% endif %}
                                             </div>
                                         {% elif field_type == "badge" %}
-                                            {# Clean and professional rating badge #}
                                             <div class="inline-flex items-center space-x-2">
-                                                {% with rating_num=field_value|add:"0" %}
-                                                    {% if rating_num >= 3000 %}
-                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
-                                                            <i class="fas fa-crown text-purple-600 text-sm"></i>
-                                                            <span class="text-purple-800 font-semibold text-sm">{{ field_value }}</span>
-                                                            <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">Master</span>
-                                                        </div>
-                                                    {% elif rating_num >= 2500 %}
-                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                                                            <i class="fas fa-medal text-blue-600 text-sm"></i>
-                                                            <span class="text-blue-800 font-semibold text-sm">{{ field_value }}</span>
-                                                            <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">Expert</span>
-                                                        </div>
-                                                    {% elif rating_num >= 2000 %}
-                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
-                                                            <i class="fas fa-trophy text-emerald-600 text-sm"></i>
-                                                            <span class="text-emerald-800 font-semibold text-sm">{{ field_value }}</span>
-                                                            <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">Advanced</span>
-                                                        </div>
-                                                    {% elif rating_num >= 1500 %}
-                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                                                            <i class="fas fa-star text-amber-600 text-sm"></i>
-                                                            <span class="text-amber-800 font-semibold text-sm">{{ field_value }}</span>
-                                                            <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">Skilled</span>
-                                                        </div>
-                                                    {% elif rating_num >= 1000 %}
-                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
-                                                            <i class="fas fa-certificate text-orange-600 text-sm"></i>
-                                                            <span class="text-orange-800 font-semibold text-sm">{{ field_value }}</span>
-                                                            <span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded">Intermediate</span>
-                                                        </div>
-                                                    {% else %}
-                                                        <div class="flex items-center space-x-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
-                                                            <i class="fas fa-user text-gray-600 text-sm"></i>
-                                                            <span class="text-gray-800 font-semibold text-sm">{{ field_value }}</span>
-                                                            <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">Beginner</span>
-                                                        </div>
-                                                    {% endif %}
-                                                {% endwith %}
+                                                {% load badge_filters %}
+                                                    <div class="flex items-center space-x-2 px-3 py-2 rounded-lg {{ field_value|random_badge_class }}">
+                                                        <span class="font-semibold text-sm">{{ field_value }}</span>
+                                                    </div>
                                             </div>
                                         {% elif field_type == "url" and field_value %}
                                             <a href="{{ field_value }}" target="_blank" 
