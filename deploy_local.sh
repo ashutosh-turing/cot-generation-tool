@@ -211,7 +211,7 @@ local_dev() {
     log "   tail -f logs/sync_daemon.log       # Monitor sync daemon"
     log ""
     
-    python manage.py runserver 127.0.0.1:8000
+    python -m debugpy --listen 5678 manage.py runserver --noreload
 }
 
 deploy() {

@@ -37,7 +37,11 @@ def submit_llm_job(request):
         question_id = data.get('question_id')
 
         task = TrainerTask.objects.filter(question_id=question_id).first()
-        project_models = ProjectLLMModel.objects.filter(project_id=task.project) if task.project else ProjectLLMModel.objects.none()
+        # If task and project found then look for associated project llm model
+        if task and task.project:
+            project_models = ProjectLLMModel.objects.filter(project_id=task.project)
+        else:
+            project_models = ProjectLLMModel.objects.none()
         
         if not job_type or not model_id:
             return JsonResponse({
