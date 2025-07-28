@@ -327,44 +327,44 @@ def trainer_dashboard(request):
     user_role = get_user_role(user)
     is_admin = user_role == 'admin'
 
+    # Get all trainers from the User table (trainer group)
+    from django.contrib.auth.models import Group
+    try:
+        trainer_group = Group.objects.get(name='trainer')
+        trainers_qs = User.objects.filter(groups=trainer_group)
+        # Exclude admins and staff
+        trainers_qs = trainers_qs.exclude(is_superuser=True).exclude(is_staff=True)
+        all_trainers = sorted([t.username for t in trainers_qs if t.username and t.username.strip()])
+        logger.log(f"DEBUG: Found {len(all_trainers)} users in trainer group: {all_trainers}")
+    except Group.DoesNotExist:
+        all_trainers = []
+        logger.log("DEBUG: 'trainer' group does not exist.")
+    
+    # Priority-based exact match: try username first, then fall back to others
+    def is_exact_match(dev):
+        if not dev:
+            return False
+        dev_clean = str(dev).strip().lower()
+        if dev_clean == user_name:
+            return True
+        if dev_clean in user_email:
+            return True
+        if dev_clean in user_full_name:
+            return True
+        if dev_clean == user_first_name:
+            return True
+        if dev_clean == user_last_name:
+            return True
+        return False    
+
     # Get all tasks for the selected project, then filter for exact developer match
     if selected_project_id:
         all_tasks = TrainerTask.objects.filter(project__id=selected_project_id).order_by('-updated_at')
-        # For debugging: get all developer names for this project
-        # Deduplicate developers by normalized name (case-insensitive, stripped)
-        raw_devs = list(all_tasks.values_list('developer', flat=True))
-        seen = set()
-        all_developers = []
-        for dev in raw_devs:
-            if dev:
-                norm = dev.strip().lower()
-                if norm and norm not in seen:
-                    seen.add(norm)
-                    all_developers.append(dev.strip())
-        logger.log(f"DEBUG: Current user - username: '{user_name}', first_name: '{user_first_name}', last_name: '{user_last_name}', full_name: '{user_full_name}'")
-        logger.log(f"DEBUG: Available developers in project: {all_developers}")
-        logger.log(f"DEBUG: Available tasks in project: {list(all_tasks)}")
 
         if is_admin and selected_trainer:
             # Admin: filter by selected trainer if provided
-            filtered_tasks = [task for task in all_tasks if task.developer and str(task.developer).strip() == selected_trainer]
+            filtered_tasks = [task for task in all_tasks if task.developer and selected_trainer in  str(task.developer).lower()]
         else:
-            # Priority-based exact match: try username first, then fall back to others
-            def is_exact_match(dev):
-                if not dev:
-                    return False
-                dev_clean = str(dev).strip().lower()
-                if dev_clean == user_name:
-                    return True
-                if dev_clean in user_email:
-                    return True
-                if dev_clean in user_full_name:
-                    return True
-                if dev_clean == user_first_name:
-                    return True
-                if dev_clean == user_last_name:
-                    return True
-                return False
             filtered_tasks = [task for task in all_tasks if is_exact_match(task.developer)]
 
         logger.log(f"DEBUG: Found {len(filtered_tasks)} tasks after admin/user filtering")
@@ -373,7 +373,7 @@ def trainer_dashboard(request):
             logger.log(f"DEBUG: Sample matching developers: {sample_developers}")
     else:
         filtered_tasks = []
-        all_developers = []
+        all_trainers = []
     
     # Calculate privacy-first productivity statistics
     week_start = timezone.now().date() - timedelta(days=timezone.now().weekday())
@@ -492,7 +492,7 @@ def trainer_dashboard(request):
         'field_labels': field_labels,
         'projects': projects,
         'selected_project': selected_project_id,
-        'all_developers': all_developers,
+        'all_trainers': all_trainers,
         'selected_trainer': selected_trainer,
         'has_admin_role': is_admin,
         'pagination': {
@@ -501,7 +501,7 @@ def trainer_dashboard(request):
             'has_previous': page > 1,
             'has_next': page < total_pages,
             'previous_page': page - 1 if page > 1 else 1,
-            'next_page': page + 1 if page < total_pages else total_pages,
+            'next_page': page + 1 if page < total_tasks else total_pages,
             'total_records': total_tasks,
         },
         'visible_page_numbers': visible_page_numbers,

@@ -183,8 +183,8 @@
                     <label for="trainer_filter" class="text-sm font-medium text-gray-700 mr-2">Filter by Trainer:</label>
                     <select name="trainer" id="trainer_filter" class="block w-48 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
                         <option value="">All Trainers</option>
-                        {% for dev in all_developers %}
-                            <option value="{{ dev }}" {% if dev == selected_trainer %}selected{% endif %}>{{ dev }}</option>
+                        {% for trainer in all_trainers %}
+                            <option value="{{ trainer }}" {% if trainer == selected_trainer %}selected{% endif %}>{{ trainer }}</option>
                         {% endfor %}
                     </select>
                     <button type="submit" class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
