@@ -169,12 +169,29 @@
 
         <!-- Tasks Table -->
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-            <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
-                <h2 class="text-xl font-bold text-gray-800 flex items-center">
-                    <i class="fas fa-code mr-3 text-green-600"></i>
-                    My Development Tasks
-                </h2>
-                <p class="text-sm text-gray-600 mt-1">Tasks assigned to you for development and training</p>
+            <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50 flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                        <i class="fas fa-code mr-3 text-green-600"></i>
+                        My Development Tasks
+                    </h2>
+                    <p class="text-sm text-gray-600 mt-1">Tasks assigned to you for development and training</p>
+                </div>
+                {% if has_admin_role and selected_project %}
+                <form method="get" class="mt-4 md:mt-0 flex items-center space-x-2">
+                    <input type="hidden" name="project" value="{{ selected_project }}">
+                    <label for="trainer_filter" class="text-sm font-medium text-gray-700 mr-2">Filter by Trainer:</label>
+                    <select name="trainer" id="trainer_filter" class="block w-48 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
+                        <option value="">All Trainers</option>
+                        {% for dev in all_developers %}
+                            <option value="{{ dev }}" {% if dev == selected_trainer %}selected{% endif %}>{{ dev }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                        <i class="fas fa-filter mr-1"></i> Apply
+                    </button>
+                </form>
+                {% endif %}
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full">

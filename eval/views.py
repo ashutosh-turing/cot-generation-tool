@@ -323,40 +323,51 @@ def trainer_dashboard(request):
     projects = Project.objects.filter(is_active=True).order_by('name')
     logger.log("DEBUG: projects count =", projects.count(), "projects =", list(projects.values('id', 'code', 'name', 'is_active')))
     selected_project_id = request.GET.get('project', '').strip()
-    
+    selected_trainer = request.GET.get('trainer', '').strip()
+    user_role = get_user_role(user)
+    is_admin = user_role == 'admin'
+
     # Get all tasks for the selected project, then filter for exact developer match
     if selected_project_id:
         all_tasks = TrainerTask.objects.filter(project__id=selected_project_id).order_by('-updated_at')
         # For debugging: get all developer names for this project
-        all_developers = list(
-            all_tasks.values_list('developer', flat=True).distinct()
-        )
-        # Debug: Print user information and available developers
+        # Deduplicate developers by normalized name (case-insensitive, stripped)
+        raw_devs = list(all_tasks.values_list('developer', flat=True))
+        seen = set()
+        all_developers = []
+        for dev in raw_devs:
+            if dev:
+                norm = dev.strip().lower()
+                if norm and norm not in seen:
+                    seen.add(norm)
+                    all_developers.append(dev.strip())
         logger.log(f"DEBUG: Current user - username: '{user_name}', first_name: '{user_first_name}', last_name: '{user_last_name}', full_name: '{user_full_name}'")
         logger.log(f"DEBUG: Available developers in project: {all_developers}")
         logger.log(f"DEBUG: Available tasks in project: {list(all_tasks)}")
-        
-        # Priority-based exact match: try username first, then fall back to others
-        def is_exact_match(dev):
-            if not dev:
+
+        if is_admin and selected_trainer:
+            # Admin: filter by selected trainer if provided
+            filtered_tasks = [task for task in all_tasks if task.developer and str(task.developer).strip() == selected_trainer]
+        else:
+            # Priority-based exact match: try username first, then fall back to others
+            def is_exact_match(dev):
+                if not dev:
+                    return False
+                dev_clean = str(dev).strip().lower()
+                if dev_clean == user_name:
+                    return True
+                if dev_clean in user_email:
+                    return True
+                if dev_clean in user_full_name:
+                    return True
+                if dev_clean == user_first_name:
+                    return True
+                if dev_clean == user_last_name:
+                    return True
                 return False
-            dev_clean = str(dev).strip().lower()
-            
-            if dev_clean == user_name:
-                return True
-            if dev_clean in user_email:
-                return True
-            if dev_clean in user_full_name:
-                return True
-            if dev_clean == user_first_name:
-                return True
-            if dev_clean == user_last_name:
-                return True
-            return False
-        filtered_tasks = [task for task in all_tasks if is_exact_match(task.developer)]
-        
-        # Debug: Print filtering results
-        logger.log(f"DEBUG: Found {len(filtered_tasks)} tasks matching current user out of {len(all_tasks)} total tasks")
+            filtered_tasks = [task for task in all_tasks if is_exact_match(task.developer)]
+
+        logger.log(f"DEBUG: Found {len(filtered_tasks)} tasks after admin/user filtering")
         if filtered_tasks:
             sample_developers = [task.developer for task in filtered_tasks[:3]]
             logger.log(f"DEBUG: Sample matching developers: {sample_developers}")
@@ -481,7 +492,9 @@ def trainer_dashboard(request):
         'field_labels': field_labels,
         'projects': projects,
         'selected_project': selected_project_id,
-        'all_developers': all_developers,  # For debugging
+        'all_developers': all_developers,
+        'selected_trainer': selected_trainer,
+        'has_admin_role': is_admin,
         'pagination': {
             'current_page': page,
             'total_pages': total_pages,
@@ -513,8 +526,8 @@ def reviewer_dashboard(request):
     logger.log(f"DEBUG: Current user: {user.username}, Full name: {user.get_full_name()}, Email: {user.email}")
     
     # Filters
-    project_id = request.GET.get('project', '').strip()
-    trainer_name = request.GET.get('trainer', '').strip()
+    project_id = request.GET.get('reviewer_project', '').strip()
+    trainer_name = request.GET.get('reviewer_trainer', '').strip()
 
     # Add retry logic for database operations
     max_retries = 3
@@ -738,6 +751,23 @@ def reviewer_dashboard(request):
     if trainer_name:
         tasks_for_table = tasks_for_table.filter(developer__iexact=trainer_name)
 
+    # Admin-only: Filter by reviewer if provided
+    reviewer_name = ""
+    reviewer_list = []
+    user_role = get_user_role(user)
+    if user_role == "admin":
+        reviewer_name = request.GET.get("reviewer_reviewer", "").strip()
+        # Get all unique reviewers for dropdown
+        reviewer_list = list(
+            tasks_for_stats_and_trainers.values_list("reviewer", flat=True)
+            .exclude(reviewer__isnull=True)
+            .exclude(reviewer__exact="")
+            .distinct()
+        )
+        reviewer_list = sorted([r for r in reviewer_list if r and r.strip()])
+        if reviewer_name:
+            tasks_for_table = tasks_for_table.filter(reviewer__iexact=reviewer_name)
+
     # Dynamic headers based on TaskSyncConfig.column_mapping if available
     config = None
     config_headers = []
@@ -817,6 +847,10 @@ def reviewer_dashboard(request):
         'selected_project': project_id,
         'trainers': trainers,
         'selected_trainer': trainer_name,
+        # 'selected_status': selected_status,  # Removed status filter
+        'reviewer_list': reviewer_list,
+        'selected_reviewer': reviewer_name,
+        'user_role': user_role,
         'stats': {
             'total': total_tasks,
             'in_progress': in_progress,
