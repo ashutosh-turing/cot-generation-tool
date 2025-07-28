@@ -378,10 +378,6 @@
                     <i class="fas fa-home"></i>
                     <span class="menu-text">Dashboard</span>
                 </a>
-                <a href="/review/001" class="menu-item {% if request.path == '/review/001/' %}active{% endif %}">
-                    <i class="fas fa-flask"></i>
-                    <span class="menu-text">Reviewer Playground</span>
-                </a>
             {% elif user_group == 'trainer' %}
                 <a href="/dashboard/tasks" class="menu-item {% if request.path == '/dashboard/tasks/' %}active{% endif %}">
                     <i class="fas fa-tasks"></i>
@@ -391,6 +387,10 @@
             <a href="/modal_playground/" class="menu-item {% if request.path == '/modal_playground/' %}active{% endif %}">
                 <i class="fas fa-flask"></i>
                 <span class="menu-text">Modal Playground</span>
+            </a>
+            <a href="/review/001" class="menu-item {% if request.path == '/review/001/' %}active{% endif %}">
+                <i class="fas fa-flask"></i>
+                <span class="menu-text">Reviewer Playground</span>
             </a>
         </div>
         
