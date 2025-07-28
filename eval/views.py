@@ -341,10 +341,15 @@ def trainer_dashboard(request):
         logger.log("DEBUG: 'trainer' group does not exist.")
     
     # Priority-based exact match: try username first, then fall back to others
-    def is_exact_match(dev):
-        if not dev:
+    def is_exact_match(dev, user=None):
+        if not dev or not user:
             return False
         dev_clean = str(dev).strip().lower()
+        user_name = user.username.strip().lower()
+        user_email = user.email.strip().lower()
+        user_full_name = user.get_full_name().strip().lower()
+        user_first_name = user.first_name.strip().lower()
+        user_last_name = user.last_name.strip().lower()
         if dev_clean == user_name:
             return True
         if dev_clean in user_email:
@@ -355,15 +360,20 @@ def trainer_dashboard(request):
             return True
         if dev_clean == user_last_name:
             return True
-        return False    
+        return False
+ 
 
     # Get all tasks for the selected project, then filter for exact developer match
     if selected_project_id:
         all_tasks = TrainerTask.objects.filter(project__id=selected_project_id).order_by('-updated_at')
 
         if is_admin and selected_trainer:
-            # Admin: filter by selected trainer if provided
-            filtered_tasks = [task for task in all_tasks if task.developer and selected_trainer in  str(task.developer).lower()]
+            # Admin: filter by selected trainer if provided (try user match, fallback to substring)
+            selected_user = User.objects.filter(username=selected_trainer).first()
+            if selected_user:
+                filtered_tasks = [task for task in all_tasks if task.developer and is_exact_match(task.developer, selected_user)]
+            else:
+                filtered_tasks = [task for task in all_tasks if task.developer and selected_trainer.strip().lower() in str(task.developer).strip().lower()]
         else:
             filtered_tasks = [task for task in all_tasks if is_exact_match(task.developer)]
 
