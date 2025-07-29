@@ -491,7 +491,7 @@ def trainer_dashboard(request):
 
     context = {
         'tasks': paginated_tasks,
-        'user': req,
+        'user': user,
         'stats': status_counts,
         'productivity_stats': productivity_stats,  # New productivity insights
         'headers': headers,
