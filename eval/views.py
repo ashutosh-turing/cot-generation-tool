@@ -314,6 +314,7 @@ def trainer_dashboard(request):
     from datetime import datetime, timedelta
     from django.utils import timezone
     from .models import Project
+    user = request.user
     projects = Project.objects.filter(is_active=True).order_by('name')
     logger.log("DEBUG: projects count =", projects.count(), "projects =", list(projects.values('id', 'code', 'name', 'is_active')))
     selected_project_id = request.GET.get('project', '').strip()
@@ -371,7 +372,7 @@ def trainer_dashboard(request):
             else:
                 filtered_tasks = [task for task in all_tasks if task.developer and selected_trainer.strip().lower() in str(task.developer).strip().lower()]
         else:
-            filtered_tasks = [task for task in all_tasks if is_exact_match(task.developer)]
+            filtered_tasks = [task for task in all_tasks if is_exact_match(task.developer, request.user)]
 
         logger.log(f"DEBUG: Found {len(filtered_tasks)} tasks after admin/user filtering")
         if filtered_tasks:
@@ -490,7 +491,7 @@ def trainer_dashboard(request):
 
     context = {
         'tasks': paginated_tasks,
-        'user': user,
+        'user': req,
         'stats': status_counts,
         'productivity_stats': productivity_stats,  # New productivity insights
         'headers': headers,
