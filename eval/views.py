@@ -309,22 +309,16 @@ def trainer_dashboard(request):
     """
     Trainer dashboard: fetches tasks from Google Sheets and displays them with productivity insights.
     """
-    user = request.user
+   
     from .models import TrainerTask, UserActivitySession, UserProductivityInsight, LLMJob
     from datetime import datetime, timedelta
     from django.utils import timezone
-    
-    user_full_name = user.get_full_name().strip().lower()
-    user_email = user.email.strip().lower()
-    user_name = user.username.strip().lower()
-    user_first_name = user.first_name.strip().lower()
-    user_last_name = user.last_name.strip().lower()
     from .models import Project
     projects = Project.objects.filter(is_active=True).order_by('name')
     logger.log("DEBUG: projects count =", projects.count(), "projects =", list(projects.values('id', 'code', 'name', 'is_active')))
     selected_project_id = request.GET.get('project', '').strip()
     selected_trainer = request.GET.get('trainer', '').strip()
-    user_role = get_user_role(user)
+    user_role = get_user_role(request.user)
     is_admin = user_role == 'admin'
 
     # Get all trainers from the User table (trainer group)
@@ -342,6 +336,8 @@ def trainer_dashboard(request):
     
     # Priority-based exact match: try username first, then fall back to others
     def is_exact_match(dev, user=None):
+        if user is None:
+            user = request.user
         if not dev or not user:
             return False
         dev_clean = str(dev).strip().lower()
