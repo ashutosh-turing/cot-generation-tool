@@ -347,15 +347,15 @@ def trainer_dashboard(request):
         user_full_name = user.get_full_name().strip().lower()
         user_first_name = user.first_name.strip().lower()
         user_last_name = user.last_name.strip().lower()
-        if dev_clean == user_name:
+        if dev_clean == user_name or user_name in dev_clean:
             return True
         if dev_clean in user_email:
             return True
-        if dev_clean in user_full_name:
+        if dev_clean in user_full_name or dev_clean == user_full_name:
             return True
-        if dev_clean == user_first_name:
+        if dev_clean == user_first_name or dev_clean in user_first_name:
             return True
-        if dev_clean == user_last_name:
+        if dev_clean == user_last_name or dev_clean in user_last_name:
             return True
         return False
  
@@ -363,21 +363,20 @@ def trainer_dashboard(request):
     # Get all tasks for the selected project, then filter for exact developer match
     if selected_project_id:
         all_tasks = TrainerTask.objects.filter(project__id=selected_project_id).order_by('-updated_at')
-
         if is_admin and selected_trainer:
             # Admin: filter by selected trainer if provided (try user match, fallback to substring)
             selected_user = User.objects.filter(username=selected_trainer).first()
             if selected_user:
                 filtered_tasks = [task for task in all_tasks if task.developer and is_exact_match(task.developer, selected_user)]
             else:
-                filtered_tasks = [task for task in all_tasks if task.developer and selected_trainer.strip().lower() in str(task.developer).strip().lower()]
+                filtered_tasks = [task for task in all_tasks if task.developer]
         else:
             filtered_tasks = [task for task in all_tasks if is_exact_match(task.developer, request.user)]
 
         logger.log(f"DEBUG: Found {len(filtered_tasks)} tasks after admin/user filtering")
         if filtered_tasks:
             sample_developers = [task.developer for task in filtered_tasks[:3]]
-            logger.log(f"DEBUG: Sample matching developers: {sample_developers}")
+            logger.log(f"DEBUG: Sample matching developers: {sample_developers}, {str(filtered_tasks)}")
     else:
         filtered_tasks = []
         all_trainers = []
