@@ -93,10 +93,35 @@ def sync_trainer_tasks(config, selected_project=None, sync_type="auto", synced_b
                 if "prompt" in defaults:
                     defaults["raw_prompt"] = defaults["prompt"]
                 filter_kwargs = {primary_key: pk_value}
-                obj, created = TrainerTask.objects.update_or_create(
-                    **filter_kwargs,
-                    defaults=defaults
-                )
+                
+                # Handle potential duplicates in custom sync mode
+                existing_tasks = TrainerTask.objects.filter(**filter_kwargs)
+                
+                if existing_tasks.count() == 0:
+                    # No existing task, create new one
+                    obj = TrainerTask.objects.create(**filter_kwargs, **defaults)
+                    created = True
+                elif existing_tasks.count() == 1:
+                    # Single existing task, update it
+                    obj = existing_tasks.first()
+                    for key, value in defaults.items():
+                        setattr(obj, key, value)
+                    obj.save()
+                    created = False
+                else:
+                    # Multiple existing tasks - handle duplicates
+                    print(f"WARNING: Found {existing_tasks.count()} duplicate tasks with {primary_key}={pk_value} in custom sync")
+                    
+                    # Use the most recently updated task
+                    obj = existing_tasks.order_by('-updated_at').first()
+                    for key, value in defaults.items():
+                        setattr(obj, key, value)
+                    obj.save()
+                    created = False
+                    
+                    # Log details about duplicates
+                    duplicate_ids = list(existing_tasks.values_list('id', flat=True))
+                    print(f"Duplicate task IDs in custom sync: {duplicate_ids}, using task ID: {obj.id}")
                 if created:
                     created_count += 1
                 else:
@@ -142,9 +167,31 @@ def sync_trainer_tasks(config, selected_project=None, sync_type="auto", synced_b
                     continue
                 sheet_keys.add(pk_value)
 
-                # Get or create the task
+                # Handle potential duplicates when getting or creating the task
                 filter_kwargs = {primary_key: pk_value}
-                obj, created = TrainerTask.objects.get_or_create(**filter_kwargs, defaults={"project": selected_project})
+                
+                # First, try to get existing records
+                existing_tasks = TrainerTask.objects.filter(**filter_kwargs)
+                
+                if existing_tasks.count() == 0:
+                    # No existing task, create new one
+                    obj = TrainerTask.objects.create(**filter_kwargs, project=selected_project)
+                    created = True
+                elif existing_tasks.count() == 1:
+                    # Single existing task, use it
+                    obj = existing_tasks.first()
+                    created = False
+                else:
+                    # Multiple existing tasks - handle duplicates
+                    print(f"WARNING: Found {existing_tasks.count()} duplicate tasks with {primary_key}={pk_value}")
+                    
+                    # Use the most recently updated task and log the issue
+                    obj = existing_tasks.order_by('-updated_at').first()
+                    created = False
+                    
+                    # Log details about duplicates for cleanup
+                    duplicate_ids = list(existing_tasks.values_list('id', flat=True))
+                    print(f"Duplicate task IDs: {duplicate_ids}, using task ID: {obj.id}")
                 
                 # Update all fields using the flexible field methods
                 obj.project = selected_project
